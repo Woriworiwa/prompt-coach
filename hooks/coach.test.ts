@@ -654,7 +654,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
-  for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['refresh', 'Refresh rules and tips'], ['sources', 'Sources']] as const) {
+  for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['rules', 'Rules and tips']] as const) {
     const g = boxNode(tree, `group-${key}`)
     // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
@@ -669,7 +669,13 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
-  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-refresh', 'group-sources'])
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-rules'])
+  // Rules and tips: the sources first, always listed (no Show sources button), a thin line, then the refresh.
+  const rules = boxNode(tree, 'group-rules-box')!
+  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-sources', 'line-rules-1', 'block-refresh'])
+  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
+  expect(buttonProps(tree, 'sources')).toBeUndefined()
+  expect(await ui.find({ text: /Show sources|Hide sources/ })).toBeUndefined()
   // General's four rows have a 1-pixel Svg line between each two: three lines.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
@@ -680,7 +686,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   // Labels in the normal weight, as Desktop's are; descriptions dim.
   expect(textLook(tree, 'Mode')).toEqual({ found: true, color: undefined, weight: undefined })
   expect(textLook(tree, 'Rewrite model')).toEqual({ found: true, color: undefined, weight: undefined })
-  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['refreshModel', 'set-refreshModel'], ['weekModel', 'set-weekModel'], ['sources', 'sources']] as const) {
+  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['refreshModel', 'set-refreshModel'], ['weekModel', 'set-weekModel']] as const) {
     const r = boxNode(tree, `setting-${key}`)
     expect(r?.props.flexDirection).toBe('row')
     expect(r?.props.justifyContent).toBe('space-between')
@@ -819,7 +825,7 @@ test('on mobile the model choices are buttons, and Sources lists the pages under
   expect(set).toEqual(['haiku'])
   expect(await ui.find({ key: 'set-rewriteModel-haiku', text: '[haiku]' })).toBeDefined()
 
-  await ui.press({ key: 'sources' })
+  // The sources are always listed, with no button to show them.
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
   await ui.unmount()
 })
@@ -1097,7 +1103,7 @@ test('/coach refresh writes only the changed rules and tips files on Accept, wit
   const ui = await $.ui.mount(pane('desktop'))
   // /coach refresh opens Settings, where refresh now lives; there is no Refresh tab.
   expect(textLook(await ui.drawn(), 'Settings').color).toBe('claude')
-  expect(textLook(await ui.drawn(), 'Refresh rules and tips').found).toBe(true)
+  expect(textLook(await ui.drawn(), 'Rules and tips').found).toBe(true)
   expect(buttonProps(await ui.drawn(), 'tab-refresh')).toBeUndefined()
   await ui.press({ key: 'accept' })
 

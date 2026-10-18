@@ -50,7 +50,6 @@ export type View = {
   rulesAsOf: string
   /** Where this copy of the mod reads Omar's own rules from. */
   ownRulesPath: string
-  showSources: boolean
   sources: string[]
   lessons: Lessons
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
@@ -112,7 +111,6 @@ export type Actions = {
   pick: (token: string, value: string) => void
   type: (token: string, value: string) => void
   submitAnswer: (token: string, value: string) => void
-  sources: () => void
   setModel: (field: ModelSetting, value: string) => void
   clearLessons: () => Promise<void>
   refresh: () => Promise<void> | undefined
@@ -484,11 +482,11 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       ? [text(E, st.note, { dimColor: true, wrap: 'wrap' })]
       : []
 
-  const sourcesButton = E.Button({ key: 'sources', label: v.showSources ? 'Hide sources' : 'Show sources', plain: true, onPress: a.sources })
-  const sources: RenderElement[] = [settingRow(E, 'sources', 'Sources', 'The pages the rules and tips come from.', sourcesButton)]
-  if (v.showSources) {
-    for (const url of v.sources) sources.push(E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] }))
-  }
+  // The source pages, always listed: where the rules and tips come from, before the refresh that updates them.
+  const sources: RenderElement[] = [
+    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules and tips come from.', { dimColor: true, wrap: 'wrap' })] }),
+    ...v.sources.map(url => E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] })),
+  ]
 
   // More space between sections than between rows: the largest spacing step, which Desktop sizes with its own scale.
   return [
@@ -499,8 +497,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote),
         settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
-        settingsGroup(E, v, 'refresh', 'Refresh rules and tips', [block(E, 'refresh', refreshSection(E, v, a))]),
-        settingsGroup(E, v, 'sources', 'Sources', [block(E, 'sources', sources)]),
+        settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
       ],
     }),
   ]

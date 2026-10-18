@@ -37,12 +37,11 @@ The pane has four tabs, Coach (`1`), Tips (`2`), Settings (`3`) and Week (`4`). 
 
 **Tips tab** (`2`): **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
 
-**Settings tab** (`3`), laid out like the Desktop app's own settings: four sections (General, Statistics, Refresh rules and tips, Sources), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
+**Settings tab** (`3`), laid out like the Desktop app's own settings: three sections (General, Statistics, Rules and tips), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model**, **Refresh model** and **Week model:** the three settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Statistics:** how many drafts you've analyzed, the checklist items you most often miss, and the rules applied most. It's kept between sessions on this Mac. **Clear statistics** resets it.
-- **Refresh rules and tips:** see "Keeping the rules current" below.
-- **Show sources:** the pages the rules and tips come from.
+- **Rules and tips:** the source pages the rules and tips come from, always listed, then the refresh (see "Keeping the rules current" below).
 
 **Week tab** (`4`): Claude Week.
 - **Write Claude Week NN** fetches the pages in `week/sources.json` (Anthropic's own pages, the Claude Code release notes on GitHub, the release trackers and the people you follow), cuts each to its text, and asks the Week model once to write the edition from them, following `week/edition-prompt.md`: up to 15 stories in sections, a Top 3, questions to think about, and a note on what it changed because of your feedback. It links only to pages it was given. There's no web search, so news Anthropic hasn't posted itself (deals, outages, policy) is left out. The tab shows its progress; it takes a few minutes, and you can keep working. A page that can't be read is named to the model, which says so where it leaves a section thin. The button shows only while this week has no edition, since editions are never overwritten. If the answer can't be read, the tab says why and offers **Try again**.
@@ -63,13 +62,13 @@ The pane has four tabs, Coach (`1`), Tips (`2`), Settings (`3`) and Week (`4`). 
 | Checklist, rewrite and reasons | One call to the rewrite model (default `sonnet`), given your draft and the rules above. It can be wrong, so treat it as a second opinion. |
 | Statistics | Saved locally by Claude Code for this plugin |
 
-The rules and tips are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date. The pane's footer shows the date, and Settings lists the source pages under **Show sources**.
+The rules and tips are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date. The pane's footer shows the date, and Settings lists the source pages under **Rules and tips**.
 
 A model with no rules file, such as an older or newer model, gets the general rules and a note in the pane. To support it, add its page to `sources.json`, add rule and tip files, add a branch in `rulesFor` in `hooks/lib.ts`, and add a test.
 
 ## Keeping the rules current
 
-`/coach refresh` fetches every page in `sources.json` and compares each with its fingerprint from your last refresh. A file is rewritten only when one of its source pages has changed. That's done by the refresh model (Opus by default), which re-paraphrases the file and changes only what the sources changed. The Settings tab shows a diff per file, under Refresh rules and tips. Nothing is written until you press **Accept**, and **Reject** discards the proposal. Either way, the pages count as reviewed and aren't proposed again until they change. A page that fails to load keeps its file as it is, and it is retried next time.
+`/coach refresh` fetches every page in `sources.json` and compares each with its fingerprint from your last refresh. A file is rewritten only when one of its source pages has changed. That's done by the refresh model (Opus by default), which re-paraphrases the file and changes only what the sources changed. The Settings tab shows a diff per file, under Rules and tips. Nothing is written until you press **Accept**, and **Reject** discards the proposal. Either way, the pages count as reviewed and aren't proposed again until they change. A page that fails to load keeps its file as it is, and it is retried next time.
 
 - **The first refresh** only records the fingerprints and proposes nothing.
 - **No page changed:** the refresh makes no model calls and costs nothing beyond the downloads.

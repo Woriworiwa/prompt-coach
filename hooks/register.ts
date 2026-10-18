@@ -125,7 +125,6 @@ let isRunning = false
 let status = ''
 let liveCalls = 0
 let lessons: Lessons = NO_LESSONS
-let showSources = false
 let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
 const buttons = new Map<string, ElementCache>()
@@ -340,7 +339,6 @@ export const register: Register = (on, options) => {
       codeTips,
       liveCalls,
       rulesAsOf,
-      showSources,
       sources,
       lessons,
       refresh,
@@ -390,10 +388,6 @@ export const register: Register = (on, options) => {
         $.ui.invalidate('ui.render')
       },
       setModel: (field, value) => setModelSetting($, field, value),
-      sources: () => {
-        showSources = !showSources
-        $.ui.invalidate('ui.render')
-      },
       clearLessons: () => clearLessons($),
       refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
       rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
