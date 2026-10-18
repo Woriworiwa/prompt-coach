@@ -599,23 +599,48 @@ function modelSetting(
   return settingRow(E, field, label, help, control)
 }
 
-/** What the analyses so far add up to: the gaps and rules seen most, and a reset. */
+/**
+ * What the analyses so far add up to, as two tables: the checklist items
+ * drafts most often miss, and the rules applied most. Then a reset.
+ */
 function statistics(E: UI, v: View, a: Actions): RenderElement[] {
   const l = v.lessons
   if (l.analyses === 0) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
 
-  const out: RenderElement[] = [text(E, `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'} so far.`)]
+  return [
+    text(E, `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'} so far.`),
+    statTable(E, v, 'missing', 'Most often missing', ['Checklist item', 'Missing or vague in'],
+      top(l.gaps, 4).map(([item, n]) => [item, `${n} of ${l.analyses}`]),
+      'Nothing yet. Your drafts have covered the checklist.'),
+    statTable(E, v, 'rules', 'Rules applied most', ['Rule', 'Times'], top(l.rules, 4).map(([rule, n]) => [rule, String(n)]), 'None yet.'),
+    E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearLessons }),
+  ]
+}
 
-  out.push(heading(E, 'What your drafts most often miss'))
-  const gaps = top(l.gaps, 4)
-  if (gaps.length === 0) out.push(text(E, 'Nothing yet. Your drafts have covered the checklist.', { dimColor: true }))
-  for (const [item, n] of gaps) out.push(text(E, `${item}: missing or vague in ${n} of ${l.analyses}`))
-
-  out.push(heading(E, 'Rules applied most'))
-  for (const [rule, n] of top(l.rules, 4)) out.push(text(E, `${rule} (${n}×)`))
-
-  out.push(E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearLessons }))
-  return out
+/**
+ * A two-column table made of Boxes: its title, a bold header row, then one
+ * row per entry with a thin line between rows, as in the rest of Settings.
+ * The name wraps on the left; the count sits on the right.
+ */
+function statTable(E: UI, v: View, key: string, title: string, headers: [string, string], rows: [string, string][], empty: string): RenderElement {
+  const line = (cells: [string, string], i: number, props: Record<string, unknown> = {}) =>
+    E.Box({
+      key: `table-${key}-${i}`,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      columnGap: 2,
+      children: [
+        E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, cells[0], { ...props, wrap: 'wrap' })] }),
+        text(E, cells[1], props),
+      ],
+    })
+  const body = rows.length ? rows.flatMap((r, i) => [...hairline(E, v, `table-${key}-${i}`), line(r, i + 1)]) : [text(E, empty, { dimColor: true })]
+  return E.Box({
+    key: `table-${key}`,
+    flexDirection: 'column',
+    gap: 1,
+    children: [text(E, title, { weight: 'semibold' }), line(headers, 0, { weight: 'semibold', dimColor: true }), ...body],
+  })
 }
 
 /** /coach refresh: the check, its progress, and each changed file's diff to accept or reject. */

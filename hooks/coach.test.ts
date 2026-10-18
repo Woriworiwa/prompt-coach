@@ -409,7 +409,21 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(buttonProps(await ui.drawn(), 'tab-lessons')).toBeUndefined()
   await ui.press({ key: 'tab-settings' })
   expect(textLook(await ui.drawn(), 'Statistics')).toEqual({ found: true, color: undefined, weight: 'semibold' })
-  expect(await ui.find({ text: /Context: missing or vague in 1 of 1/ })).toBeDefined()
+  // Statistics as tables: a header row, then each item with its count on the right.
+  const asNode = (b: ReturnType<typeof boxNode>) => b && { type: 'Box', props: b.props, children: b.kids }
+  const missing = boxNode(await ui.drawn(), 'table-missing')!
+  expect(textLook(asNode(missing), 'Most often missing').weight).toBe('semibold')
+  expect(textLook(asNode(boxNode(asNode(missing), 'table-missing-0')), 'Checklist item')).toEqual({ found: true, color: undefined, weight: 'semibold' })
+  expect(textLook(asNode(boxNode(asNode(missing), 'table-missing-0')), 'Missing or vague in').found).toBe(true)
+  // Each of the four missed items is a row: its name on the left, "1 of 1" on the right.
+  const entries = [1, 2, 3, 4].map(i => boxNode(asNode(missing), `table-missing-${i}`)!)
+  const context = entries.find(r => textLook(asNode(r), 'Context').found)!
+  expect(context.props.justifyContent).toBe('space-between')
+  expect(textLook(asNode(context), '1 of 1').found).toBe(true)
+  // A thin line between rows, as in the rest of Settings.
+  expect(missing.kids.some(k => (k as { props?: { key?: string } }).props?.key === 'line-table-missing-0')).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-0')), 'Rule').found).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-1')), '1').found).toBe(true)
   expect(await ui.find({ text: 'Recent drafts' })).toBeUndefined()
   expect(await ui.find({ text: 'Lessons' })).toBeUndefined()
   expect(await ui.find({ key: 'clear-lessons', text: 'Clear statistics' })).toBeDefined()
