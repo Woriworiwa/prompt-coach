@@ -1,6 +1,6 @@
 # Handover: prompt-coach v0.8.1 (2026-10-18)
 
-prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`. It's for Omar, and there's no git repo. `README.md` describes it for him, TASKS.md has a one-line log per version, and this file is the brief for the next session.
+prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`. It's for Omar. It's a git repo on his personal GitHub, private: https://github.com/Woriworiwa/prompt-coach (branch `main`). The repo's own config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`, so pushes never use his work account (`omar-smartarena`, the global git identity and gh's active account). Keep it separate from his work repositories. `.claude-plugin/types/` is ignored: the installed Claude Code writes it. `README.md` describes it for him, TASKS.md has a one-line log per version, and this file is the brief for the next session.
 
 ## Start here
 
