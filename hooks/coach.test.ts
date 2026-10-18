@@ -773,11 +773,12 @@ test('Settings: each section in the Analytics group\'s bordered box with its tit
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  // The Analytics tab's Rules group is the model: its box, and its title's box but for the band.
+  // The Analytics tab's Rules group is the model for the box; its title has no band (v0.20.2) but keeps its padding.
   await ui.press({ key: 'tab-analytics' })
   const model = boxNode(await ui.drawn(), 'group-rule-list')!
   const { key: _k, children: _c, ...boxLook } = model.props
-  expect((model.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBe('subtle')
+  expect((model.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBeUndefined()
+  expect((model.kids[0] as { props: Record<string, unknown> }).props.paddingX).toBe(1)
   expect(boxLook.borderStyle).toBe('round')
 
   await ui.press({ key: 'tab-settings' })
@@ -1892,11 +1893,11 @@ test('Rules on the Analytics tab: General, then the model with its name a dropdo
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
   await ui.press({ key: 'rules-toggle-model' })
-  // Rules sits in a box like the Week tab's sections: a round subtle border, the title on a subtle band.
+  // Rules sits in a box like the Week tab's sections: a round subtle border; its title on no band since v0.20.2, still padded.
   const box = boxNode(await ui.drawn(), 'group-rule-list')!
   expect(box.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
   expect(textLook(box.kids[0], 'Rules').found).toBe(true)
-  expect((box.kids[0] as { props?: { backgroundColor?: string } }).props?.backgroundColor).toBe('subtle')
+  expect((box.kids[0] as { props?: { backgroundColor?: string; paddingX?: number } }).props).toEqual({ paddingX: 1 })
   // Its items sit a cell in from the title (v0.20.1).
   const items = boxNode(await ui.drawn(), 'group-rule-list-items')!
   expect(items.props.paddingLeft).toBe(1)
