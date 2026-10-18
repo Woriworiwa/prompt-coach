@@ -87,3 +87,4 @@ Notes from the build:
 - v0.17.2: Sonnet, Haiku and Fable list their source as a bulleted line like Opus, so every model's sources show in the rules list (Omar wants them there). Content only. 125 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.17.3: the Rules model dropdown shows the model picked (it always showed Opus 5.5: withStableForm reused the first element under one key); it is now keyed by the pick. Rule switching unchanged. 125 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.17.4: the model's rules on the Analytics tab start closed, like General and Your rules; the dropdown and rule switching unchanged. 125 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- Desktop: v0.17.4 Rules box on Analytics, v0.12.0 Your rules, v0.10.1 News label and the Settings layout (confirmed by Omar, 2026-10-18).

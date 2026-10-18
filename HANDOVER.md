@@ -143,14 +143,12 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 ## Left to do
 
+**Decide:** how Statistics come back now that each model has its own checklist (the stored records and the score assume the old six items), then turn them on and check them in Desktop.
+
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
-- v0.17.1 Rules: in a box like the News tab's sections; General first and closed, then your model with its name a dropdown that switches the rules (its Checklist a section of them, with sources), then Your rules with Edit in Settings; no separate Checklist; statistics say they're off; an Analyze on Opus judges Stop rule.
-- v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
-- v0.10.1: the third tab reads News.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
-- Settings: it reads like Desktop's own settings page, the hairlines are 1 pixel and span the width in light and dark, the Mode dropdown switches, the space between sections is enough, Rules and tips lists the sources first, and Claude Week shows the Week model, the profile path (`…/plugins/data/prompt-coach-prompt-coach/profile.yaml`, with no "blank profile" note) and source links that open.
 - Coach: Apply and send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
 - A real `/coach refresh` after a source page changes. So far only the baseline run has happened.
 
