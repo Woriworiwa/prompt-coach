@@ -490,11 +490,19 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     for (const url of v.sources) sources.push(E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] }))
   }
 
+  // More space between sections than between rows: the largest spacing step, which Desktop sizes with its own scale.
   return [
-    settingsGroup(E, v, 'general', 'General', general, generalNote),
-    settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
-    settingsGroup(E, v, 'refresh', 'Refresh rules and tips', [block(E, 'refresh', refreshSection(E, v, a))]),
-    settingsGroup(E, v, 'sources', 'Sources', [block(E, 'sources', sources)]),
+    E.Box({
+      key: 'settings-sections',
+      flexDirection: 'column',
+      gap: 'xl',
+      children: [
+        settingsGroup(E, v, 'general', 'General', general, generalNote),
+        settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
+        settingsGroup(E, v, 'refresh', 'Refresh rules and tips', [block(E, 'refresh', refreshSection(E, v, a))]),
+        settingsGroup(E, v, 'sources', 'Sources', [block(E, 'sources', sources)]),
+      ],
+    }),
   ]
 }
 

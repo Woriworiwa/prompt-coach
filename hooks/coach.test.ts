@@ -667,6 +667,9 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   }
   expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
   expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
+  // More space between sections (the xl step) than between rows (1).
+  expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-refresh', 'group-sources'])
   // General's four rows have a 1-pixel Svg line between each two: three lines.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
