@@ -288,17 +288,16 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     row(E, [
       E.Button({
         key: 'analyze',
-        label: v.isRunning ? 'Analyzing…' : 'Analyze',
+        label: v.isRunning ? 'Rewriting…' : 'Rewrite',
         hotkey: 'a',
         ...(v.analysis ? {} : { variant: 'primary' as const }),
         onPress: a.analyze,
       }),
     ]),
   )
-  if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Analyzing') ? 'suggestion' : 'warning' }))
+  if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' }))
   // The rewrite sits right under the draft, so the two read side by side.
   if (v.analysis) {
-    out.push(heading(E, 'Rewrite'))
     out.push(F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
   }

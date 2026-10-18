@@ -505,8 +505,11 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   const rewriteAt = order.findIndex(t => t.includes('Fix the login bug in [which file?]'))
   expect(draftAt).toBeGreaterThan(-1)
   expect(rewriteAt).toBeGreaterThan(draftAt)
-  expect(order.findIndex(t => t === 'Analyze')).toBeGreaterThan(draftAt)
-  expect(rewriteAt).toBeGreaterThan(order.findIndex(t => t === 'Analyze'))
+  expect(order.findIndex(t => t === 'Rewrite')).toBeGreaterThan(draftAt)
+  expect(rewriteAt).toBeGreaterThan(order.findIndex(t => t === 'Rewrite'))
+  // No heading above the rewrite box since v0.25.0: the only "Rewrite" before it is the button.
+  expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(1)
+  expect((await ui.find({ key: 'analyze' }))?.text).toBe('Rewrite')
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Copy to prompt'))
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.

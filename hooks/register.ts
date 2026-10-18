@@ -577,7 +577,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
   if (isRunning) return
   isRunning = true
   await syncModel($)
-  status = modelLabel ? `Analyzing for ${modelLabel}…` : 'Analyzing…'
+  status = modelLabel ? `Rewriting for ${modelLabel}…` : 'Rewriting…'
   $.ui.invalidate('ui.render')
   try {
     const file = rulesFor(model)?.file
