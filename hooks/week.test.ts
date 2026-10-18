@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import {
   MAX_STORIES,
+  archiveRows,
   type Edition,
   type FeedbackStore,
   buildWeekRequest,
@@ -162,6 +163,22 @@ describe('reading', () => {
     expect(storyRef({ '2026-W42': r.edition }, '2026-W42-idle')).toEqual({ story_id: '2026-W42-idle', edition_id: '2026-W42', section: 'code', title: 'Story 2026-W42-idle' })
     expect(storyRef({}, 'nope')).toBeUndefined()
     expect(editionIds({ '2026-W40': r.edition, '2026-W42': r.edition, '2026-W41': r.edition })).toEqual(['2026-W42', '2026-W41', '2026-W40'])
+  })
+
+  test('archiveRows lists editions newest first, with stories read and voted per edition', () => {
+    const r = parseEdition(ANSWER, '2026-W42') as { edition: Edition }
+    const older = { ...(parseEdition(ANSWER.replaceAll('2026-W42', '2026-W41'), '2026-W41') as { edition: Edition }).edition, title: 'Claude Week 41' }
+    const feedback: FeedbackStore = {
+      a: { story_id: 'a', edition_id: '2026-W41', section: 'code', title: 'A', verdict: 'down', why: null, take: null, updated_at: 'x' },
+      b: { story_id: 'b', edition_id: '2026-W41', section: 'code', title: 'B', verdict: null, why: null, take: 'a take', updated_at: 'x' },
+    }
+    const rows = archiveRows({ '2026-W41': older, '2026-W42': r.edition }, feedback, { '2026-W42-idle': true })
+    expect(rows.map(x => [x.id, x.title, x.read, x.total, x.voted])).toEqual([
+      ['2026-W42', r.edition.title, 1, 2, 0],
+      ['2026-W41', 'Claude Week 41', 0, 2, 1],
+    ])
+    expect(rows[0]!.range).toBe(dateRange(r.edition.date_from, r.edition.date_to))
+    expect(archiveRows({}, {}, {})).toEqual([])
   })
 })
 

@@ -4,7 +4,7 @@ import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Addition, type Analysis, type CheckStatus, type Lessons, LIVE_CAP, NO_PICK, type Placeholder, top } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
-import { type Edition, type FeedbackStore, type ReadState, type Story, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
+import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
 /** The elements every surface draws, so one tree fits the terminal, Desktop and mobile. */
 export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | 'Code' | 'Markdown'> & Partial<Pick<Elements['mobile'], 'Svg'>>
@@ -78,6 +78,11 @@ export type WeekView = {
   job: WeekJob
   weekModel: string
   profilePath: string
+  /** The pages Write reads (week/sources.json), listed under Settings; undefined when the file couldn't be read. */
+  sources?: WeekSource[]
+  /** True while the tab shows the archive instead of an edition. */
+  archive: boolean
+  archiveRows: ArchiveRow[]
 }
 
 export type WeekJob =
@@ -135,6 +140,9 @@ export type WeekActions = {
   toggleDetail: (storyId: string) => void
   /** Puts `/btw <text>` in the prompt box, so Enter asks it in the side chat, beside the conversation and not in it. */
   askAside: (text: string) => Promise<void>
+  /** Shows the list of stored editions, or goes back from it to the edition. */
+  openArchive: () => void
+  closeArchive: () => void
 }
 
 /** The pane's pressable elements by key, kept between redraws. */
@@ -474,7 +482,6 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
     modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Analyze, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
     modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites rules and tips on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
-    modelSetting(E, a, 'weekModel', 'Week model', 'Writes each Claude Week edition from the fetched pages.', v.week.weekModel, st.weekChoices, st.readOnlyReason, F),
   ]
   const generalNote = st.readOnlyReason
     ? [text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' })]
@@ -498,8 +505,25 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
         settingsGroup(E, v, 'general', 'General', general, generalNote),
         settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
         settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
+        settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
       ],
     }),
+  ]
+}
+
+/** Claude Week's settings: the model that writes it, the reader profile it writes for, and the pages it reads. */
+function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
+  const w = v.week
+  const st = v.settings
+  const labelled = (label: string, help: string) =>
+    E.Box({ flexDirection: 'column', children: [text(E, label), text(E, help, { dimColor: true, wrap: 'wrap' })] })
+  const pages = w.sources
+    ? w.sources.map(s => E.Box({ key: `week-source-${s.url}`, children: [E.Link({ href: s.link ?? s.url, label: `Tier ${s.tier} · ${s.label}` })] }))
+    : [text(E, "Couldn't read week/sources.json.", { color: 'warning', wrap: 'wrap' })]
+  return [
+    modelSetting(E, a, 'weekModel', 'Week model', 'Writes each Claude Week edition from the fetched pages.', w.weekModel, st.weekChoices, st.readOnlyReason, F),
+    block(E, 'week-profile', [labelled('Reader profile', 'What the writer knows about you. Edit this file to steer future editions.'), code(E, w.profilePath)]),
+    block(E, 'week-sources', [labelled('Sources', 'The pages Write reads each week (week/sources.json).'), ...pages]),
   ]
 }
 
@@ -698,10 +722,12 @@ function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
  * The Week tab: one Claude Week edition. The title, range, intro and what
  * changed from feedback; the Top 3; how much is read; then each section in a
  * bordered group, the questions and the sources. Older and Newer step through
- * the stored editions; the write button starts this week's edition.
+ * the stored editions, Archive lists them all; the write button starts this
+ * week's edition.
  */
 function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const w = v.week
+  if (w.archive) return weekArchive(E, v, a)
   const out: RenderElement[] = []
   const ed = w.edition
 
@@ -711,6 +737,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const newer = i > 0 ? w.editionIds[i - 1] : undefined
   if (older) nav.push(E.Button({ key: 'week-older', label: '‹ Older', onPress: () => a.week.show(older) }))
   if (newer) nav.push(E.Button({ key: 'week-newer', label: 'Newer ›', onPress: () => a.week.show(newer) }))
+  if (w.editionIds.length >= 2) nav.push(E.Button({ key: 'week-archive', label: 'Archive', onPress: a.week.openArchive }))
   const hasCurrent = w.editionIds.includes(w.currentId)
   if (!hasCurrent && w.job.state !== 'running') {
     nav.push(
@@ -731,9 +758,8 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   }
 
   if (!ed) {
-    out.push(text(E, `No edition yet. The mod reads Anthropic's own pages, the release trackers and the people you follow (week/sources.json), then ${w.weekModel} writes the week's stories from them.`, { dimColor: true, wrap: 'wrap' }))
+    out.push(text(E, "No edition yet. Write reads the pages listed under Settings → Claude Week, then the Week model writes the week's stories.", { dimColor: true, wrap: 'wrap' }))
     if (nav.length) out.push(row(E, nav))
-    out.push(weekFooter(E, w))
     return out
   }
 
@@ -805,8 +831,37 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       }),
     )
   }
-  out.push(weekFooter(E, w))
   return out
+}
+
+/**
+ * Every stored edition, newest first: its title and dates, how many stories
+ * are read and voted on, and Open, which shows it as it was written, with the
+ * votes, reasons, takes and read marks saved for it. Back returns to the edition.
+ */
+function weekArchive(E: UI, v: View, a: Actions): RenderElement[] {
+  const w = v.week
+  const shown = w.edition?.edition_id
+  const rows = w.archiveRows.map(r =>
+    settingRow(
+      E,
+      `week-archive-${r.id}`,
+      `${r.title}${r.range ? ` · ${r.range}` : ''}${r.id === shown ? ' (showing)' : ''}`,
+      `${r.read} of ${r.total} read · ${r.voted} voted`,
+      E.Button({ key: `week-open-${r.id}`, label: 'Open', onPress: () => a.week.show(r.id) }),
+    ),
+  )
+  return [
+    E.Box({
+      key: 'week-archive-list',
+      flexDirection: 'column',
+      gap: 1,
+      children: [
+        row(E, [heading(E, 'Archive'), E.Button({ key: 'week-archive-back', label: 'Back', onPress: a.week.closeArchive })]),
+        ...rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `week-archive-${i}`), r])),
+      ],
+    }),
+  ]
 }
 
 /**
@@ -885,14 +940,6 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
   if (saved) children.push(text(E, saved, { ...(saved.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' }))
 
   return E.Box({ key: `story-${s.id}`, flexDirection: 'column', children })
-}
-
-function weekFooter(E: UI, w: WeekView): RenderElement {
-  return E.Box({
-    key: 'week-footer',
-    flexDirection: 'column',
-    children: [text(E, `Written by ${w.weekModel} from your reader profile: ${w.profilePath}`, { dimColor: true, wrap: 'wrap' })],
-  })
 }
 
 // ---- Small builders ----

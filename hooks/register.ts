@@ -47,6 +47,7 @@ import {
   type FetchedPage,
   type ReadState,
   type WeekSource,
+  archiveRows,
   buildWeekRequest,
   editionIds,
   feedbackForPrompt,
@@ -163,6 +164,10 @@ let weekShown = ''
 let weekDetails: string[] = []
 let weekTakes: string[] = []
 let weekSaves: Record<string, string> = {}
+/** True while the Week tab lists the stored editions instead of showing one. */
+let weekArchive = false
+/** The pages Write reads, for Settings; undefined when week/sources.json couldn't be read. */
+let weekSources: WeekSource[] | undefined
 const weekTimers = new Map<string, Timer>()
 
 export const register: Register = (on, options) => {
@@ -397,6 +402,15 @@ export const register: Register = (on, options) => {
         write: () => (weekJob.state === 'running' ? undefined : writeEdition($)),
         show: id => {
           weekShown = id
+          weekArchive = false
+          $.ui.invalidate('ui.render')
+        },
+        openArchive: () => {
+          weekArchive = true
+          $.ui.invalidate('ui.render')
+        },
+        closeArchive: () => {
+          weekArchive = false
           $.ui.invalidate('ui.render')
         },
         vote: (id, verdict) => voteOn($, id, verdict),
@@ -795,6 +809,11 @@ async function loadWeek($: EngineInterface): Promise<void> {
   editions = asRecord(await $.store.get(STORE.weekEditions)) as Editions
   feedback = asRecord(await $.store.get(STORE.weekFeedback)) as FeedbackStore
   readState = asRecord(await $.store.get(STORE.weekRead)) as ReadState
+  try {
+    weekSources = parseWeekSources(await $.fs.read(`${$.plugin.root}/week/sources.json`))
+  } catch {
+    weekSources = undefined
+  }
   // A take box with text in it opens with the edition.
   weekTakes = Object.values(feedback).filter(f => f.take).map(f => f.story_id)
   // Only a failure is kept; one still running when the session ended never came back.
@@ -822,6 +841,9 @@ function weekView($: EngineInterface, now: number): View['week'] {
     job: weekJob,
     weekModel,
     profilePath: `${$.plugin.root}/week/profile.yaml`,
+    sources: weekSources,
+    archive: weekArchive,
+    archiveRows: archiveRows(editions, feedback, readState),
   }
 }
 

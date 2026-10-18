@@ -408,3 +408,16 @@ export function readCounts(edition: Edition, read: ReadState): { read: number; t
 export function editionIds(editions: Editions): string[] {
   return Object.keys(editions).sort().reverse()
 }
+
+/** One line of the Week tab's archive: an edition, its dates, and how far Omar got with it. */
+export type ArchiveRow = { id: string; title: string; range: string; read: number; total: number; voted: number }
+
+/** Every stored edition for the archive, newest first, with its stories read and the ones voted on. */
+export function archiveRows(editions: Editions, feedback: FeedbackStore, read: ReadState): ArchiveRow[] {
+  return editionIds(editions).map(id => {
+    const e = editions[id]!
+    const counts = readCounts(e, read)
+    const voted = Object.values(feedback).filter(f => f.edition_id === id && f.verdict).length
+    return { id, title: e.title, range: e.date_from && e.date_to ? dateRange(e.date_from, e.date_to) : '', read: counts.read, total: counts.total, voted }
+  })
+}

@@ -668,7 +668,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
-  for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['rules', 'Rules and tips']] as const) {
+  for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)
     // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
@@ -683,17 +683,17 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
-  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-rules'])
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-rules', 'group-week'])
   // Rules and tips: the sources first, always listed (no Show sources button), a thin line, then the refresh.
   const rules = boxNode(tree, 'group-rules-box')!
   expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-sources', 'line-rules-1', 'block-refresh'])
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
   expect(buttonProps(tree, 'sources')).toBeUndefined()
   expect(await ui.find({ text: /Show sources|Hide sources/ })).toBeUndefined()
-  // General's four rows have a 1-pixel Svg line between each two: three lines.
+  // General's three rows have a 1-pixel Svg line between each two: two lines.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
-  expect(lines).toHaveLength(3)
+  expect(lines).toHaveLength(2)
   const svg = (lines[0] as { props?: { children?: unknown[] }; children?: unknown[] })
   const svgNode = [svg.children, svg.props?.children].flat().find(k => (k as { type?: string })?.type === 'Svg') as { props?: Record<string, unknown> }
   expect(svgNode?.props?.height).toBe(1)
@@ -1372,6 +1372,68 @@ test('Week: Older and Newer step through the stored editions', async ($, on) => 
   expect(buttonProps(await ui.drawn(), 'week-older')).toBeUndefined()
   await ui.press({ key: 'week-newer' })
   expect(await ui.find({ text: /^Claude Week 42/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Settings: Claude Week holds the Week model, the reader profile and the pages Write reads; the Week tab has no footer', async ($, on) => {
+  world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  const tree = await ui.drawn()
+  const week = JSON.stringify(boxNode(tree, 'group-week'))
+  expect(week).toContain('"set-weekModel"')
+  expect(JSON.stringify(boxNode(tree, 'group-general'))).not.toContain('set-weekModel')
+  expect(week).toContain('Reader profile')
+  expect(week).toContain('/week/profile.yaml')
+  expect(await ui.find({ type: 'Link', text: 'Tier 1 · Newsroom' })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: 'Tier 2 · Tracker' })).toBeDefined()
+  await ui.press({ key: 'tab-week' })
+  expect(await ui.find({ text: /Written by/ })).toBeUndefined()
+  expect(await ui.find({ text: /Settings → Claude Week/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Week: Archive lists every edition with its counts, and Open shows an older one as it was, still editable', async ($, on) => {
+  const older = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('Claude Week 42', 'Claude Week 41'), '2026-W41') as { edition: unknown }
+  const vote = { story_id: '2026-W41-idle', edition_id: '2026-W41', section: 'code', title: 'Idle compaction', verdict: 'up', why: null, take: 'worth trying', updated_at: 'x' }
+  const { saved, ui } = await weekPane($, on, {
+    saved: {
+      weekEditions: { ...storedEdition().weekEditions, '2026-W41': older.edition },
+      weekFeedback: { '2026-W41-idle': vote },
+      weekRead: { '2026-W41-haiku': true },
+    },
+  })
+  // One edition alone has no archive; two do.
+  await ui.press({ key: 'week-archive' })
+  expect(await ui.find({ text: 'Archive' })).toBeDefined()
+  expect(await ui.find({ text: /^Claude Week 42 · .* \(showing\)$/ })).toBeDefined()
+  expect(await ui.find({ text: '0 of 2 read · 0 voted' })).toBeDefined()
+  expect(await ui.find({ text: /^Claude Week 41 · / })).toBeDefined()
+  expect(await ui.find({ text: '1 of 2 read · 1 voted' })).toBeDefined()
+  expect(buttonProps(await ui.drawn(), 'up-2026-W42-idle')).toBeUndefined()
+
+  await ui.press({ key: 'week-open-2026-W41' })
+  expect(await ui.find({ text: /^Claude Week 41/ })).toBeDefined()
+  expect(buttonLook(await ui.drawn(), 'up-2026-W41-idle')?.variant).toBe('primary')
+  expect(await ui.find({ type: 'Input', key: 'take-field-2026-W41-idle' })).toBeDefined()
+  expect(await ui.find({ text: '✓ Haiku default' })).toBeDefined()
+
+  // Feedback on an older week saves like any other.
+  await ui.press({ key: 'up-2026-W41-idle' })
+  expect((saved.get('weekFeedback') as Record<string, { verdict: string | null; take: string }>)['2026-W41-idle']).toMatchObject({ verdict: null, take: 'worth trying' })
+
+  await ui.press({ key: 'week-archive' })
+  await ui.press({ key: 'week-archive-back' })
+  expect(await ui.find({ text: /^Claude Week 41/ })).toBeDefined()
+  expect(buttonProps(await ui.drawn(), 'week-archive-back')).toBeUndefined()
+  await ui.unmount()
+})
+
+test('Week: with one edition there is no Archive button', async ($, on) => {
+  const { ui } = await weekPane($, on, { saved: storedEdition() })
+  expect(buttonProps(await ui.drawn(), 'week-archive')).toBeUndefined()
   await ui.unmount()
 })
 
