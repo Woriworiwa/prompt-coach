@@ -647,7 +647,7 @@ function boxNode(node: unknown, key: string): { props: Record<string, unknown>; 
   return undefined
 }
 
-test('Settings groups its parts in bordered boxes, each bold title above its box with no band, each control right of its label', async ($, on) => {
+test('Settings is laid out like Desktop\'s own: a bold title per section with no box, plain labels, a thin line between rows', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -656,20 +656,27 @@ test('Settings groups its parts in bordered boxes, each bold title above its box
   const tree = await ui.drawn()
   for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['refresh', 'Refresh rules and tips'], ['sources', 'Sources']] as const) {
     const g = boxNode(tree, `group-${key}`)
-    // The title first, outside the border: semibold, in the normal text color, on no background.
+    // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
     expect(label?.type).toBe('Text')
     expect(textLook(label, title)).toEqual({ found: true, color: undefined, weight: 'semibold' })
-    expect(g?.props.borderStyle).toBeUndefined()
-    expect(g?.props.backgroundColor).toBeUndefined()
-    // Then the bordered box, holding only the settings.
-    expect((g?.kids[1] as { props?: { key?: string } })?.props?.key).toBe(`group-${key}-box`)
+    // Then the rows, in no box: no border and no band anywhere.
     const box = boxNode(tree, `group-${key}-box`)
-    expect(box?.props.borderStyle).toBe('round')
-    expect(box?.props.borderColor).toBe('subtle')
-    expect(textLook(box, title).found).toBe(false)
+    expect(box?.props.borderStyle).toBeUndefined()
+    expect(g?.props.borderStyle).toBeUndefined()
   }
   expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
+  expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
+  // General's four rows have a 1-pixel Svg line between each two: three lines.
+  const general = boxNode(tree, 'group-general-box')!
+  const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
+  expect(lines).toHaveLength(3)
+  const svg = (lines[0] as { props?: { children?: unknown[] }; children?: unknown[] })
+  const svgNode = [svg.children, svg.props?.children].flat().find(k => (k as { type?: string })?.type === 'Svg') as { props?: Record<string, unknown> }
+  expect(svgNode?.props?.height).toBe(1)
+  // Labels in the normal weight, as Desktop's are; descriptions dim.
+  expect(textLook(tree, 'Mode')).toEqual({ found: true, color: undefined, weight: undefined })
+  expect(textLook(tree, 'Rewrite model')).toEqual({ found: true, color: undefined, weight: undefined })
   for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['refreshModel', 'set-refreshModel'], ['weekModel', 'set-weekModel'], ['sources', 'sources']] as const) {
     const r = boxNode(tree, `setting-${key}`)
     expect(r?.props.flexDirection).toBe('row')
@@ -708,11 +715,11 @@ test('buttons follow the desktop design system: neutral, primary for the main ac
   expect(textLook(await ui.drawn(), 'Fill in the gaps')).toEqual({ found: true, color: undefined, weight: 'semibold' })
 
   await ui.press({ key: 'tab-settings' })
-  expect(buttonLook(await ui.drawn(), 'mode')?.color).toBeUndefined()
+  expect(await ui.find({ type: 'Select', key: 'mode' })).toBeDefined()
   await ui.unmount()
 })
 
-test('a redraw (the pane taking focus) keeps each unchanged Button\'s press handle, and Mode switches on one press', async ($, on) => {
+test('a redraw (the pane taking focus) keeps each unchanged Button\'s press handle, and Mode switches with one pick', async ($, on) => {
   const { s, saved } = world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -723,10 +730,10 @@ test('a redraw (the pane taking focus) keeps each unchanged Button\'s press hand
   expect(handleOf(await ui.drawn(), 'analyze')).toBe(before)
 
   await ui.press({ key: 'tab-settings' })
-  await ui.press({ key: 'mode' })
+  await ui.select({ key: 'mode', value: 'live' })
   expect(saved.get('mode')).toBe('live')
-  expect(await ui.find({ text: /Live \(0\/30\)/ })).toBeDefined()
-  await ui.press({ key: 'mode' })
+  expect(await ui.find({ text: /0\/30 this session/ })).toBeDefined()
+  await ui.select({ key: 'mode', value: 'manual' })
   expect(saved.get('mode')).toBe('manual')
   expect(s.analyses).toHaveLength(0)
   await ui.unmount()
@@ -745,7 +752,7 @@ test('Settings (tab 3) holds the mode, and the Coach tab only shows a dim Live l
   expect(await ui.find({ text: 'Mode' })).toBeDefined()
   expect(await ui.find({ type: 'Select', key: 'set-rewriteModel' })).toBeDefined()
   expect(await ui.find({ type: 'Select', key: 'set-refreshModel' })).toBeDefined()
-  await ui.press({ key: 'mode' })
+  await ui.select({ key: 'mode', value: 'live' })
   await ui.press({ key: 'tab-coach' })
   expect(await ui.find({ text: 'Live 0/30' })).toBeDefined()
   expect(await ui.find({ key: 'mode' })).toBeUndefined()
@@ -782,12 +789,13 @@ test('when a model setting change is refused, the model settings show read-only 
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   await ui.select({ key: 'set-refreshModel', value: 'sonnet' })
-  expect(await ui.find({ type: 'Select' })).toBeUndefined()
+  for (const key of ['set-rewriteModel', 'set-refreshModel', 'set-weekModel']) expect(await ui.find({ type: 'Select', key })).toBeUndefined()
   expect(await ui.find({ text: /can't be changed from the pane here \(a trusted policy owns it\)/ })).toBeDefined()
   expect(await ui.find({ text: 'opus' })).toBeDefined()
-  // The mode toggle still works.
-  await ui.press({ key: 'mode' })
-  expect(await ui.find({ key: 'mode', text: 'Live (0/30)' })).toBeDefined()
+  // The mode still works: it isn't a model setting.
+  await ui.select({ key: 'mode', value: 'live' })
+  expect(await ui.find({ type: 'Select', key: 'mode' })).toBeDefined()
+  expect(await ui.find({ text: /0\/30 this session/ })).toBeDefined()
   await ui.unmount()
 })
 

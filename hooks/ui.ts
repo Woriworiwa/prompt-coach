@@ -7,7 +7,7 @@ import type { RefreshResult } from './refresh.ts'
 import { type Edition, type FeedbackStore, type ReadState, type Story, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
 /** The elements every surface draws, so one tree fits the terminal, Desktop and mobile. */
-export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | 'Code' | 'Markdown'>
+export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | 'Code' | 'Markdown'> & Partial<Pick<Elements['mobile'], 'Svg'>>
 /** The form fields the terminal, Desktop and VS Code draw; the mobile app has none. */
 export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 
@@ -453,30 +453,36 @@ function footer(E: UI, v: View): RenderElement {
 }
 
 /**
- * The Settings tab: bordered groups (General, Statistics, Refresh rules and
- * tips, Sources), each titled on a subtle band. In each setting the label and
- * its help sit on the left and the control on the right.
+ * The Settings tab, laid out like the Desktop app's own settings: each
+ * section a bold title with no box, then its rows, each with its label and a
+ * dim description on the left and its control on the right, a thin line
+ * between rows.
  */
 function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const st = v.settings
 
-  const modeButton = E.Button({
-    key: 'mode',
-    label: v.mode === 'live' ? `Live (${v.liveCalls}/${LIVE_CAP})` : 'Manual',
-    hotkey: 'l',
-    onPress: () => a.mode(v.mode === 'live' ? 'manual' : 'live'),
-  })
+  const modeHelp =
+    v.mode === 'live' ? `Analyzes each draft when you pause typing (${v.liveCalls}/${LIVE_CAP} this session).` : 'Analyzes only when you press Analyze.'
+  const modeControl = F
+    ? F.Select({ key: 'mode', options: [{ value: 'manual', label: 'Manual' }, { value: 'live', label: 'Live' }], value: v.mode, onSelect: m => void a.mode(m === 'live' ? 'live' : 'manual') })
+    : row(
+        E,
+        (['manual', 'live'] as const).map(m => {
+          const label = m === 'live' ? 'Live' : 'Manual'
+          return E.Button({ key: `mode-${m}`, label: m === v.mode ? `[${label}]` : label, plain: true, onPress: () => a.mode(m) })
+        }),
+      )
   const general: RenderElement[] = [
-    settingRow(E, 'mode', 'Mode', v.mode === 'live' ? 'Analyzes each draft when you pause typing.' : 'Analyzes only when you press Analyze.', modeButton),
+    settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
     modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Analyze, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
     modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites rules and tips on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
     modelSetting(E, a, 'weekModel', 'Week model', 'Writes each Claude Week edition from the fetched pages.', v.week.weekModel, st.weekChoices, st.readOnlyReason, F),
   ]
-  if (st.readOnlyReason) {
-    general.push(text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' }))
-  } else if (st.note) {
-    general.push(text(E, st.note, { dimColor: true, wrap: 'wrap' }))
-  }
+  const generalNote = st.readOnlyReason
+    ? [text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' })]
+    : st.note
+      ? [text(E, st.note, { dimColor: true, wrap: 'wrap' })]
+      : []
 
   const sourcesButton = E.Button({ key: 'sources', label: v.showSources ? 'Hide sources' : 'Show sources', plain: true, onPress: a.sources })
   const sources: RenderElement[] = [settingRow(E, 'sources', 'Sources', 'The pages the rules and tips come from.', sourcesButton)]
@@ -485,27 +491,45 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   }
 
   return [
-    settingsGroup(E, 'general', 'General', general),
-    settingsGroup(E, 'statistics', 'Statistics', statistics(E, v, a)),
-    settingsGroup(E, 'refresh', 'Refresh rules and tips', refreshSection(E, v, a)),
-    settingsGroup(E, 'sources', 'Sources', sources),
+    settingsGroup(E, v, 'general', 'General', general, generalNote),
+    settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
+    settingsGroup(E, v, 'refresh', 'Refresh rules and tips', [block(E, 'refresh', refreshSection(E, v, a))]),
+    settingsGroup(E, v, 'sources', 'Sources', [block(E, 'sources', sources)]),
   ]
 }
 
 /**
- * A group of settings: its bold title above the box, outside the border, and
- * the bordered box holding only the settings. The title is in the normal text
- * color, so it reads in light and dark alike.
+ * A settings section as Desktop draws one: its bold title (normal text
+ * color, no box, no band), then its rows with a thin line between each two.
+ * `after` follows the last row with no line, as a note under the section.
  */
-function settingsGroup(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
+function settingsGroup(E: UI, v: View, key: string, title: string, rows: RenderElement[], after: RenderElement[] = []): RenderElement {
+  const children = rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `${key}-${i}`), r]))
   return E.Box({
     key: `group-${key}`,
     flexDirection: 'column',
-    children: [
-      heading(E, title),
-      E.Box({ key: `group-${key}-box`, flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1, children }),
-    ],
+    gap: 1,
+    children: [heading(E, title), E.Box({ key: `group-${key}-box`, flexDirection: 'column', gap: 1, children: [...children, ...after] })],
   })
+}
+
+/**
+ * The thin line between two settings rows, as in Desktop's settings: a
+ * 1-pixel Svg the width of the pane. A mod can't border one side of a Box, so
+ * it's a picture; its translucent gray reads on light and dark alike, since an
+ * Svg can't use the theme's colors. The terminal has no Svg, so it gets none.
+ */
+const HAIRLINE =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="1" viewBox="0 0 4000 1" preserveAspectRatio="none"><rect width="4000" height="1" fill="rgb(128,128,128)" fill-opacity="0.3"/></svg>'
+
+function hairline(E: UI, v: View, key: string): RenderElement[] {
+  if (!E.Svg || (v.surface !== 'desktop' && v.surface !== 'mobile')) return []
+  return [E.Box({ key: `line-${key}`, children: [E.Svg({ source: HAIRLINE, alt: '', height: 1 })] })]
+}
+
+/** Several elements kept together as one settings row, with no lines inside. */
+function block(E: UI, key: string, children: RenderElement[]): RenderElement {
+  return E.Box({ key: `block-${key}`, flexDirection: 'column', gap: 1, children })
 }
 
 /** A bordered group, its title on a subtle band (the Week tab's sections). Theme keys only, so it follows light and dark. */
@@ -531,7 +555,8 @@ function settingRow(E: UI, key: string, label: string, help: string, control: Re
     columnGap: 2,
     flexWrap: 'wrap',
     children: [
-      E.Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [text(E, label, { weight: 'semibold' }), text(E, help, { dimColor: true, wrap: 'wrap' })] }),
+      // The label in the normal weight and color, the description dim under it, as Desktop's settings rows are.
+      E.Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [text(E, label), text(E, help, { dimColor: true, wrap: 'wrap' })] }),
       control,
     ],
   })

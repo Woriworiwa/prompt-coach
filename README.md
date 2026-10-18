@@ -37,8 +37,8 @@ The pane has four tabs, Coach (`1`), Tips (`2`), Settings (`3`) and Week (`4`). 
 
 **Tips tab** (`2`): **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
 
-**Settings tab** (`3`), in four bordered groups (General, Statistics, Refresh rules and tips, Sources), each setting's control on the right of its label:
-- **Manual / Live** (`l`): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
+**Settings tab** (`3`), laid out like the Desktop app's own settings: four sections (General, Statistics, Refresh rules and tips, Sources), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
+- **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model**, **Refresh model** and **Week model:** the three settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Statistics:** how many drafts you've analyzed, the checklist items you most often miss, and the rules applied most. It's kept between sessions on this Mac. **Clear statistics** resets it.
 - **Refresh rules and tips:** see "Keeping the rules current" below.
