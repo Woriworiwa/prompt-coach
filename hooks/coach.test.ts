@@ -849,9 +849,8 @@ test('buttons follow the desktop design system: neutral, primary for the main ac
 
   await ui.press({ key: 'analyze' })
   const tree = await ui.drawn()
-  // Analyzed: grayed out under its own key (v0.24.1), neutral.
-  expect(buttonLook(tree, 'analyze')).toBeUndefined()
-  expect(buttonLook(tree, 'analyze-done')).toEqual({ color: undefined, variant: undefined })
+  // Analyzed: neutral, and always active (no gray-out since v0.24.2).
+  expect(buttonLook(tree, 'analyze')).toEqual({ color: undefined, variant: undefined })
   expect(buttonLook(tree, 'apply')).toEqual({ color: undefined, variant: 'primary' })
   expect(buttonLook(tree, 'fill')).toEqual({ color: undefined, variant: undefined })
   expect(buttonLook(tree, 'add-1-0')?.color).toBeUndefined()
@@ -970,32 +969,6 @@ test('on mobile the model choices are buttons, and Sources lists the pages under
   await ui.unmount()
 })
 
-test('Analyze is grayed out once the draft is analyzed, does nothing then, and wakes when the draft changes', async ($, on) => {
-  const { s, clock } = world(on)
-  s.box = 'fix the login thing'
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(false)
-  await ui.press({ key: 'analyze' })
-  expect(s.analyses).toHaveLength(1)
-  // Grayed out under a key of its own, so Desktop draws a new Button rather than keeping the old one.
-  expect(await ui.find({ key: 'analyze' })).toBeUndefined()
-  expect((await ui.find({ key: 'analyze-done' }))?.props.dimColor).toBe(true)
-  // Pressed again with the same draft: no second analysis.
-  await ui.press({ key: 'analyze-done' })
-  expect(s.analyses).toHaveLength(1)
-  // Typing a change wakes it once the typing pauses, before any press: back under its own key, not dim.
-  await type($, s, 'fix the login thing in auth.ts')
-  await clock.advance(500)
-  expect(await ui.find({ key: 'analyze-done' })).toBeUndefined()
-  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(false)
-  await ui.press({ key: 'analyze' })
-  expect(s.analyses).toHaveLength(2)
-  expect((await ui.find({ key: 'analyze-done' }))?.props.dimColor).toBe(true)
-  await ui.unmount()
-})
-
 test('after an analysis the draft stays on screen through an empty box, and typing replaces it', async ($, on) => {
   const { s, clock } = world(on)
   s.box = 'fix the login thing'
@@ -1003,35 +976,45 @@ test('after an analysis the draft stays on screen through an empty box, and typi
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  // The box empties (Desktop can report it so): the analyzed draft stays, and Analyze stays grayed out.
+  // The box empties (Desktop can report it so): the analyzed draft stays.
   await type($, s, '')
   await clock.advance(1500)
   expect(await ui.find({ type: 'Code', text: 'fix the login thing' })).toBeDefined()
-  expect((await ui.find({ key: 'analyze-done' }))?.props.dimColor).toBe(true)
   // Typing starts: the box shows the new draft instead.
   await type($, s, 'add a logout test')
   await clock.advance(500)
   expect(await ui.find({ type: 'Code', text: 'fix the login thing' })).toBeUndefined()
   expect(await ui.find({ type: 'Code', text: 'add a logout test' })).toBeDefined()
-  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(false)
   await ui.unmount()
 })
 
-test('with no edit events at all, the pane reads the prompt box each second, so typing still wakes Analyze', async ($, on) => {
+test('with no edit events at all, the pane reads the prompt box each second, so Your draft follows typing', async ($, on) => {
   const { s, clock } = world(on)
   s.box = 'fix the login thing'
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  expect((await ui.find({ key: 'analyze-done' }))?.props.dimColor).toBe(true)
   // The box changes with no prompt.edit, as in Desktop.
   s.box = 'fix the login thing in auth.ts'
   await clock.advance(1000)
   expect(await ui.find({ type: 'Code', text: 'fix the login thing in auth.ts' })).toBeDefined()
-  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(false)
   await ui.press({ key: 'analyze' })
   expect(s.analyses).toHaveLength(2)
+  await ui.unmount()
+})
+
+test('Analyze is always active: no gray look, and a second press with the same draft analyzes again', async ($, on) => {
+  const { s } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses).toHaveLength(2)
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
   await ui.unmount()
 })
 
@@ -1104,8 +1087,7 @@ test('Enter in a gap field updates the rewrite, and the next analysis starts wit
   expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in auth.ts.' })).toBeDefined()
 
   s.box = 'fix the login thing again'
-  // Pressed before the pane has seen the change: the grayed button reads the box afresh and analyzes the new draft.
-  await ui.press({ key: 'analyze-done' })
+  await ui.press({ key: 'analyze' })
   expect(await ui.find({ type: 'Input', key: 'gap-2-0-type' })).toBeDefined()
   expect(await ui.find({ type: REWRITE, text: '[which file?]' })).toBeDefined()
   await ui.unmount()
@@ -1227,8 +1209,7 @@ editTest('the rewrite is a field you can edit: Apply sends your text, gaps and A
 
   // Typing a suggestion's sentence in by hand counts it as added.
   s.box = 'fix the login thing again'
-  // Pressed before the pane has seen the change: the grayed button reads the box afresh and analyzes the new draft.
-  await ui.press({ key: 'analyze-done' })
+  await ui.press({ key: 'analyze' })
   expect(await ui.find({ type: 'Input', text: 'without touching the tests' })).toBeUndefined()
   expect(await ui.find({ type: 'Input', text: 'Fix the login bug in [which file?]. Done means the login test passes.' })).toBeDefined()
   const fresh = (await ui.find({ type: 'Input', text: 'Fix the login bug in [which file?]' }))!.key!
