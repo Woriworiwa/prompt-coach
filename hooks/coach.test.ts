@@ -186,8 +186,11 @@ describe('bars and live mode', () => {
       { section: 'Remove', rules: ['Remove "think hard".'] },
     ])
     expect(parseRuleFile('# Your own rules\n\nOne rule per line.\n')).toEqual([])
-    // The Checklist section is not a list of rules.
-    expect(parseRuleFile('## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: the outcome. Source: x\n')).toEqual([{ section: 'Clarity', rules: ['Be explicit.'] }])
+    // The Checklist shows as one of the file's sections.
+    expect(parseRuleFile('## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: the outcome. Source: x\n')).toEqual([
+      { section: 'Clarity', rules: ['Be explicit.'] },
+      { section: 'Checklist', rules: ['Goal: the outcome. Source: x'] },
+    ])
   })
 
   test('checklist: a model file\'s own, inheriting nothing; else general.md\'s; else the built-in list', () => {
@@ -1783,32 +1786,32 @@ test('Your rules: the mobile app lists the rules with no field to add one', asyn
   await ui.unmount()
 })
 
-test('Rules on the Analytics tab: the session model picked, any model one press away, groups shown and hidden, Edit in Settings', async ($, on) => {
+test('Rules on the Analytics tab: General first and closed, then the model with its name a dropdown, then Your rules; no separate Checklist', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
-  // The session's model is picked and its rules open; the general rules start hidden.
-  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
-  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
+  const groups = boxNode(await ui.drawn(), 'group-rule-list-box')!.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
+  expect(groups.filter(k => k!.startsWith('block-rules-'))).toEqual(['block-rules-general', 'block-rules-model', 'block-rules-own'])
+  expect(await ui.find({ key: 'rules-toggle-checklist' })).toBeUndefined()
+  expect(await ui.find({ text: /^Checklist$/ })).toBeUndefined()
+  // General starts closed; the session's model is picked in the dropdown and its rules are open.
   expect(await ui.find({ key: 'rules-general-list' })).toBeUndefined()
-  expect(await ui.find({ text: '1 rule' })).toBeDefined()
-  // Rules sit between the statistics and the tips.
-  const order = (await ui.findAll({})).map(el => el.text ?? '')
-  expect(order.findIndex(t => t === 'Rules')).toBeGreaterThan(order.findIndex(t => t === 'Statistics'))
-  expect(order.findIndex(t => t === 'Rules')).toBeLessThan(order.findIndex(t => t === 'Using Opus 5.5 well'))
+  expect(await ui.find({ key: 'rules-toggle-general', text: 'Show' })).toBeDefined()
+  expect((await ui.find({ type: 'Select', key: 'rules-model' }))?.props?.value).toBe('opus-5-5.md')
+  expect(await ui.find({ key: 'rules-pick-opus-5-5.md' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   await ui.press({ key: 'rules-toggle-general' })
   expect(await ui.find({ key: 'rules-general-list', text: 'Be explicit.' })).toBeDefined()
-  // Another model's rules, though the session runs Opus.
-  await ui.press({ key: 'rules-pick-sonnet-5-5.md' })
-  expect(await ui.find({ key: 'rules-pick-sonnet-5-5.md', text: '[Sonnet 5.5]' })).toBeDefined()
+  // Another model from the dropdown.
+  // (The dropdown shows the person's pick itself; withStableForm leaves its value to them.)
+  await ui.select({ key: 'rules-model', value: 'sonnet-5-5.md' })
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-model-list', text: 'Ask for a real check.' })).toBeDefined()
-  expect(await ui.find({ text: 'Name the finish line.' })).toBeUndefined()
-  // A model with no file reads as such.
-  await ui.press({ key: 'rules-pick-haiku-5-5.md' })
+  await ui.select({ key: 'rules-model', value: 'haiku-5-5.md' })
   expect(await ui.find({ text: 'No rules found for Haiku 5.5.' })).toBeDefined()
-  // Your rules, hidden at first, then Edit in Settings opens the Settings tab.
+  // Your rules as before: hidden at first, Edit in Settings opens Settings.
   expect(await ui.find({ key: 'rules-own-list' })).toBeUndefined()
   await ui.press({ key: 'rules-toggle-own' })
   expect(await ui.find({ key: 'rules-own-list', text: 'End with a recap.' })).toBeDefined()
@@ -1817,18 +1820,22 @@ test('Rules on the Analytics tab: the session model picked, any model one press 
   await ui.unmount()
 })
 
-test('Rules on the Analytics tab: a model with no rule file picks nothing and says so', async ($, on) => {
-  world(on, { model: 'claude-opus-4-1' })
+test('Rules on the Analytics tab: the mobile app picks the model with buttons; a model with no rule file says so', async ($, on) => {
+  world(on, { model: 'claude-opus-4-1', surfaces: ['mobile'] })
   await $.session.start(START)
   await $.command.run(coach())
-  const ui = await $.ui.mount(pane('terminal'))
+  const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: /^\[/ , key: 'rules-pick-opus-5-5.md' })).toBeUndefined()
-  expect(await ui.find({ text: 'claude-opus-4-1 has no rules of its own. Pick a model above.' })).toBeDefined()
+  expect(await ui.find({ type: 'Select', key: 'rules-model' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: 'Opus 5.5' })).toBeDefined()
+  expect(await ui.find({ text: 'claude-opus-4-1 has no rules of its own, so only the general rules apply. Pick a model to read its rules.' })).toBeDefined()
+  await ui.press({ key: 'rules-pick-opus-5-5.md' })
+  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   await ui.unmount()
 })
 
-test('Checklist from the rule files: Analyze judges by the model\'s own list, and the Analytics tab shows it per model', async ($, on) => {
+test('Checklist from the rule files: Analyze judges by the model\'s own list, which shows as a section of its rules', async ($, on) => {
   const general = '# General\n\nAs of: 2026-10\n\n- Be explicit.\n\n## Checklist\n- Goal: what outcome they want. Source: "Be clear and direct"\n- Done means: how it will be checked. Source: "Ask Claude to self-check"\n'
   const opus = '# Opus\n\nAs of: 2026-09\n\n- Name the finish line.\n\n## Checklist\n- Goal: the whole task in one message. Source: blog\n- Done means: the finish line. Source: blog, "name the finish line"\n- Stop rule: when to stop and ask. Source: blog\n'
   const { s, saved } = world(on, { files: { 'rules/general.md': general, 'rules/opus-5-5.md': opus } })
@@ -1840,31 +1847,19 @@ test('Checklist from the rule files: Analyze judges by the model\'s own list, an
   expect(s.analysisSystems[0]).toContain('- Done means: the finish line.')
   expect(s.analysisSystems[0]).toContain('- Stop rule: when to stop and ask.')
   expect(s.analysisSystems[0]).not.toContain('how it will be checked')
-  // The rules go with the draft without their checklist.
+  // The rules go with the draft without their checklist: it is in the system prompt.
   expect(s.analyses[0]).toContain('Name the finish line.')
   expect(s.analyses[0]).not.toContain('## Checklist')
   expect(saved.get('analytics')).toBeUndefined()
 
   await ui.press({ key: 'tab-analytics' })
-  // The session model's own checklist is open first, each item with its definition and source.
-  expect(await ui.find({ text: '3 items' })).toBeDefined()
-  expect(await ui.find({ text: /Opus 5\.5's own checklist\./ })).toBeDefined()
-  expect(await ui.find({ text: 'the finish line.' })).toBeDefined()
-  expect(await ui.find({ text: 'Source: blog, "name the finish line"' })).toBeDefined()
-  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
-  expect(await ui.find({ key: 'rules-model-list', text: 'Stop rule' })).toBeUndefined()
-  // Sonnet's file here has no checklist, so it shows the general one and says so.
-  await ui.press({ key: 'rules-pick-sonnet-5-5.md' })
-  expect(await ui.find({ text: '2 items' })).toBeDefined()
-  expect(await ui.find({ text: /Sonnet 5\.5's file has no checklist, so the general checklist/ })).toBeDefined()
-  expect(await ui.find({ text: 'how it will be checked.' })).toBeDefined()
-  // Hide folds it.
-  await ui.press({ key: 'rules-toggle-checklist' })
-  expect(await ui.find({ text: 'how it will be checked.' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-model-list', text: '**Checklist**' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Stop rule: when to stop and ask. Source: blog' })).toBeDefined()
+  expect(await ui.find({ text: '4 rules' })).toBeDefined()
   await ui.unmount()
 })
 
-test('A newer model borrows the newest older file of its family, and the pane says so; an older one gets general.md', async ($, on) => {
+test('A newer model borrows the newest older file of its family, and the pane says so under its rules', async ($, on) => {
   const { s } = world(on, { model: 'claude-opus-6' })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1875,6 +1870,6 @@ test('A newer model borrows the newest older file of its family, and the pane sa
   expect(s.analyses[0]).toContain('The prompt will be sent to: Opus 6')
   await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: "No rules file for Opus 6 yet; it uses Opus 5.5's." })).toBeDefined()
-  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
+  expect((await ui.find({ type: 'Select', key: 'rules-model' }))?.props?.value).toBe('opus-5-5.md')
   await ui.unmount()
 })

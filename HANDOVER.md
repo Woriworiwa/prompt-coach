@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.15.0
+# Handover: prompt-coach v0.16.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -55,7 +55,7 @@ The goal, set by Omar, is to help him write better prompts by showing what he do
 
 ## Rules list (Analytics tab)
 
-Omar's option A (2026-10-18): a reference list beside the statistics, with no link from the "changed most" bars to rules. Picker `rules-pick-<file>` starts on the session model (`rulesPick` '' follows it); groups Checklist, General, the model and Your rules toggle with `rules-toggle-<group>` (Checklist and the model start open); `rules-edit-own` opens Settings. `loadRuleFiles` reads every rule file on sync, on opening Analytics and on each Analyze.
+Omar's option A (2026-10-18), laid out by him in v0.16.0: Rules holds three groups, General first and closed, then the model (its name a `rules-model` Select of every model, `rules-pick-<file>` buttons on mobile; it starts on the session model, `rulesPick` '' following it, and starts open), then Your rules with `rules-edit-own`. Each toggles with `rules-toggle-<group>`. There is no separate Checklist group: `parseRuleFile` keeps the Checklist as one of a file's sections. The borrowed-file note sits under the model's row. The Select keeps its first element between redraws (`withStableForm`), so it shows the person's pick. `loadRuleFiles` reads every rule file on sync, on opening Analytics and on each Analyze.
 
 ## Checklist (in the rule files)
 
@@ -146,7 +146,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
-- v0.15.0 Checklist: the Analytics tab says statistics are off; Rules opens with your model's own Checklist (6 items with sources), another model switches it, no model picked shows general.md's; an Analyze on Opus judges Stop rule. Also from v0.13.0: Show and Hide work, Edit in Settings opens Settings.
+- v0.16.0 Rules: General first and closed, then your model with its name a dropdown that switches the rules (its Checklist a section of them, with sources), then Your rules with Edit in Settings; no separate Checklist; statistics say they're off; an Analyze on Opus judges Stop rule.
 - v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
 - v0.10.1: the third tab reads News.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.

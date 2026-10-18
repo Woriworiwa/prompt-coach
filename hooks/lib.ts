@@ -52,12 +52,12 @@ export type RuleSection = { section: string; rules: string[] }
 
 /**
  * A rules file as its sections, for reading in the pane: each `## ` heading
- * with the "- " lines under it. The title, source and As of lines are not
- * rules and are skipped, and so are sections with no rules.
+ * with the "- " lines under it, the Checklist among them. The title, source
+ * and As of lines are not rules and are skipped, and so are sections with no rules.
  */
 export function parseRuleFile(md: string): RuleSection[] {
   const out: RuleSection[] = [{ section: '', rules: [] }]
-  for (const line of withoutChecklist(md).split('\n')) {
+  for (const line of md.split('\n')) {
     const heading = /^##\s+(.+?)\s*$/.exec(line)?.[1]
     const rule = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
     if (heading) out.push({ section: heading, rules: [] })

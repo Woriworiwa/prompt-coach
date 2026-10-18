@@ -3,7 +3,7 @@
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, STATS_ON, scoreTrend, strengths, tokenSummary } from './analytics.ts'
-import { type Addition, type Analysis, type ChecklistItem, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
+import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
@@ -15,7 +15,7 @@ export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 export type Tab = 'coach' | 'analytics' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
 /** The groups in the Analytics tab's rules list, each opened and closed on its own. */
-export type RuleGroup = 'checklist' | 'general' | 'model' | 'own'
+export type RuleGroup = 'general' | 'model' | 'own'
 /** Which part of the analysis shows below the buttons. */
 export type Detail = 'checklist' | 'why'
 
@@ -79,8 +79,6 @@ export type RuleList = {
   models: (ModelRules & { sections: RuleSection[] })[]
   /** The picked model's file; '' when the session's model has none and nothing was picked. */
   picked: string
-  /** The checklist for the picked model, and where it comes from: its own file, general.md (no model picked), or the built-in list. */
-  checklist: { items: ChecklistItem[]; from: 'model' | 'general' | 'built in' }
   /** Set when the session's model borrows an older model's file; '' otherwise. */
   borrowed: string
   open: RuleGroup[]
@@ -245,7 +243,7 @@ const MARK: Record<CheckStatus, { mark: string; color: string }> = {
 
 export function coachPane(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   const body =
-    v.tab === 'analytics' ? analyticsTab(E, v, a) : v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
+    v.tab === 'analytics' ? analyticsTab(E, v, a, F) : v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
   return E.Box({ flexDirection: 'column', gap: 1, children: [tabs(E, v, a), ...body] })
 }
 
@@ -339,11 +337,11 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
  * The Analytics tab (the Tips tab until v0.10.0): the statistics first, as
  * Settings drew them, then a thin line and the tips.
  */
-function analyticsTab(E: UI, v: View, a: Actions): RenderElement[] {
+function analyticsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   return [
     settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
     ...hairline(E, v, 'analytics'),
-    ruleList(E, v, a),
+    ruleList(E, v, a, F),
     ...hairline(E, v, 'analytics-rules'),
     ...tips(E, v),
   ]
@@ -351,71 +349,53 @@ function analyticsTab(E: UI, v: View, a: Actions): RenderElement[] {
 
 /**
  * The rules the coach checks drafts against, to read beside the statistics:
- * a model picker (the session's model to start), then the general rules, the
- * picked model's and Omar's own, each opened and closed on its own. Edit in
- * Settings goes to where his own rules are changed.
+ * the general rules (closed to start), the picked model's (the session's to
+ * start, its name a dropdown of every model) and Omar's own, each opened and
+ * closed on its own. Each file's Checklist shows as one of its sections.
+ * Edit in Settings goes to where his own rules are changed.
  */
-function ruleList(E: UI, v: View, a: Actions): RenderElement {
+function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   const r = v.ruleList
   const picked = r.models.find(m => m.file === r.picked)
-  const picker = block(E, 'rules-picker', [
-    text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
-    ...(r.borrowed ? [text(E, r.borrowed, { color: 'warning', wrap: 'wrap' })] : []),
-    row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) }))),
-  ])
   const own: RuleSection[] = v.ownRules.rules.length ? [{ section: '', rules: v.ownRules.rules }] : []
+  // The mobile app has no fields, so there the models are buttons, the picked one in brackets.
+  const none = r.picked ? [] : [{ value: '', label: `${v.modelLabel || 'This model'} (no rules file)` }]
+  const modelName = F
+    ? F.Select({ key: 'rules-model', options: [...none, ...r.models.map(m => ({ value: m.file, label: m.label }))], value: r.picked, onSelect: file => a.pickRules(file) })
+    : row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) })))
   return settingsGroup(E, v, 'rule-list', 'Rules', [
-    picker,
-    checklistGroup(E, v, a, picked?.label),
+    text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
-    ruleGroup(E, v, a, 'model', picked?.label ?? 'Model', picked?.sections ?? [], picked ? `No rules found for ${picked.label}.` : `${v.modelLabel || 'This model'} has no rules of its own. Pick a model above.`),
+    ruleGroup(
+      E,
+      v,
+      a,
+      'model',
+      modelName,
+      picked?.sections ?? [],
+      picked ? `No rules found for ${picked.label}.` : `${v.modelLabel || 'This model'} has no rules of its own, so only the general rules apply. Pick a model to read its rules.`,
+      [],
+      r.borrowed ? [text(E, r.borrowed, { color: 'warning', wrap: 'wrap' })] : [],
+    ),
     ruleGroup(E, v, a, 'own', 'Your rules', own, 'No rules yet.', [E.Button({ key: 'rules-edit-own', label: 'Edit in Settings', onPress: () => a.tab('settings') })]),
   ])
 }
 
 /**
- * The checklist drafts are judged on for the picked model: each item with its
- * definition and source. A model's checklist is its own and inherits nothing;
- * with no model picked it is general.md's, for older and unknown models.
+ * One group in the rules list: its name (or a control naming it), rule count
+ * and Show or Hide, any note under that, then when open each section's rules.
  */
-function checklistGroup(E: UI, v: View, a: Actions, model: string | undefined): RenderElement {
-  const { items, from } = v.ruleList.checklist
-  const isOpen = v.ruleList.open.includes('checklist')
-  const whose =
-    from === 'model' ? `${model}'s own checklist.` : from === 'general' ? `${model ? `${model}'s file has no checklist, so the` : 'The'} general checklist, for older and unknown models.` : 'The built-in checklist: no rule file has one.'
-  const head = E.Box({
-    key: 'rules-checklist-head',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    columnGap: 2,
-    flexWrap: 'wrap',
-    children: [
-      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, 'Checklist', { weight: 'semibold' }), text(E, plural(items.length, 'item', 'items'), { dimColor: true })] }),
-      E.Button({ key: 'rules-toggle-checklist', label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleRules('checklist') }),
-    ],
-  })
-  const body = !isOpen
-    ? []
-    : [
-        text(E, `What each draft is judged on. ${whose}`, { dimColor: true, wrap: 'wrap' }),
-        ...items.map(i =>
-          E.Box({
-            key: `checklist-${i.name}`,
-            flexDirection: 'column',
-            children: [
-              text(E, i.name, { weight: 'semibold' }),
-              ...(i.definition ? [text(E, i.definition, { wrap: 'wrap' })] : []),
-              ...(i.source ? [text(E, `Source: ${i.source}`, { dimColor: true, wrap: 'wrap' })] : []),
-            ],
-          }),
-        ),
-      ]
-  return block(E, 'rules-checklist', [head, ...body])
-}
-
-/** One group in the rules list: its name, rule count and Show or Hide, then when open each section's rules. */
-function ruleGroup(E: UI, v: View, a: Actions, key: RuleGroup, label: string, sections: RuleSection[], empty: string, extra: RenderElement[] = []): RenderElement {
+function ruleGroup(
+  E: UI,
+  v: View,
+  a: Actions,
+  key: RuleGroup,
+  label: string | RenderElement,
+  sections: RuleSection[],
+  empty: string,
+  extra: RenderElement[] = [],
+  notes: RenderElement[] = [],
+): RenderElement {
   const isOpen = v.ruleList.open.includes(key)
   const count = sections.reduce((n, s) => n + s.rules.length, 0)
   const head = E.Box({
@@ -426,7 +406,12 @@ function ruleGroup(E: UI, v: View, a: Actions, key: RuleGroup, label: string, se
     columnGap: 2,
     flexWrap: 'wrap',
     children: [
-      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, label, { weight: 'semibold' }), text(E, plural(count, 'rule', 'rules'), { dimColor: true })] }),
+      E.Box({
+        flexDirection: 'row',
+        columnGap: 1,
+        alignItems: 'center',
+        children: [typeof label === 'string' ? text(E, label, { weight: 'semibold' }) : label, text(E, plural(count, 'rule', 'rules'), { dimColor: true })],
+      }),
       row(E, [...extra, E.Button({ key: `rules-toggle-${key}`, label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleRules(key) })]),
     ],
   })
@@ -435,7 +420,7 @@ function ruleGroup(E: UI, v: View, a: Actions, key: RuleGroup, label: string, se
     : count
       ? [E.Markdown({ key: `rules-${key}-list`, text: sections.map(s => [...(s.section ? [`**${s.section}**`] : []), s.rules.map(rule => `- ${rule}`).join('\n')].join('\n\n')).join('\n\n') })]
       : [text(E, empty, { dimColor: true, wrap: 'wrap' })]
-  return block(E, `rules-${key}`, [head, ...body])
+  return block(E, `rules-${key}`, [head, ...notes, ...body])
 }
 
 /** Tips for the analyzed draft, the session's model, and Claude Code in general. */

@@ -159,8 +159,8 @@ let ruleFiles: Record<string, RuleSection[]> = {}
 let ruleTexts: Record<string, string> = {}
 /** The model file picked in the rules list; '' follows the session's model. */
 let rulesPick = ''
-/** The rules list's groups that are open; the checklist and the chosen model's start open. */
-let rulesOpen: RuleGroup[] = ['checklist', 'model']
+/** The rules list's groups that are open; the chosen model's starts open, the general rules closed. */
+let rulesOpen: RuleGroup[] = ['model']
 
 let refresh: { isRunning: boolean; progress: string; results: RefreshResult[] } = { isRunning: false, progress: '', results: [] }
 
@@ -376,7 +376,6 @@ export const register: Register = (on, options) => {
         general: ruleFiles['general.md'] ?? [],
         models: MODEL_RULES.map(m => ({ ...m, sections: ruleFiles[m.file] ?? [] })),
         picked: rulesPick || (rulesFor(model)?.file ?? ''),
-        checklist: checklistFor(ruleTexts['general.md'] ?? '', ruleTexts[rulesPick || (rulesFor(model)?.file ?? '')] ?? ''),
         borrowed: borrowedNote(),
         open: rulesOpen,
       },
@@ -553,7 +552,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
   try {
     const file = rulesFor(model)?.file
     const rules = await loadRules($, file)
-    // The checklist for this model, read fresh like the rules: general.md's items with the model file's changes.
+    // The checklist for this model, read fresh like the rules: the model file's own, else general.md's.
     await loadRuleFiles($)
     const { items } = checklistFor(ruleTexts['general.md'] ?? '', file ? ruleTexts[file] : '')
     const names = items.map(i => i.name)
