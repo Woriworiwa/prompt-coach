@@ -121,6 +121,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 - Desktop ignores `plain` on a Button. Branch on `v.surface === 'desktop'` where that matters, as `tabs` does.
 - `$` may only be passed to top-level functions in `register.ts`. `Text`, `Link` and `Code` take no `key`.
 - `Text` `weight`, `size`, `mono`, `tabular` and Box spacing steps need Claude Code 2.1.299 or later.
+- Input `rows` needs a newer engine than 2.1.299: Desktop's 2.1.299 drops it, so the rewrite field is one line there (seen in Desktop and in the drawn props, 2026-10-18), while 2.1.302 keeps it. Its test kit passes anyway, since a dropped prop isn't refused. No Input has a width prop, so Desktop alone decides a field's width. Omar chose to wait for Desktop's update rather than work around it.
 - Colors follow Omar's "Claude Desktop CDS" design system (https://claude.ai/artifact/4deoXGZwi6kY6ioirEyy9d): neutral buttons, `variant: 'primary'` for the main action, red only on destructive buttons, clay only on the open tab, headings in the normal text color. Use typed theme keys only; backgrounds use `subtle`. Mods can't set fonts or control Desktop's copy icon on `Code` blocks.
 - Desktop collapses runs of ordinary spaces; use no-break spaces (U+00A0) for padding.
 - `/reload-plugins` reloads the mod in an open session. A pane left open across a reload is redrawn by the new code but doesn't sync again, so its Sources list and rules date stay empty until `/coach` reopens it or an Analyze runs. A fix was offered (sync on draw when not yet synced); see "Left to do".
@@ -151,7 +152,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
-- v0.19.1 Coach: the rewrite field spans the pane, fits short text with no cut-off, and scrolls past 12 lines.
+- v0.19.1 Coach, once Desktop bundles a Claude Code newer than 2.1.299 (see the Input `rows` rule): the rewrite field grows with its text and scrolls past 12 lines; and whether it spans the pane. On 2.1.299 it's one line and not full width (confirmed by Omar).
 - v0.19.0 Coach: the rewrite is editable; Apply sends the edit; a gap pick and Add/Remove still work after editing; the field doesn't jump or lose text while typing.
 - v0.18.0 Coach: one Checklist, no sub-tabs; under a missing item, "Rewrite" and why when the rewrite fixed it; Other changes and Other suggestions at the end.
 - Coach: Apply and send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
