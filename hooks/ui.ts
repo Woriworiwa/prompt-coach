@@ -353,7 +353,9 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   // The mobile app has no fields, so there the models are buttons, the picked one in brackets.
   const none = r.picked ? [] : [{ value: '', label: `${v.modelLabel || 'This model'} (no rules file)` }]
   const modelName = F
-    ? F.Select({ key: 'rules-model', options: [...none, ...r.models.map(m => ({ value: m.file, label: m.label }))], value: r.picked, onSelect: file => a.pickRules(file) })
+    ? // Keyed by the pick: withStableForm hands back the element it drew last while the key stays the
+      // same and leaves `value` out of the comparison, so with one key the list kept showing the first pick.
+      F.Select({ key: `rules-model-${r.picked || 'none'}`, options: [...none, ...r.models.map(m => ({ value: m.file, label: m.label }))], value: r.picked, onSelect: file => a.pickRules(file) })
     : row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) })))
   // Boxed like the Week tab's sections (`group`), the last section on the tab.
   return group(E, 'rule-list', 'Rules', [
