@@ -73,3 +73,4 @@ Notes from the build:
 - v0.9.6: Omar picked the Bars layout for Statistics; the Tables, Two-column grid and Side by side layouts and the Layout switch are gone. 109 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.9.7: removed the unused statTable, tokenRows and analysesLine from ui.ts; session start deletes the layout trial's statsLayout store key (only the business store had it). 110 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.9.8: Statistics bars drawn in the monospaced face with counts padded to one width (barLine), so Desktop's proportional font no longer makes them different lengths. 111 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.9.9: Statistics bars use █ for both parts, the empty part dimmed, so filled and empty are the same height in Desktop (its mono face draws ░ shorter). v0.9.8's alignment confirmed by Omar. 111 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
