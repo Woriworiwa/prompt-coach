@@ -102,9 +102,9 @@ Run the second line again with Desktop's bundled binary: `~/Library/Application 
 
 **Check in a new Desktop session; Omar has to click.** Not yet confirmed in the real app:
 - v0.8.1 Week tab: the tab draws (confirmed); Write shows its progress and an edition arrives within a few minutes, with links that open; how good the stories are from index pages alone; votes, reasons and takes survive closing and reopening the pane; Mark read updates the counts; Ask in side chat puts `/btw …` in the prompt box and Enter opens Desktop's side chat with the story's question; groups and buttons read well in light and dark.
-- v0.8.5 Settings: it looks like Desktop's own settings page; the Svg hairlines between rows are 1 pixel, span the width and read in light and dark; the Mode dropdown switches Manual/Live.
+- v0.8.5–v0.8.8 Settings: it looks like Desktop's own settings page; the Svg hairlines between rows are 1 pixel, span the width and read in light and dark (unseen in Desktop so far); the Mode dropdown switches Manual/Live; the v0.8.6 space between sections is enough; Rules and tips lists the sources first, then the refresh; the Statistics tables (v0.8.8) read well, and their row lines are the same Svg hairlines, also unseen in Desktop.
 - v0.6.0 Tips tab shows the tips, and the Coach tab no longer does.
-- v0.5.0 Settings holds Statistics and Refresh rules and tips, and `/coach refresh` lands there.
+- `/coach refresh` opens Settings, with the refresh under Rules and tips.
 - Apply and send actually submits.
 - Changing a model under Settings saves it. The reload that follows may reset an open analysis.
 - The gap dropdowns and fields work, including Enter in an empty field.
