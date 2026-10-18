@@ -1180,12 +1180,12 @@ test('the checklist shows each missing item with its suggestion right under it, 
   const at = (t: string) => order.indexOf(t)
   // Stop rule (missing) is followed by its suggestion, before the next item.
   expect(at('Stop rule')).toBeGreaterThan(-1)
-  expect(at('Say when to stop')).toBeGreaterThan(at('nothing on when to ask'))
-  expect(at('Say when to stop')).toBeLessThan(at('Output'))
+  expect(at('Suggestion: Say when to stop')).toBeGreaterThan(at('nothing on when to ask'))
+  expect(at('Suggestion: Say when to stop')).toBeLessThan(at('Output'))
   // Output's suggestion sits under Output, and the untied one under Other suggestions at the end.
-  expect(at('Ask for a summary')).toBeGreaterThan(at('a fix'))
-  expect(at('Other suggestions')).toBeGreaterThan(at('Ask for a summary'))
-  expect(at('Mention the branch')).toBeGreaterThan(at('Other suggestions'))
+  expect(at('Suggestion: Ask for a summary')).toBeGreaterThan(at('a fix'))
+  expect(at('Other suggestions')).toBeGreaterThan(at('Suggestion: Ask for a summary'))
+  expect(at('Suggestion: Mention the branch')).toBeGreaterThan(at('Other suggestions'))
   // Items with no suggestion are shown as before.
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
 
@@ -1201,6 +1201,32 @@ const FIXED = MERGED.replace(
   '<changes>\nDone means | Naming the finish line tells it when the work is complete.\nclarity | "Remove completely" spells out what remove means.',
 )
 
+test('the checklist sits in one box like a Settings section: an item per row, a line between rows, the note under the name', async ($, on) => {
+  const { s } = world(on, { analysis: FIXED })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const tree = await ui.drawn()
+  expect(boxNode(tree, 'group-checklist')?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
+  const keys = boxNode(tree, 'group-checklist-box')!.kids.map(k => (k as { props?: { key?: string } }).props?.key)
+  expect(keys).toEqual([
+    'check-Goal', 'line-checklist-1', 'check-Context', 'line-checklist-2', 'check-Constraints', 'line-checklist-3',
+    'check-Done means', 'line-checklist-4', 'check-Stop rule', 'line-checklist-5', 'check-Output', 'line-checklist-6',
+    'other-changes', 'line-checklist-7', 'other-suggestions',
+  ])
+  // The mark and name on one line, the note on its own line under them.
+  const head = boxNode(tree, 'check-Context-head')!
+  expect(head.props.flexDirection).toBe('column')
+  expect(JSON.stringify(boxNode(tree, 'check-Context-row'))).toContain('"Context"')
+  expect(JSON.stringify(boxNode(tree, 'check-Context-row'))).not.toContain('no file or error named')
+  expect(JSON.stringify(head)).toContain('no file or error named')
+  // Suggestions say so, apart from the rewrite's own changes.
+  expect(await ui.find({ text: 'Suggestion: Say when to stop' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('each change the rewrite made sits under the item it fixes, and the rest under Other changes', async ($, on) => {
   const { s } = world(on, { analysis: FIXED })
   s.box = 'fix the login thing'
@@ -1215,7 +1241,7 @@ test('each change the rewrite made sits under the item it fixes, and the rest un
   expect(at('Naming the finish line tells it when the work is complete.')).toBeLessThan(at('Stop rule'))
   expect(order[at('Naming the finish line tells it when the work is complete.') - 1]).toBe('Rewrite')
   // Changes named like no item (any case) go under Other changes, after the items and before Other suggestions.
-  expect(at('Other changes')).toBeGreaterThan(at('Ask for a summary'))
+  expect(at('Other changes')).toBeGreaterThan(at('Suggestion: Ask for a summary'))
   expect(at('clarity')).toBeGreaterThan(at('Other changes'))
   expect(at('Remove "think step by step"')).toBeGreaterThan(at('Other changes'))
   expect(at('Other suggestions')).toBeGreaterThan(at('Remove "think step by step"'))

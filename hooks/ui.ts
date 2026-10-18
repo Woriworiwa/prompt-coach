@@ -318,7 +318,8 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       out.push(text(E, `Read as a reply to Claude's last message.${cut}`, { dimColor: true, wrap: 'wrap' }))
     }
 
-    out.push(heading(E, 'Checklist'), ...checklistWithFixes(E, v, a, an))
+    const { rows, after } = checklistWithFixes(E, v, a, an)
+    out.push(settingsGroup(E, v, 'checklist', 'Checklist', rows, after, true))
   }
 
   out.push(footer(E, v))
@@ -420,25 +421,29 @@ function ruleGroup(
  * when its rule is named like the item. Changes and suggestions that fill no
  * item follow at the end, under "Other changes", "Other suggestions" or both.
  */
-function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): RenderElement[] {
+function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: RenderElement[]; after: RenderElement[] } {
   const indexed = an.additions.map((s, i) => ({ s, i }))
   const changes = an.changes.map((c, i) => ({ c, i }))
   const fills = (rule: string, item: string) => rule.trim().toLowerCase() === item.toLowerCase()
-  const out: RenderElement[] = []
+  const rows: RenderElement[] = []
   for (const c of an.checklist) {
     const m = MARK[c.status]
     const fixes = changes.filter(x => fills(x.c.rule, c.item))
     const mine = indexed.filter(x => x.s.item === c.item)
-    out.push(
+    // Each item a row of its own: the mark and name on one line, the note under them, then what fills it, indented.
+    rows.push(
       E.Box({
         key: `check-${c.item}`,
         flexDirection: 'column',
+        gap: 1,
         children: [
           E.Box({
-            key: `check-${c.item}-row`,
-            flexDirection: 'row',
-            columnGap: 1,
-            children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' }), text(E, c.note, { dimColor: true, wrap: 'wrap' })],
+            key: `check-${c.item}-head`,
+            flexDirection: 'column',
+            children: [
+              E.Box({ key: `check-${c.item}-row`, flexDirection: 'row', columnGap: 1, children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' })] }),
+              text(E, c.note, { dimColor: true, wrap: 'wrap' }),
+            ],
           }),
           ...fixes.map(x => fix(E, x.i, 'Rewrite', x.c.why)),
           ...mine.map(x => suggestion(E, v, a, x.s, x.i)),
@@ -447,27 +452,16 @@ function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): RenderEle
     )
   }
   const otherChanges = changes.filter(x => !an.checklist.some(c => fills(x.c.rule, c.item)))
-  if (otherChanges.length) {
-    out.push(
-      E.Box({
-        key: 'other-changes',
-        flexDirection: 'column',
-        children: [text(E, 'Other changes', { weight: 'semibold', dimColor: true }), ...otherChanges.map(x => fix(E, x.i, x.c.rule, x.c.why))],
-      }),
-    )
-  }
+  if (otherChanges.length) rows.push(otherRow(E, 'other-changes', 'Other changes', otherChanges.map(x => fix(E, x.i, x.c.rule, x.c.why))))
   const other = indexed.filter(x => !x.s.item)
-  if (other.length) {
-    out.push(
-      E.Box({
-        key: 'other-suggestions',
-        flexDirection: 'column',
-        children: [text(E, 'Other suggestions', { weight: 'semibold', dimColor: true }), ...other.map(x => suggestion(E, v, a, x.s, x.i))],
-      }),
-    )
-  }
-  if (an.changes.length === 0) out.push(text(E, 'The rewrite made no changes.', { dimColor: true }))
-  return out
+  if (other.length) rows.push(otherRow(E, 'other-suggestions', 'Other suggestions', other.map(x => suggestion(E, v, a, x.s, x.i))))
+  const after = an.changes.length === 0 ? [text(E, 'The rewrite made no changes.', { dimColor: true })] : []
+  return { rows, after }
+}
+
+/** A row for what fills no checklist item: its title, then the entries, spaced like an item's. */
+function otherRow(E: UI, key: string, title: string, entries: RenderElement[]): RenderElement {
+  return E.Box({ key, flexDirection: 'column', gap: 1, children: [text(E, title, { weight: 'semibold' }), ...entries] })
 }
 
 /** One change the rewrite made, indented under what it fixes: who made it (the rewrite, or the rule's name) and why it helps. */
@@ -489,7 +483,7 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
     paddingLeft: 2,
     children: [
       row(E, [
-        text(E, s.label, { weight: 'semibold', wrap: 'wrap' }),
+        text(E, `Suggestion: ${s.label}`, { weight: 'semibold', wrap: 'wrap' }),
         E.Button({ key: `add-${v.formGen}-${i}`, ...(isAdded ? tinted(E, 'Remove', 'error') : { label: 'Add' }), onPress: () => a.toggleAddition(i) }),
       ]),
       text(E, s.text, { dimColor: true, wrap: 'wrap' }),
