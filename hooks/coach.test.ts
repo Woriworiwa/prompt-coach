@@ -27,7 +27,7 @@ import {
   parseChecklist,
   withoutChecklist,
 } from './lib.ts'
-import { BAR_CELLS, barCount, barRuns, rowsFor } from './ui.ts'
+import { BAR_CELLS, REWRITE_EDITABLE, barCount, barRuns, rowsFor } from './ui.ts'
 import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
@@ -442,6 +442,9 @@ function world(
 const START = { cwd: '/tmp', surface: 'desktop', isInteractive: true } as const
 /** The statistics' pane tests, which run only while statistics are on (STATS_ON in analytics.ts). */
 const statsTest: typeof test = STATS_ON ? test : (() => {}) as unknown as typeof test
+// The rewrite is a Code block until the editable field is back on (REWRITE_EDITABLE); its editing tests run only then.
+const REWRITE = REWRITE_EDITABLE ? 'Input' : 'Code'
+const editTest: typeof test = REWRITE_EDITABLE ? test : (() => {}) as unknown as typeof test
 const coach = (args = '') =>
   ({ command: 'coach', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } }) as const
 
@@ -489,7 +492,7 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.analyses[0]).toContain('Name the finish line.') // the Opus rules file
   expect(s.analyses[0]).toContain('End with a recap.') // your own rules, from the data folder, are sent too
   expect(s.analyses[0]).toContain('think step by step and fix the login thing')
-  expect(await ui.find({ type: 'Input', text: '[which file?]' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: '[which file?]' })).toBeDefined()
   // One list, no tabs (v0.18.0): the checklist and the rewrite's changes show together.
   expect(await ui.find({ key: 'detail-checklist' })).toBeUndefined()
   expect(await ui.find({ key: 'detail-why' })).toBeUndefined()
@@ -994,11 +997,11 @@ test('Fill in the gaps: a pick updates the rewrite, a typed answer wins, and App
   expect([handleOf(await ui.drawn(), 'gap-1-0-pick'), handleOf(await ui.drawn(), 'gap-1-0-type')]).toEqual(before)
 
   await ui.select({ key: 'gap-1-0-pick', value: 'session.ts' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug in session.ts.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in session.ts.' })).toBeDefined()
 
   // Typed without Enter: the rewrite box waits, but Apply uses it.
   await ui.input({ key: 'gap-1-0-type', text: 'auth/login.ts', kind: 'change' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug in session.ts.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in session.ts.' })).toBeDefined()
   await ui.press({ key: 'apply' })
   expect(s.submitted[0]?.text).toBe('Fix the login bug in auth/login.ts. Done means the login test passes.')
   await ui.unmount()
@@ -1015,12 +1018,12 @@ test('Enter in a gap field updates the rewrite, and the next analysis starts wit
   expect(await ui.find({ text: 'which file?' })).toBeDefined()
   expect(await ui.find({ type: 'Select' })).toBeUndefined()
   await ui.input({ key: 'gap-1-0-type', text: 'auth.ts' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug in auth.ts.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in auth.ts.' })).toBeDefined()
 
   s.box = 'fix the login thing again'
   await ui.press({ key: 'analyze' })
   expect(await ui.find({ type: 'Input', key: 'gap-2-0-type' })).toBeDefined()
-  expect(await ui.find({ type: 'Input', text: '[which file?]' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: '[which file?]' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1033,13 +1036,13 @@ test('Enter in an empty gap field removes the gap with its sentence; an answer b
   await ui.press({ key: 'analyze' })
 
   await ui.input({ key: 'gap-1-0-type', text: '' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug' })).toBeUndefined()
-  expect(await ui.find({ type: 'Input', text: 'Done means the login test passes.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug' })).toBeUndefined()
+  expect(await ui.find({ type: REWRITE, text: 'Done means the login test passes.' })).toBeDefined()
   expect(await ui.find({ text: /Removed from the rewrite, with its sentence/ })).toBeDefined()
 
   // A pick brings it back, filled in.
   await ui.select({ key: 'gap-1-0-pick', value: 'auth.ts' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug in auth.ts.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in auth.ts.' })).toBeDefined()
   expect(await ui.find({ text: /Removed from the rewrite/ })).toBeUndefined()
 
   // Back to no answer, then an empty Enter again: Apply sends the rewrite without that sentence.
@@ -1059,7 +1062,7 @@ test('an empty Enter with an answer picked keeps the pick and removes nothing', 
   await ui.press({ key: 'analyze' })
   await ui.select({ key: 'gap-1-0-pick', value: 'session.ts' })
   await ui.input({ key: 'gap-1-0-type', text: '' })
-  expect(await ui.find({ type: 'Input', text: 'Fix the login bug in session.ts.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Fix the login bug in session.ts.' })).toBeDefined()
   expect(await ui.find({ text: /Removed from the rewrite/ })).toBeUndefined()
   await ui.unmount()
 })
@@ -1095,10 +1098,10 @@ test('Add puts a suggestion at the end of the rewrite, Remove takes it out, and 
   expect(await ui.find({ text: 'Say when to stop' })).toBeDefined()
 
   await ui.press({ key: 'add-1-0' })
-  expect(await ui.find({ type: 'Input', text: 'Done means the login test passes. Stop and ask me before deleting anything.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Done means the login test passes. Stop and ask me before deleting anything.' })).toBeDefined()
   expect(await ui.find({ key: 'add-1-0', text: 'Remove' })).toBeDefined()
   await ui.press({ key: 'add-1-0' })
-  expect(await ui.find({ type: 'Input', text: 'Stop and ask me' })).toBeUndefined()
+  expect(await ui.find({ type: REWRITE, text: 'Stop and ask me' })).toBeUndefined()
 
   await ui.press({ key: 'add-1-0' })
   await ui.select({ key: 'gap-1-0-pick', value: 'auth.ts' })
@@ -1107,7 +1110,7 @@ test('Add puts a suggestion at the end of the rewrite, Remove takes it out, and 
   await ui.unmount()
 })
 
-test('the rewrite is a field you can edit: Apply sends your text, gaps and Add still work on it, and a new analysis starts afresh', async ($, on) => {
+editTest('the rewrite is a field you can edit: Apply sends your text, gaps and Add still work on it, and a new analysis starts afresh', async ($, on) => {
   const { s } = world(on, { analysis: WITH_ADDITIONS })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1178,7 +1181,7 @@ test('the checklist shows each missing item with its suggestion right under it, 
 
   // Add from the merged view works as before.
   await ui.press({ key: 'add-1-0' })
-  expect(await ui.find({ type: 'Input', text: 'Stop and ask me before deleting anything.' })).toBeDefined()
+  expect(await ui.find({ type: REWRITE, text: 'Stop and ask me before deleting anything.' })).toBeDefined()
   expect(await ui.find({ key: 'add-1-0', text: 'Remove' })).toBeDefined()
   await ui.unmount()
 })

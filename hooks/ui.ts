@@ -287,7 +287,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   // The rewrite sits right under the draft, so the two read side by side.
   if (v.analysis) {
     out.push(heading(E, 'Rewrite'))
-    out.push(F ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
+    out.push(F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
   }
 
@@ -496,6 +496,14 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
     ],
   })
 }
+
+/**
+ * Whether the rewrite is an editable field (v0.19.0). Off since v0.19.2: Desktop's
+ * bundled Claude Code 2.1.299 drops Input `rows`, so the field is one line there,
+ * and Omar chose the v0.18.0 text block until Desktop ships a newer one. Turn it
+ * on then; the editing code and its tests are kept.
+ */
+export const REWRITE_EDITABLE = false
 
 /**
  * The lines a field needs to show all of `text`: each line wrapped at a width
