@@ -10,7 +10,6 @@ export type ModelRules = { file: string; label: string }
  * read as the newest model of its family. A newer version than any file
  * borrows the newest older file of its family (`isBorrowed`); an older model,
  * or one with no family file, gets undefined and so general.md alone.
- * The same file name is used under `rules/` and `tips/`.
  */
 export function rulesFor(model: string): (ModelRules & { model: string; isBorrowed: boolean }) | undefined {
   const m = model.toLowerCase()
@@ -182,7 +181,6 @@ export type Analysis = {
   checklist: CheckItem[]
   rewrite: string
   changes: Change[]
-  tips: string[]
   placeholders: Placeholder[]
   additions: Addition[]
 }
@@ -202,7 +200,7 @@ Rules for the rewrite:
 ${SHARED_RULES}
 ${REPLY_RULES}
 - Where an essential detail is missing, put a short placeholder in square brackets for the person to fill in, such as [which file?]. Use at most three.
-- Something worth adding that the person did not ask for (a finish line, a stop rule, an output format) goes in <additions>, not in the rewrite or the tips: the checklist item it fills (or Other), a short label, then the exact sentence to add, written as the person, in their language, using only details from the draft or the previous reply, with no square brackets.
+- Something worth adding that the person did not ask for (a finish line, a stop rule, an output format) goes in <additions>, not in the rewrite: the checklist item it fills (or Other), a short label, then the exact sentence to add, written as the person, in their language, using only details from the draft or the previous reply, with no square brackets.
 
 Reply in exactly this format and nothing else:
 <checklist>
@@ -217,9 +215,6 @@ the rewritten prompt
 Rule name | why this change helps, in one sentence
 (at most 5 lines; "None | The draft already works." if nothing changed)
 </changes>
-<tips>
-- at most 2 short tips on using the target model or Claude Code for this particular task, only if they clearly help
-</tips>
 <additions>
 Done means | Name the finish line | Done means the login test passes.
 (at most 3 lines: checklist item | label | sentence, the item one of the checklist items above or Other; leave the block empty when nothing is worth adding)
@@ -316,7 +311,6 @@ export function parseAnalysis(reply: string, names: readonly string[] = FALLBACK
     checklist,
     rewrite,
     changes,
-    tips: bullets(tag(reply, 'tips') ?? '').slice(0, 2),
     placeholders: parsePlaceholders(rewrite, tag(reply, 'placeholders') ?? ''),
     additions: parseAdditions(tag(reply, 'additions') ?? '', names),
   }
@@ -435,16 +429,7 @@ export function fillPlaceholders(rewrite: string, answers: Record<string, string
   return out
 }
 
-/** The bullet lines of a tips file, without the markers. */
-export function parseTips(markdown: string): string[] {
-  return markdown
-    .split('\n')
-    .filter(line => /^\s*-\s+/.test(line))
-    .map(line => line.replace(/^\s*-\s+/, '').trim())
-    .filter(Boolean)
-}
-
-/** The `As of:` date in a rules or tips file, if it has one. */
+/** The `As of:` date in a rules file, if it has one. */
 export function asOfDate(markdown: string): string | undefined {
   return /^As of:\s*(\S+)/m.exec(markdown)?.[1]
 }

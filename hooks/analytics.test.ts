@@ -26,7 +26,6 @@ function analysis(status: Partial<Record<CheckName, CheckStatus>>, rules: string
     checklist: Object.entries(status).map(([item, s]) => ({ item: item as CheckName, status: s, note: '' })),
     rewrite: 'x',
     changes: rules.map(rule => ({ rule, why: '' })),
-    tips: [],
     placeholders: [],
     additions,
   }

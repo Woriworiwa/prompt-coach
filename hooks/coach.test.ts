@@ -20,7 +20,6 @@ import {
   withoutOwnRule,
   OWN_RULES_HEADER,
   parseAnalysis,
-  parseTips,
   parseRuleFile,
   analysisSystem,
   checklistFor,
@@ -46,19 +45,15 @@ Fix the login bug in [which file?]. Done means the login test passes.
 <changes>
 Name the finish line | The assistant knows when to stop.
 Remove "think step by step" | Opus 5.5 already thinks before replying.
-</changes>
-<tips>
-- Raise /effort to high for this bug fix.
-</tips>`
+</changes>`
 
 describe('parseAnalysis', () => {
-  test('reads the checklist, rewrite, changes and tips', () => {
+  test('reads the checklist, rewrite and changes', () => {
     const a = parseAnalysis(ANALYSIS)!
     expect(a.checklist.map(c => c.status)).toEqual(['partial', 'missing', 'n/a', 'missing', 'missing', 'present'])
     expect(a.checklist[1]).toEqual({ item: 'Context', status: 'missing', note: 'no file or error named' })
     expect(a.rewrite).toBe('Fix the login bug in [which file?]. Done means the login test passes.')
     expect(a.changes[0]).toEqual({ rule: 'Name the finish line', why: 'The assistant knows when to stop.' })
-    expect(a.tips).toEqual(['Raise /effort to high for this bug fix.'])
   })
 
   test('fills unjudged items, drops "None" changes, and rejects a reply with no rewrite', () => {
@@ -158,9 +153,8 @@ describe('bars and live mode', () => {
     expect(liveSkipReason({ ...base, liveCalls: LIVE_CAP })).toContain('Live limit')
   })
 
-  test('parseTips and asOfDate read the tips files', () => {
-    const md = '# Tips\n\nSource: x\nAs of: 2026-10-17\n\n- First tip.\n- Second `tip`.\n'
-    expect(parseTips(md)).toEqual(['First tip.', 'Second `tip`.'])
+  test('asOfDate reads a rules file\'s date', () => {
+    const md = '# Rules\n\nSource: x\nAs of: 2026-10-17\n\n- First rule.\n'
     expect(asOfDate(md)).toBe('2026-10-17')
   })
 
@@ -226,17 +220,18 @@ describe('bars and live mode', () => {
 })
 
 describe('refresh helpers', () => {
-  test('parseSources keeps only https rules and tips targets', () => {
+  test('parseSources keeps only https rules targets', () => {
     const s = parseSources(
       JSON.stringify({
         targets: {
           'rules/general.md': ['https://a.example/x'],
           'hooks/register.ts': ['https://a.example/z'],
-          'tips/opus-5-5.md': ['http://insecure.example', 'https://b.example/'],
+          'rules/opus-5-5.md': ['http://insecure.example', 'https://b.example/'],
+          'tips/opus-5-5.md': ['https://c.example/'],
         },
       }),
     )
-    expect(s.targets).toEqual({ 'rules/general.md': ['https://a.example/x'], 'tips/opus-5-5.md': ['https://b.example/'] })
+    expect(s.targets).toEqual({ 'rules/general.md': ['https://a.example/x'], 'rules/opus-5-5.md': ['https://b.example/'] })
     expect(toFetchUrl('https://claude.dev/blog/post/')).toBe('https://claude.dev/blog/post.md')
   })
 
@@ -291,9 +286,6 @@ const FILES: Record<string, string> = {
   'rules/opus-5-5.md': '# Opus\n\nSources: x\nAs of: 2026-09\n\n- Name the finish line.\n',
   'rules/sonnet-5-5.md': '# Sonnet\n\nSource: x\nAs of: 2026-10\n\n- Ask for a real check.\n',
   [OWN_RULES]: '# Your own rules\n\n- End with a recap.\n',
-  'tips/opus-5-5.md': '# Opus tips\n\nSource: x\n\n- Use /effort, not "think hard".\n',
-  'tips/sonnet-5-5.md': '# Sonnet tips\n\nSource: x\n\n- Sonnet is the everyday model.\n',
-  'tips/claude-code.md': '# Claude Code\n\nSource: x\n\n- Run /clear between tasks.\n',
   [PROFILE]: 'name: Omar\nuses_claude_code: daily, in the desktop app\n',
   'week/profile.example.yaml': '# Claude Week reader profile.\nname:\n',
   'week/edition-prompt.md': 'You are writing this week\'s edition of Claude Week.\n',
@@ -306,8 +298,8 @@ const FILES: Record<string, string> = {
   'sources.json': JSON.stringify({
     targets: {
       'rules/general.md': ['https://docs.example/general'],
-      'tips/opus-5-5.md': ['https://docs.example/opus', 'https://docs.example/broken'],
-      'tips/sonnet-5-5.md': ['https://docs.example/sonnet'],
+      'rules/opus-5-5.md': ['https://docs.example/opus', 'https://docs.example/broken'],
+      'rules/sonnet-5-5.md': ['https://docs.example/sonnet'],
     },
   }),
 }
@@ -464,16 +456,14 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.opened).toEqual(['prompt-coach'])
 
   const ui = await $.ui.mount(pane('desktop'))
-  // No "For <model>" line under the tabs; the model shows in the tips heading, on the Analytics tab.
+  // No "For <model>" line under the tabs.
   expect(await ui.find({ text: /^For / })).toBeUndefined()
   expect(await ui.find({ type: 'Code', text: 'think step by step' })).toBeDefined()
   expect(await ui.find({ text: /Rules as of 2026-09/ })).toBeDefined()
-  // Tips live only on the Analytics tab.
-  expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeUndefined()
-  expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeUndefined()
+  // Tips are gone (v0.17.0): the Analytics tab has no tips section.
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeDefined()
-  expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
+  expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeUndefined()
+  expect(await ui.find({ key: 'tips' })).toBeUndefined()
   expect(await ui.find({ key: 'analyze' })).toBeUndefined()
   await ui.press({ key: 'tab-coach' })
 
@@ -501,15 +491,8 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(rewriteAt).toBeGreaterThan(draftAt)
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Analyze'))
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === '[Checklist]'))
-  // Tips come in groups on the Analytics tab: this draft's, the model's, then Claude Code's, each labelled.
-  expect(await ui.find({ text: 'For this draft' })).toBeUndefined()
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'For this draft' })).toBeDefined()
-  expect(await ui.find({ key: 'tips-draft-list', text: 'Raise /effort to high for this bug fix.' })).toBeDefined()
-  expect(await ui.find({ key: 'tips-model-list', text: 'Use /effort, not "think hard".' })).toBeDefined()
-  expect(await ui.find({ text: 'Claude Code in general' })).toBeDefined()
-  expect(await ui.find({ key: 'tips-code-list', text: 'Run /clear between tasks.' })).toBeDefined()
-  await ui.press({ key: 'tab-coach' })
+  // The analysis asks for no tips.
+  expect(s.analysisSystems[0]).not.toContain('<tips>')
 
   await ui.press({ key: 'apply' })
   const rewrite = 'Fix the login bug in [which file?]. Done means the login test passes.'
@@ -627,7 +610,7 @@ test('an empty box after sending is not reported as a changed draft', async ($, 
   await ui.unmount()
 })
 
-test('when the session reports no model, the pane still loads tips, then takes the model from Claude\'s reply', async ($, on) => {
+test('when the session reports no model, the pane still loads the rules, then takes the model from Claude\'s reply', async ($, on) => {
   const { s } = world(on, { model: '' })
   await $.session.start(START)
   await $.command.run(coach())
@@ -637,13 +620,13 @@ test('when the session reports no model, the pane still loads tips, then takes t
   expect(await ui.find({ text: /No rules for/ })).toBeUndefined()
   expect(await ui.find({ text: /Rules as of 2026-10/ })).toBeDefined()
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
+  expect(await ui.find({ text: /has no rules of its own/ })).toBeDefined()
   await ui.press({ key: 'tab-coach' })
 
   const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'claude-opus-5-5' }
   await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', usage })
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   expect(s.model).toBe('')
   await ui.unmount()
 })
@@ -773,7 +756,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
-  for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
+  for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)
     // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
@@ -791,7 +774,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
   // Statistics moved to the Analytics tab in v0.10.0.
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
-  // Rules and tips: the sources first, always listed (no Show sources button), a thin line, then the refresh.
+  // Rules: the sources first, always listed (no Show sources button), a thin line, then the refresh.
   const rules = boxNode(tree, 'group-rules-box')!
   expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-sources', 'line-rules-1', 'block-refresh'])
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
@@ -973,8 +956,8 @@ test('Apply sits right before Apply and send, and fills the box without sending'
 })
 
 const WITH_GAPS = ANALYSIS.replace(
-  '</tips>',
-  '</tips>\n<placeholders>\n[which file?] | Which file has the login bug? | auth.ts ; session.ts\n</placeholders>',
+  '</changes>',
+  '</changes>\n<placeholders>\n[which file?] | Which file has the login bug? | auth.ts ; session.ts\n</placeholders>',
 )
 
 test('Fill in the gaps: a pick updates the rewrite, a typed answer wins, and Apply sends the filled rewrite', async ($, on) => {
@@ -1167,7 +1150,7 @@ test('manual mode never calls the model while typing', async ($, on) => {
   expect(s.analyses).toHaveLength(0)
 })
 
-test('switching model changes the label and tips while the pane is open', async ($, on) => {
+test('switching model changes the label and rules while the pane is open', async ($, on) => {
   const { s, clock } = world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -1175,8 +1158,7 @@ test('switching model changes the label and tips while the pane is open', async 
   await clock.advance(5000)
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Using Sonnet 5.5 well' })).toBeDefined()
-  expect(await ui.find({ type: 'Markdown', text: 'Sonnet is the everyday model.' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Ask for a real check.' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1203,7 +1185,7 @@ test('/coach refresh proposes changes, and Reject leaves every file alone', asyn
   expect(s.fetched).toContain('https://docs.example/general.md')
   const ui = await $.ui.mount(pane('desktop'))
   expect(await ui.find({ type: 'Code', text: '+ - Be explicit, and say why.' })).toBeDefined()
-  expect(await ui.find({ text: /tips\/opus-5-5.md: kept as is \(https:\/\/docs.example\/broken answered HTTP 404\)/ })).toBeDefined()
+  expect(await ui.find({ text: /rules\/opus-5-5.md: kept as is \(https:\/\/docs.example\/broken answered HTTP 404\)/ })).toBeDefined()
   expect(saved.has('pendingRefresh')).toBe(true)
 
   await ui.press({ key: 'reject' })
@@ -1216,7 +1198,7 @@ test('/coach refresh proposes changes, and Reject leaves every file alone', asyn
   await ui.unmount()
 })
 
-test('/coach refresh writes only the changed rules and tips files on Accept, with a date', async ($, on) => {
+test('/coach refresh writes only the changed rules files on Accept, with a date', async ($, on) => {
   const { s, saved, clock } = world(on, { seen: STALE })
   await $.session.start(START)
   await $.command.run(coach('refresh'))
@@ -1224,11 +1206,11 @@ test('/coach refresh writes only the changed rules and tips files on Accept, wit
   const ui = await $.ui.mount(pane('desktop'))
   // /coach refresh opens Settings, where refresh now lives; there is no Refresh tab.
   expect(textLook(await ui.drawn(), 'Settings').color).toBe('claude')
-  expect(textLook(await ui.drawn(), 'Rules and tips').found).toBe(true)
+  expect(textLook(await ui.drawn(), 'Rules').found).toBe(true)
   expect(buttonProps(await ui.drawn(), 'tab-refresh')).toBeUndefined()
   await ui.press({ key: 'accept' })
 
-  expect([...s.written.keys()]).toEqual(['rules/general.md', 'tips/sonnet-5-5.md'])
+  expect([...s.written.keys()]).toEqual(['rules/general.md', 'rules/sonnet-5-5.md'])
   expect(s.written.get('rules/general.md')).toContain('As of: 2026-10-17')
   expect(s.written.has(OWN_RULES)).toBe(false)
   expect(saved.has('pendingRefresh')).toBe(false)
@@ -1262,7 +1244,7 @@ test('only files whose pages changed are rewritten, by the refresh model (Opus b
   await $.command.run(coach('refresh'))
   await clock.advance(1)
   expect(s.refreshes).toHaveLength(1)
-  expect(s.refreshes[0]).toContain('path="tips/sonnet-5-5.md"')
+  expect(s.refreshes[0]).toContain('path="rules/sonnet-5-5.md"')
   expect(s.refreshModels).toEqual(['opus'])
 })
 
@@ -1271,7 +1253,7 @@ test('Rewrite all rewrites every reachable file even when no page changed', asyn
   await $.session.start(START)
   await $.command.run(coach('refresh all'))
   await clock.advance(1)
-  expect(s.refreshes.map(r => /path="([^"]+)"/.exec(r)?.[1])).toEqual(['rules/general.md', 'tips/sonnet-5-5.md'])
+  expect(s.refreshes.map(r => /path="([^"]+)"/.exec(r)?.[1])).toEqual(['rules/general.md', 'rules/sonnet-5-5.md'])
 })
 
 test('/coach opens in Desktop, which attaches its surface after the session starts', async ($, on) => {
@@ -1713,7 +1695,7 @@ statsTest('Statistics: on mobile the statistics show too, and Clear statistics e
   await ui.unmount()
 })
 
-test('Analytics: the statistics first, then a thin line and the tips', async ($, on) => {
+test('Analytics: the statistics first, then a thin line and the rules, and nothing after them', async ($, on) => {
   world(on, { saved: { lessons: STATS } })
   await $.session.start(START)
   await $.command.run(coach())
@@ -1723,9 +1705,11 @@ test('Analytics: the statistics first, then a thin line and the tips', async ($,
   const text = JSON.stringify(tree)
   expect(boxNode(tree, 'group-statistics')).toBeDefined()
   expect(boxNode(tree, 'line-analytics')).toBeDefined()
-  expect(text.indexOf('Work on next')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
-  expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
-  expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
+  expect(text.indexOf('Statistics are off')).toBeLessThan(text.indexOf('group-rule-list'))
+  expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('group-rule-list'))
+  const body = boxNode(tree, 'group-rule-list')
+  expect(body).toBeDefined()
+  expect(await ui.find({ text: /^Using .* well$/ })).toBeUndefined()
   await ui.unmount()
 })
 

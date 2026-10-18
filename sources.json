@@ -20,32 +20,6 @@
     "rules/fable-5-1.md": [
       "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1",
       "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
-    ],
-    "tips/opus-5-5.md": [
-      "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/",
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5",
-      "https://code.claude.com/docs/en/model-config",
-      "https://code.claude.com/docs/en/fast-mode"
-    ],
-    "tips/sonnet-5-5.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5",
-      "https://code.claude.com/docs/en/model-config"
-    ],
-    "tips/haiku-5-5.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5",
-      "https://code.claude.com/docs/en/model-config"
-    ],
-    "tips/fable-5-1.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1",
-      "https://code.claude.com/docs/en/model-config"
-    ],
-    "tips/claude-code.md": [
-      "https://code.claude.com/docs/en/best-practices",
-      "https://code.claude.com/docs/en/permission-modes",
-      "https://code.claude.com/docs/en/common-workflows",
-      "https://code.claude.com/docs/en/sub-agents",
-      "https://code.claude.com/docs/en/memory",
-      "https://code.claude.com/docs/en/context-window"
     ]
   }
 }

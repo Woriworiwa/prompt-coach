@@ -28,7 +28,6 @@ import {
   checklistFor,
   parseRuleFile,
   withoutChecklist,
-  parseTips,
   rulesFor,
 } from './lib.ts'
 import {
@@ -75,10 +74,10 @@ import {
 // presses Enter. /improve alone rewrites the last prompt they sent.
 //
 // /coach: a pane that reads the draft in the prompt box, checks it against a
-// checklist, rewrites it with the reason for each change, shows tips for the
-// session's model, and keeps the person's statistics for the Analytics tab.
+// checklist, rewrites it with the reason for each change, and shows the rules
+// for the session's model on the Analytics tab.
 // /coach refresh: re-reads the pages in sources.json and proposes updated
-// rules and tips, which change only when the person accepts them.
+// rules, which change only when the person accepts them.
 // The Week tab: Claude Week, a weekly digest the Week model writes from the
 // source pages the mod fetches; votes and takes on its stories steer the next.
 
@@ -143,14 +142,12 @@ let modelPoll: Timer | undefined
 
 // What the session's model gives the pane, refreshed when the model changes.
 let model = ''
-/** False until the pane has loaded tips and dates once, even for an unknown model. */
+/** False until the pane has loaded the rules and dates once, even for an unknown model. */
 let isSynced = false
 /** The model that answered the last main turn: the fallback when the session reports none (the Desktop app can). */
 let answeredModel = ''
 let modelLabel = ''
 let hasModelRules = false
-let modelTips: string[] = []
-let codeTips: string[] = []
 let rulesAsOf = ''
 let sources: string[] = []
 /** The shipped rule files as sections, by file name (general.md and each model's), for the Analytics tab's rules list. */
@@ -211,7 +208,7 @@ export const register: Register = (on, options) => {
     })
     await $.command.register({
       name: 'coach',
-      description: 'Open the prompt coach pane: checklist, rewrite, reasons and model tips',
+      description: 'Open the prompt coach pane: checklist, rewrite, reasons and the rules for your model',
       argumentHint: '[live | manual | refresh | refresh all]',
       immediate: true,
     })
@@ -379,8 +376,6 @@ export const register: Register = (on, options) => {
         borrowed: borrowedNote(),
         open: rulesOpen,
       },
-      modelTips,
-      codeTips,
       liveCalls,
       rulesAsOf,
       sources,
@@ -703,7 +698,7 @@ async function pollModel($: EngineInterface): Promise<void> {
   if (await syncModel($)) $.ui.invalidate('ui.render')
 }
 
-/** Reads the session's model and, when it changed, its label, tips and rules date. True when it changed. */
+/** Reads the session's model and, when it changed, its label, rules and rules date. True when it changed. */
 async function syncModel($: EngineInterface): Promise<boolean> {
   const current = (await $.session.model()) || answeredModel
   if (isSynced && current === model) return false
@@ -714,9 +709,6 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   hasModelRules = !!target
 
   const root = $.plugin.root
-  modelTips = target ? parseTips(await readOr($, `${root}/tips/${target.file}`)) : []
-  codeTips = parseTips(await readOr($, `${root}/tips/claude-code.md`))
-
   const dates = [await readOr($, `${root}/rules/general.md`), target ? await readOr($, `${root}/rules/${target.file}`) : '']
     .map(asOfDate)
     .filter((d): d is string => !!d)
@@ -726,7 +718,7 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   try {
     const all = parseSources(await $.fs.read(`${root}/sources.json`)).targets
     const mine = Object.entries(all)
-      .filter(([t]) => t === 'rules/general.md' || t === 'tips/claude-code.md' || (target && t.endsWith(`/${target.file}`)))
+      .filter(([t]) => t === 'rules/general.md' || (target && t === `rules/${target.file}`))
       .flatMap(([, urls]) => urls)
     sources = [...new Set(mine)]
   } catch {
@@ -862,9 +854,9 @@ async function acceptRefresh($: EngineInterface): Promise<void> {
   }
   await reviewed($)
   refresh = { isRunning: false, progress: `Updated ${written} ${written === 1 ? 'file' : 'files'}.`, results: [] }
-  model = '' // Reload tips and dates from the new files.
+  model = '' // Reload the rules and dates from the new files.
   await syncModel($)
-  $.ui.toast(`prompt-coach: updated ${written} rules and tips files.`)
+  $.ui.toast(`prompt-coach: updated ${written} rules ${written === 1 ? 'file' : 'files'}.`)
   $.ui.invalidate('ui.render')
 }
 

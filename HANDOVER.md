@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.16.0
+# Handover: prompt-coach v0.17.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -14,15 +14,15 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 ## What it does now
 
 - **`/improve [draft]`** rewrites a draft into the prompt box and never sends it. With no draft, it rewrites the last prompt Omar sent.
-- **`/coach`** opens a pane that Desktop docks beside the transcript. Running it again closes it. `/coach live` and `/coach manual` set the mode and open it. `/coach refresh` (and `refresh all`) opens Settings and proposes rules and tips updates for files whose source pages changed. Nothing is written until Omar accepts.
+- **`/coach`** opens a pane that Desktop docks beside the transcript. Running it again closes it. `/coach live` and `/coach manual` set the mode and open it. `/coach refresh` (and `refresh all`) opens Settings and proposes rules updates for files whose source pages changed. Nothing is written until Omar accepts.
 - **Inside a conversation,** each analysis also sends Claude's last reply (capped at 6,000 characters), and the draft is read as a reply to it.
 - **Tabs:** Coach (1), Analytics (2) and News (3) on the left, Settings (4) alone at the right end, the same on every surface. `tabs()` puts them in one `tabs` Box with `justifyContent: 'space-between'`. The terminal draws each tab as a plain button, with the open one in clay brackets. Desktop always draws a native button, so there the open tab is clay semibold `Text` and the others are `dimColor` buttons. News is the Week tab's label: its key is `tab-week`, the code calls it the Week tab, and the digest is still "Claude Week".
   - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove. A dim footer gives the rules' date and the path to Omar's rules file.
-  - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then Rules (`ruleList`), then a hairline, then the tips (`tips()`): "Using \<model\> well", in three groups: this draft, the session's model, and Claude Code in general. Tips appear only here.
+  - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then Rules (`ruleList`). The Tips section was removed in v0.17.0 at Omar's say (he didn't find it useful): no tips files, no `<tips>` in the analysis, no model or Claude Code tips.
   - **Settings** is laid out like Desktop's own settings page, with four sections (`settingsGroup`): General, Your rules, Rules and tips, and Claude Week. Each section is a bold title with no box, then rows (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
     - **General:** Mode (Manual or Live; live is capped at 30 analyses a session), Rewrite model and Refresh model. Model changes are saved with `$.config.set`. A refused change makes them read-only, with the reason.
     - **Your rules** (`ownRulesSettings`): the rules file's path, each rule with Remove (`remove-rule-<rule>`), and an Add a rule field (`add-rule-<gen>`, emptied after each add; none on mobile). A note says Added, Removed, already there, or Not saved.
-    - **Rules and tips:** the source pages, always listed, then the refresh (check sources, Rewrite all, progress, per-file diffs, Accept/Reject). Omar chose the title and the order.
+    - **Rules** (titled "Rules and tips" until v0.17.0): the source pages, always listed, then the refresh (check sources, Rewrite all, progress, per-file diffs, Accept/Reject). Omar chose the title and the order.
     - **Claude Week:** Week model, Reader profile (its path, plus a note when the mod just created it or couldn't), and Sources (the pages in `week/sources.json` as links, `Tier N · label`).
   - **News:** Claude Week (below).
 
@@ -91,7 +91,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
 | `hooks/*.test.ts` | 125 tests (the statistics' pane tests are off with the statistics). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
-| `rules/*.md`, `tips/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
+| `rules/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
 ## How every change ships (Omar expects all of it)
@@ -121,7 +121,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 - `Text` `weight`, `size`, `mono`, `tabular` and Box spacing steps need Claude Code 2.1.299 or later.
 - Colors follow Omar's "Claude Desktop CDS" design system (https://claude.ai/artifact/4deoXGZwi6kY6ioirEyy9d): neutral buttons, `variant: 'primary'` for the main action, red only on destructive buttons, clay only on the open tab, headings in the normal text color. Use typed theme keys only; backgrounds use `subtle`. Mods can't set fonts or control Desktop's copy icon on `Code` blocks.
 - Desktop collapses runs of ordinary spaces; use no-break spaces (U+00A0) for padding.
-- `/reload-plugins` reloads the mod in an open session. A pane left open across a reload is redrawn by the new code but doesn't sync again, so its Sources list, tips and rules date stay empty until `/coach` reopens it or an Analyze runs. A fix was offered (sync on draw when not yet synced); see "Left to do".
+- `/reload-plugins` reloads the mod in an open session. A pane left open across a reload is redrawn by the new code but doesn't sync again, so its Sources list and rules date stay empty until `/coach` reopens it or an Analyze runs. A fix was offered (sync on draw when not yet synced); see "Left to do".
 - A running session may hold the store. Edit a store file by hand only with no session running; otherwise change it through `$.store` from the mod.
 - You can't drive Desktop or sign in a CLI from the shell, so Omar does real-app checks. Desktop's log is at `~/Library/Logs/Claude/claude.ai-web.log`; look for `ui_press not handled`.
 - Screenshots Omar mentions may not reach you. If one doesn't, say so and work from the code.
@@ -130,7 +130,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 - Keep Omar's intent and language. Add no scope, invent no context, and leave a `[placeholder]` instead.
 - Suggestions enter the rewrite only when Omar clicks Add.
-- The analysis format is a `<checklist>`, `<rewrite>`, `<changes>`, `<tips>`, `<additions>` (each line `item | label | sentence`) and `<placeholders>` (each line `[token] | question | a ; b`). Ask Omar before changing it. The checklist items come from the rule files and differ per model (see Checklist).
+- The analysis format is a `<checklist>`, `<rewrite>`, `<changes>`, `<additions>` (each line `item | label | sentence`) and `<placeholders>` (each line `[token] | question | a ; b`). Ask Omar before changing it. The checklist items come from the rule files and differ per model (see Checklist).
 - Ask before reversing an earlier choice of his. He asks for options first on bigger UI changes. The models default to sonnet (`rewriteModel`), opus (`refreshModel`) and opus (`weekModel`).
 - Made on his requests and not objected to: tab changes apply on every surface, not only Desktop; tabs are numbered in the order shown.
 - Session handover: keep this file current as you go (`CLAUDE.md`). Rewrite rather than add, keep history in TASKS.md and the commits, and keep this file under about 150 lines. NEXT-SESSION.md was dropped on 2026-10-18.

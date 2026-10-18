@@ -4,7 +4,7 @@ A Claude Code mod that helps you write better prompts, learn why they're better,
 
 It has two parts, plus a weekly digest:
 
-- **`/coach`** opens a side pane that reads the draft in your prompt box before you send it. It shows a checklist, a rewrite, the reason for each change, and, on the Analytics tab, statistics on what your drafts most often miss, the rules the coach uses for any model, and tips for the model you're on.
+- **`/coach`** opens a side pane that reads the draft in your prompt box before you send it. It shows a checklist, a rewrite, the reason for each change, and, on the Analytics tab, statistics on what your drafts most often miss, and the rules the coach uses for any model.
 - **`/improve <draft>`** is the quick path. It rewrites the draft straight into the prompt box, with a dim transcript line saying what changed.
 - **Claude Week**, on the pane's Week tab: a weekly digest about Claude, Claude Code, Claude Desktop, usage limits and Anthropic. Vote on stories and add your own take; the next edition reads them first.
 
@@ -18,8 +18,8 @@ Inside a conversation, both read your draft as a reply to Claude's last message,
 /coach            open or close the pane
 /coach live       open it in live mode
 /coach manual     open it in manual mode
-/coach refresh    check the source pages for changes and propose updated rules and tips
-/coach refresh all  rewrite every rules and tips file from today's pages
+/coach refresh    check the source pages for changes and propose updated rules
+/coach refresh all  rewrite every rules file from today's pages
 ```
 
 The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left, and Settings (`4`) at the right end. In the terminal the open tab shows in clay brackets. In the Desktop app it shows as clay text, and the other tabs are dim buttons.
@@ -35,7 +35,7 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left,
 - **Apply and send** (`p`): puts the rewrite in the prompt box and sends it. To copy the rewrite, use the copy icon Desktop draws in the rewrite box's corner.
 - **Live 3/30:** a dim reminder under the tabs while live mode is on, with the count used this session. Switch modes under Settings.
 
-**Analytics tab** (`2`): first **Statistics** (below; off for now), then **Rules**: what the coach checks drafts against, in three groups, each with its rule count and Show or Hide. **General** comes first, closed. Then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead); its rules start open, and its checklist shows as one of its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Then **Your rules**, with **Edit in Settings**. Then a thin line and **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
+**Analytics tab** (`2`): first **Statistics** (below; off for now), then **Rules**: what the coach checks drafts against, in three groups, each with its rule count and Show or Hide. **General** comes first, closed. Then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead); its rules start open, and its checklist shows as one of its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Then **Your rules**, with **Edit in Settings**.
 
 **Statistics** are off since v0.14.0, while the checklist's design changes: nothing is recorded, the tab says so, and the statistics kept before stay stored. When they were on (rebuilt in v0.11.0 to help you write better prompts), they showed, from your last 200 analyzed drafts, in this order:
 - **Score:** your last 10 drafts' average out of 6 (a point for each checklist item covered or not needed, half for a vague one), and whether it went up or down from the 10 before.
@@ -52,7 +52,7 @@ It's all kept between sessions on this Mac, with no draft text, and no extra mod
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model** and **Refresh model:** two of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
-- **Rules and tips:** the source pages the rules and tips come from, always listed, then the refresh (see "Keeping the rules current" below).
+- **Rules:** the source pages the rules come from, always listed, then the refresh (see "Keeping the rules current" below).
 - **Claude Week:** the **Week model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
 
 **News tab** (`3`): Claude Week.
@@ -69,18 +69,17 @@ It's all kept between sessions on this Mac, with no draft text, and no extra mod
 | --- | --- |
 | Prompting rules | `rules/general.md`, plus the session model's file (`opus-5-5.md`, `sonnet-5-5.md`, `haiku-5-5.md`, `fable-5-1.md`, which also covers Mythos 5.1) |
 | Your own rules | `rules.md` in the mod's data folder, `plugins/data/prompt-coach-prompt-coach/` in your Claude config. Edited under Settings → Your rules or by hand. Loaded last, wins on conflict; neither refresh nor an update touches it. |
-| Model tips | `tips/<model>.md` and `tips/claude-code.md` |
 | Which model you're on | The live session |
 | Checklist, rewrite and reasons | One call to the rewrite model (default `sonnet`), given your draft and the rules above. It can be wrong, so treat it as a second opinion. |
 | Statistics | Saved locally by Claude Code for this plugin |
 
-The rules and tips are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date. The pane's footer shows the date, and Settings lists the source pages under **Rules and tips**.
+The rules are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date. The pane's footer shows the date, and Settings lists the source pages under **Rules**.
 
-A model with no rules file, such as an older or newer model, gets the general rules and a note in the pane. To support it, add its page to `sources.json`, add rule and tip files, add a branch in `rulesFor` in `hooks/lib.ts`, and add a test.
+A model with no rules file, such as an older or newer model, gets the general rules and a note in the pane. To support it, add its page to `sources.json`, add a rules file, add it to `MODEL_RULES` and `MODEL_FAMILIES` in `hooks/lib.ts`, and add a test.
 
 ## Keeping the rules current
 
-`/coach refresh` fetches every page in `sources.json` and compares each with its fingerprint from your last refresh. A file is rewritten only when one of its source pages has changed. That's done by the refresh model (Opus by default), which re-paraphrases the file and changes only what the sources changed. The Settings tab shows a diff per file, under Rules and tips. Nothing is written until you press **Accept**, and **Reject** discards the proposal. Either way, the pages count as reviewed and aren't proposed again until they change. A page that fails to load keeps its file as it is, and it is retried next time.
+`/coach refresh` fetches every page in `sources.json` and compares each with its fingerprint from your last refresh. A file is rewritten only when one of its source pages has changed. That's done by the refresh model (Opus by default), which re-paraphrases the file and changes only what the sources changed. The Settings tab shows a diff per file, under Rules. Nothing is written until you press **Accept**, and **Reject** discards the proposal. Either way, the pages count as reviewed and aren't proposed again until they change. A page that fails to load keeps its file as it is, and it is retried next time.
 
 - **The first refresh** only records the fingerprints and proposes nothing.
 - **No page changed:** the refresh makes no model calls and costs nothing beyond the downloads.
@@ -98,7 +97,7 @@ claude plugin install prompt-coach@prompt-coach
 Then start a new session in the Desktop app's Code tab, or run `/reload-plugins`. Type `/coach`.
 
 **An installed copy runs from Claude Code's plugin cache** (`~/.claude-personal/plugins/cache/prompt-coach/…`), not from this folder. Three things follow:
-- Your edits to the rules and tips here don't reach it until you raise `version` in `.claude-plugin/plugin.json` and run `claude plugin update prompt-coach@prompt-coach`. Your own rules and reader profile aren't part of the install, so they apply at once.
+- Your edits to the rules here don't reach it until you raise `version` in `.claude-plugin/plugin.json` and run `claude plugin update prompt-coach@prompt-coach`. Your own rules and reader profile aren't part of the install, so they apply at once.
 - A refresh you accept writes into the cached copy.
 - The pane's footer shows the path of the rules file it is actually reading.
 
@@ -107,7 +106,7 @@ The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLA
 ## Settings
 
 - `rewriteModel` (default `sonnet`): the model for Analyze, live mode and `/improve`. `haiku` is faster and cheaper, and `opus` is slower and more careful.
-- `refreshModel` (default `opus`): the model that rewrites rules and tips on `/coach refresh`. Refresh is rare, and the job is to change only what the sources changed, which Opus does with fewer needless rewordings.
+- `refreshModel` (default `opus`): the model that rewrites the rules on `/coach refresh`. Refresh is rare, and the job is to change only what the sources changed, which Opus does with fewer needless rewordings.
 
 - `weekModel` (default `opus`): the model that writes each Claude Week edition. Writing an edition means reading and checking many pages.
 

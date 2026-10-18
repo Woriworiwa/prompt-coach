@@ -46,9 +46,6 @@ export type View = {
   analyzedReply?: { chars: number; isCut: boolean }
   /** True when the prompt box no longer holds the draft that was analyzed. */
   isStale: boolean
-  /** Tips for the session's model, then for Claude Code in general. */
-  modelTips: string[]
-  codeTips: string[]
   liveCalls: number
   rulesAsOf: string
   ownRules: OwnRules
@@ -333,17 +330,12 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   return out
 }
 
-/**
- * The Analytics tab (the Tips tab until v0.10.0): the statistics first, as
- * Settings drew them, then a thin line and the tips.
- */
+/** The Analytics tab: the statistics first, as Settings drew them, then a thin line and the rules. */
 function analyticsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   return [
     settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
     ...hairline(E, v, 'analytics'),
     ruleList(E, v, a, F),
-    ...hairline(E, v, 'analytics-rules'),
-    ...tips(E, v),
   ]
 }
 
@@ -421,20 +413,6 @@ function ruleGroup(
       ? [E.Markdown({ key: `rules-${key}-list`, text: sections.map(s => [...(s.section ? [`**${s.section}**`] : []), s.rules.map(rule => `- ${rule}`).join('\n')].join('\n\n')).join('\n\n') })]
       : [text(E, empty, { dimColor: true, wrap: 'wrap' })]
   return block(E, `rules-${key}`, [head, ...notes, ...body])
-}
-
-/** Tips for the analyzed draft, the session's model, and Claude Code in general. */
-function tips(E: UI, v: View): RenderElement[] {
-  const groups = [
-    { key: 'draft', label: 'For this draft', tips: v.analysis?.tips ?? [] },
-    { key: 'model', label: v.modelLabel, tips: v.modelTips },
-    { key: 'code', label: 'Claude Code in general', tips: v.codeTips },
-  ].filter(g => g.tips.length)
-  if (!groups.length) return [text(E, 'No tips yet. They load with the session model; Analyze adds tips for your draft.', { dimColor: true, wrap: 'wrap' })]
-  return [
-    heading(E, `Using ${v.modelLabel || 'Claude Code'} well`),
-    E.Box({ key: 'tips', flexDirection: 'column', gap: 1, children: groups.map(g => tipGroup(E, g.key, g.label, g.tips)) }),
-  ]
 }
 
 /** The Checklist and Why each change tabs, drawn like the pane's own tabs: the open one in brackets. */
@@ -568,18 +546,6 @@ function withHelp(E: UI, title: string, scope: string, help: string): RenderElem
   ]
 }
 
-/** One group of tips: a small label, then the tips as a list with a blank line between them. */
-function tipGroup(E: UI, key: string, label: string, tips: string[]): RenderElement {
-  return E.Box({
-    key: `tips-${key}`,
-    flexDirection: 'column',
-    children: [
-      ...(label ? [text(E, label, { weight: 'semibold', dimColor: true })] : []),
-      E.Markdown({ key: `tips-${key}-list`, text: tips.map(t => `- ${t}`).join('\n\n') }),
-    ],
-  })
-}
-
 function footer(E: UI, v: View): RenderElement {
   return E.Box({
     key: 'footer',
@@ -611,7 +577,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const general: RenderElement[] = [
     settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
     modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Analyze, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
-    modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites rules and tips on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
+    modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites the rules on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
   ]
   const generalNote = st.readOnlyReason
     ? [text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' })]
@@ -619,9 +585,9 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       ? [text(E, st.note, { dimColor: true, wrap: 'wrap' })]
       : []
 
-  // The source pages, always listed: where the rules and tips come from, before the refresh that updates them.
+  // The source pages, always listed: where the rules come from, before the refresh that updates them.
   const sources: RenderElement[] = [
-    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules and tips come from.', { dimColor: true, wrap: 'wrap' })] }),
+    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules come from.', { dimColor: true, wrap: 'wrap' })] }),
     ...v.sources.map(url => E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] })),
   ]
 
@@ -634,7 +600,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote),
         settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F)),
-        settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
+        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
       ],
     }),
