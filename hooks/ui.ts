@@ -355,7 +355,8 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   const modelName = F
     ? F.Select({ key: 'rules-model', options: [...none, ...r.models.map(m => ({ value: m.file, label: m.label }))], value: r.picked, onSelect: file => a.pickRules(file) })
     : row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) })))
-  return settingsGroup(E, v, 'rule-list', 'Rules', [
+  // Boxed like the Week tab's sections (`group`), the last section on the tab.
+  return group(E, 'rule-list', 'Rules', [
     text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
     ruleGroup(

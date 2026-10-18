@@ -1776,7 +1776,12 @@ test('Rules on the Analytics tab: General first and closed, then the model with 
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
-  const groups = boxNode(await ui.drawn(), 'group-rule-list-box')!.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
+  // Rules sits in a box like the Week tab's sections: a round subtle border, the title on a subtle band.
+  const box = boxNode(await ui.drawn(), 'group-rule-list')!
+  expect(box.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
+  expect(textLook(box.kids[0], 'Rules').found).toBe(true)
+  expect((box.kids[0] as { props?: { backgroundColor?: string } }).props?.backgroundColor).toBe('subtle')
+  const groups = box.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
   expect(groups.filter(k => k!.startsWith('block-rules-'))).toEqual(['block-rules-general', 'block-rules-model', 'block-rules-own'])
   expect(await ui.find({ key: 'rules-toggle-checklist' })).toBeUndefined()
   expect(await ui.find({ text: /^Checklist$/ })).toBeUndefined()
