@@ -511,6 +511,10 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(1)
   expect((await ui.find({ key: 'analyze' }))?.text).toBe('Rewrite')
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Copy to prompt'))
+  // Send then Copy to prompt right under the rewrite box (v0.26.0), and no "Your draft" label above the draft.
+  expect(order[rewriteAt + 1]).toBe('Send')
+  expect(order[rewriteAt + 2]).toBe('Copy to prompt')
+  expect(textLook(await ui.drawn(), 'Your draft')).toEqual({ found: false })
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.
   expect(s.analysisSystems[0]).not.toContain('<tips>')
@@ -862,8 +866,9 @@ test('buttons follow the desktop design system: neutral, primary for the main ac
   await ui.press({ key: 'add-1-0' })
   expect(buttonLook(await ui.drawn(), 'add-1-0')?.color).toBe('error')
 
-  // Section headings are semibold in the normal text color, not clay.
-  expect(textLook(await ui.drawn(), 'Fill in the gaps')).toEqual({ found: true, color: undefined, weight: 'semibold' })
+  // Section headings are semibold in the normal text color, not clay (Fill in the gaps has none since v0.26.0).
+  expect(textLook(await ui.drawn(), 'Fill in the gaps')).toEqual({ found: false })
+  expect(textLook(await ui.drawn(), 'Checklist')).toEqual({ found: true, color: undefined, weight: 'semibold' })
 
   await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ type: 'Select', key: 'mode' })).toBeDefined()
@@ -1036,7 +1041,7 @@ test('Fill in the gaps: the dropdown and the text field share one line', async (
   await ui.unmount()
 })
 
-test('Copy to prompt sits right before Send, and fills the box without sending', async ($, on) => {
+test('Send sits right before Copy to prompt, and Copy to prompt fills the box without sending', async ($, on) => {
   const { s } = world(on)
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1045,7 +1050,8 @@ test('Copy to prompt sits right before Send, and fills the box without sending',
   expect(await ui.find({ key: 'fill' })).toBeUndefined()
   await ui.press({ key: 'analyze' })
   const keys = (await ui.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key)
-  expect(keys.indexOf('fill')).toBe(keys.indexOf('apply') - 1)
+  // Send first, then Copy to prompt (v0.26.0).
+  expect(keys.indexOf('fill')).toBe(keys.indexOf('apply') + 1)
   expect(await ui.find({ key: 'fill', text: 'Copy to prompt' })).toBeDefined()
   expect(await ui.find({ key: 'apply', text: 'Send' })).toBeDefined()
 
@@ -1070,7 +1076,8 @@ test('Fill in the gaps: a pick updates the rewrite, a typed answer wins, and App
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  expect(await ui.find({ text: 'Fill in the gaps' })).toBeDefined()
+  // No "Fill in the gaps" heading since v0.26.0; the question shows on its own.
+  expect(await ui.find({ text: 'Fill in the gaps' })).toBeUndefined()
   expect(await ui.find({ text: 'Which file has the login bug?' })).toBeDefined()
   expect(await ui.find({ type: 'Select', key: 'gap-1-0-pick' })).toBeDefined()
 
@@ -1158,7 +1165,7 @@ test('on mobile, which has no fields, the gaps are listed to fill in later', asy
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'analyze' })
-  expect(await ui.find({ text: /Fill these in after Apply: \[which file\?\]/ })).toBeDefined()
+  expect(await ui.find({ text: /Fill these in after Copy to prompt: \[which file\?\]/ })).toBeDefined()
   expect(await ui.find({ type: 'Input' })).toBeUndefined()
   // The rewrite can't be edited there, so it shows as text.
   expect(await ui.find({ type: 'Code', text: 'Fix the login bug in [which file?].' })).toBeDefined()
@@ -1177,8 +1184,9 @@ test('Add puts a suggestion at the end of the rewrite, Remove takes it out, and 
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  // An untagged (older-format) suggestion fills no checklist item, so it shows under Other suggestions.
-  expect(await ui.find({ text: 'Other suggestions' })).toBeDefined()
+  // Suggestions show in their own list after the gap questions (v0.26.0), not in the checklist.
+  expect(await ui.find({ text: 'Other suggestions' })).toBeUndefined()
+  expect(await ui.find({ key: 'suggestions' })).toBeDefined()
   expect(await ui.find({ text: 'Say when to stop' })).toBeDefined()
 
   await ui.press({ key: 'add-1-0' })
@@ -1241,7 +1249,7 @@ const MERGED = WITH_GAPS.replace(
   '<additions>\nStop rule | Say when to stop | Stop and ask me before deleting anything.\nOutput | Ask for a summary | End with a two-line summary.\nOther | Mention the branch | Work on the main branch.\n</additions>\n<placeholders>',
 )
 
-test('the checklist shows each missing item with its suggestion right under it, and Other suggestions last', async ($, on) => {
+test('suggestions to add sit right after the gap questions, in the analysis order, and the checklist has none', async ($, on) => {
   const { s } = world(on, { analysis: MERGED })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1252,15 +1260,14 @@ test('the checklist shows each missing item with its suggestion right under it, 
 
   const order = (await ui.findAll({})).filter(el => ['Text', 'Button'].includes(el.type)).map(el => el.text ?? '')
   const at = (t: string) => order.indexOf(t)
-  // Stop rule (missing) is followed by its suggestion, before the next item.
-  expect(at('Stop rule')).toBeGreaterThan(-1)
-  expect(at('Suggestion: Say when to stop')).toBeGreaterThan(at('nothing on when to ask'))
-  expect(at('Suggestion: Say when to stop')).toBeLessThan(at('Output'))
-  // Output's suggestion sits under Output, and the untied one under Other suggestions at the end.
-  expect(at('Suggestion: Ask for a summary')).toBeGreaterThan(at('a fix'))
-  expect(at('Other suggestions')).toBeGreaterThan(at('Suggestion: Ask for a summary'))
-  expect(at('Suggestion: Mention the branch')).toBeGreaterThan(at('Other suggestions'))
-  // Items with no suggestion are shown as before.
+  // After the gap question, before the checklist, in the analysis order.
+  expect(at('Suggestion: Say when to stop')).toBeGreaterThan(at('Which file has the login bug?'))
+  expect(at('Suggestion: Ask for a summary')).toBeGreaterThan(at('Suggestion: Say when to stop'))
+  expect(at('Suggestion: Mention the branch')).toBeGreaterThan(at('Suggestion: Ask for a summary'))
+  expect(at('Suggestion: Mention the branch')).toBeLessThan(at('Checklist'))
+  // The checklist itself has no suggestions any more, and no Other suggestions row.
+  expect(at('Other suggestions')).toBe(-1)
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'group-checklist'))).not.toContain('Suggestion:')
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
 
   // Add from the merged view works as before.
@@ -1288,7 +1295,7 @@ test('the checklist sits in one box like a Settings section: an item per row, a 
   expect(keys).toEqual([
     'check-Goal', 'line-checklist-1', 'check-Context', 'line-checklist-2', 'check-Constraints', 'line-checklist-3',
     'check-Done means', 'line-checklist-4', 'check-Stop rule', 'line-checklist-5', 'check-Output', 'line-checklist-6',
-    'other-changes', 'line-checklist-7', 'other-suggestions',
+    'other-changes',
   ])
   // The mark, name and note on one row (v0.24.0).
   const itemRow = boxNode(tree, 'check-Context-row')!
@@ -1314,11 +1321,10 @@ test('each change the rewrite made sits under the item it fixes, and the rest un
   expect(at('Naming the finish line tells it when the work is complete.')).toBeGreaterThan(at('no finish line'))
   expect(at('Naming the finish line tells it when the work is complete.')).toBeLessThan(at('Stop rule'))
   expect(order[at('Naming the finish line tells it when the work is complete.') - 1]).toBe('Rewrite')
-  // Changes named like no item (any case) go under Other changes, after the items and before Other suggestions.
-  expect(at('Other changes')).toBeGreaterThan(at('Suggestion: Ask for a summary'))
+  // Changes named like no item (any case) go under Other changes, after the items.
+  expect(at('Other changes')).toBeGreaterThan(at('a fix'))
   expect(at('clarity')).toBeGreaterThan(at('Other changes'))
   expect(at('Remove "think step by step"')).toBeGreaterThan(at('Other changes'))
-  expect(at('Other suggestions')).toBeGreaterThan(at('Remove "think step by step"'))
   expect(await ui.find({ text: 'The rewrite made no changes.' })).toBeUndefined()
   await ui.unmount()
 })

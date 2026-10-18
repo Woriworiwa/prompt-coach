@@ -281,7 +281,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Add its page to sources.json, then run /coach refresh.`, { color: 'warning' }))
   }
 
-  out.push(heading(E, 'Your draft'))
+  // The draft box has no label since v0.26.0.
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
   // Rewrite (the analyze button) sits under the draft it reads, always active and always the primary style: it used to
   // drop to the plain style once a rewrite existed, which read as grayed out in Desktop (v0.25.3).
@@ -297,20 +297,21 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     ]),
   )
   if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' }))
-  // The rewrite sits right under the draft, so the two read side by side.
+  // The rewrite sits right under the draft, so the two read side by side; Send and Copy to prompt right under it
+  // (v0.26.0), then the gap questions, then the suggestions to add.
   if (v.analysis) {
     out.push(F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
-    if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
-  }
-
-  // Copy to prompt only fills the prompt box; Send fills it and sends.
-  if (v.analysis) {
+    // Send fills the prompt box and sends; Copy to prompt only fills it.
     out.push(
       row(E, [
-        E.Button({ key: 'fill', label: 'Copy to prompt', onPress: a.fill }),
         E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply }),
+        E.Button({ key: 'fill', label: 'Copy to prompt', onPress: a.fill }),
       ]),
     )
+    if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
+    if (v.analysis.additions.length) {
+      out.push(E.Box({ key: 'suggestions', flexDirection: 'column', gap: 1, children: v.analysis.additions.map((s, i) => suggestion(E, v, a, s, i)) }))
+    }
   }
 
   if (v.analysis) {
@@ -424,14 +425,12 @@ function ruleGroup(
  * item follow at the end, under "Other changes", "Other suggestions" or both.
  */
 function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: RenderElement[]; after: RenderElement[] } {
-  const indexed = an.additions.map((s, i) => ({ s, i }))
   const changes = an.changes.map((c, i) => ({ c, i }))
   const fills = (rule: string, item: string) => rule.trim().toLowerCase() === item.toLowerCase()
   const rows: RenderElement[] = []
   for (const c of an.checklist) {
     const m = MARK[c.status]
     const fixes = changes.filter(x => fills(x.c.rule, c.item))
-    const mine = indexed.filter(x => x.s.item === c.item)
     // Each item a row of its own: the mark, name and note on one line (v0.24.0, Omar's call), then what fills it, indented.
     rows.push(
       E.Box({
@@ -446,15 +445,12 @@ function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: R
             children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' }), text(E, c.note, { dimColor: true, wrap: 'wrap' })],
           }),
           ...fixes.map(x => fix(E, x.i, 'Rewrite', x.c.why)),
-          ...mine.map(x => suggestion(E, v, a, x.s, x.i)),
         ],
       }),
     )
   }
   const otherChanges = changes.filter(x => !an.checklist.some(c => fills(x.c.rule, c.item)))
   if (otherChanges.length) rows.push(otherRow(E, 'other-changes', 'Other changes', otherChanges.map(x => fix(E, x.i, x.c.rule, x.c.why))))
-  const other = indexed.filter(x => !x.s.item)
-  if (other.length) rows.push(otherRow(E, 'other-suggestions', 'Other suggestions', other.map(x => suggestion(E, v, a, x.s, x.i))))
   const after = an.changes.length === 0 ? [text(E, 'The rewrite made no changes.', { dimColor: true })] : []
   return { rows, after }
 }
@@ -536,11 +532,10 @@ function rewriteField(E: UI, F: Form, v: View, a: Actions): RenderElement {
 
 /** A dropdown of likely answers and a text field for each placeholder; on mobile, a list to fill in later. */
 function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form): RenderElement[] {
-  const help =
-    'A typed answer wins over a pick. Press Enter in a field to update the rewrite; Copy to prompt and Send use what you typed either way. Enter in an empty field removes that gap and its sentence.'
-  const out = F ? [...withHelp(E, 'Fill in the gaps', 'gaps-help', help)] : [heading(E, 'Fill in the gaps')]
+  // No "Fill in the gaps" heading since v0.26.0: each question stands on its own.
+  const out: RenderElement[] = []
   if (!F) {
-    out.push(text(E, `Fill these in after Apply: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' }))
+    out.push(text(E, `Fill these in after Copy to prompt: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' }))
     return out
   }
   for (const [i, p] of placeholders.entries()) {
@@ -577,31 +572,6 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
     out.push(E.Box({ key: id, flexDirection: 'column', children: fields }))
   }
   return out
-}
-
-/**
- * A heading with an ⓘ beside it, and the help text in a box that shows while
- * the pointer is on the ⓘ or on the box itself (one hover group): drawn
- * hidden, revealed by the surface on hover, with no hook running.
- */
-function withHelp(E: UI, title: string, scope: string, help: string): RenderElement[] {
-  return [
-    E.Box({
-      key: `${scope}-title`,
-      flexDirection: 'row',
-      columnGap: 1,
-      children: [heading(E, title), E.Text({ dimColor: true, hover: { scope, dimColor: false }, children: ['ⓘ'] })],
-    }),
-    E.Box({
-      key: scope,
-      display: 'none',
-      hover: { scope, display: 'flex' },
-      borderStyle: 'round',
-      borderColor: 'subtle',
-      paddingX: 1,
-      children: [text(E, help, { dimColor: true, wrap: 'wrap' })],
-    }),
-  ]
 }
 
 /**
