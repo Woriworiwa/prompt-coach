@@ -156,7 +156,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 - v0.24.2 Coach: Analyze always active, responds to every press.
 - v0.24.0 Coach: each checklist item's name and note on one row.
 - v0.23.0 Coach: no rules-date line; Your draft stays filled after an analysis and changes when you type; Your draft follows typing within about a second.
-- v0.22.0 Coach: Analyze under Your draft, grayed out after an analysis and awake again once the draft changes (as you type); Copy to prompt fills without sending; Send sends.
+- v0.22.0 Coach: Analyze under Your draft; Copy to prompt fills without sending; Send sends.
 - v0.21.0 Coach: the Checklist in a box, a line between items, the note under each name, "Suggestion:" labels, spacing between entries; does it read clearly now?
 - v0.20.0–0.20.1 Settings: each section in a bordered box like Analytics' Rules, the title on no band with no padding, the rows a cell in; hairlines still between rows. Analytics: Rules' items and Statistics a cell in; Rules' title on no background (v0.20.2).
 - v0.19.2 Coach: the rewrite shows as the full-width text block again.
