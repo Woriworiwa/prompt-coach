@@ -286,13 +286,16 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   out.push(heading(E, 'Your draft'))
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
   // Analyze sits under the draft it reads. Mods have no disabled Button, so a dim label and a press that does nothing stand in for one.
+  // Its key names its state: Desktop keeps drawing the first Button it got under a key, so a grayed one under
+  // the same key stayed gray, its presses going to a handle the engine had replaced (v0.24.1).
+  const analyzeKey = v.canAnalyze ? 'analyze' : v.isRunning ? 'analyze-running' : 'analyze-done'
   out.push(
     row(E, [
       E.Button({
-        key: 'analyze',
+        key: analyzeKey,
         label: v.isRunning ? 'Analyzing…' : 'Analyze',
         hotkey: 'a',
-        ...(v.canAnalyze ? (v.analysis ? {} : { variant: 'primary' as const }) : { dimColor: true }),
+        ...(v.canAnalyze ? (v.analysis ? { dimColor: false } : { variant: 'primary' as const, dimColor: false }) : { dimColor: true }),
         onPress: a.analyze,
       }),
     ]),

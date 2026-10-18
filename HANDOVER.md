@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.24.0
+# Handover: prompt-coach v0.24.1
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -114,7 +114,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 ## Rules learned the hard way
 
-- Every Button goes through `withStableButtons`, and every Input and Select through `withStableForm`. A Select whose value the code changes must carry that value in its key, or it keeps showing the old one. A new element on each redraw drops its press handle, and Desktop's first click then does nothing.
+- Every Button goes through `withStableButtons`, and every Input and Select through `withStableForm`. A Select whose value the code changes must carry that value in its key, or it keeps showing the old one. The same goes for a Button whose look the code changes: Analyze stayed grayed in Desktop until v0.24.1 keyed it by state (`analyze`, `analyze-running`, `analyze-done`) and set `dimColor` explicitly; the Desktop log showed its presses as `ui_press not handled`. A new element on each redraw drops its press handle, and Desktop's first click then does nothing.
 - Don't redraw on each keystroke (`onInput` only records the text); redraw on Enter or a pick.
 - `$.session.model()` can return `''` in Desktop. The fallback is `turn.complete`'s `e.usage.model`.
 - Resolved element tables name every element, including ones a surface lacks. Choose the form fields by `e.surface !== 'mobile'`.
@@ -153,6 +153,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
 - Once Desktop bundles a Claude Code newer than 2.1.299 (a new folder in `~/Library/Application Support/Claude/claude-code/`): set `REWRITE_EDITABLE` to true and ship, then check the field in Desktop: it grows with its text, scrolls past 12 lines, and whether it spans the pane; Copy to prompt and Send use the edit; a gap pick and Add/Remove still work after editing.
+- v0.24.1 Coach: Analyze un-grays once you change the draft (keyed by state).
 - v0.24.0 Coach: each checklist item's name and note on one row.
 - v0.23.0 Coach: no rules-date line; Your draft stays filled after an analysis and changes when you type; Analyze un-grays within about a second of typing.
 - v0.22.0 Coach: Analyze under Your draft, grayed out after an analysis and awake again once the draft changes (as you type); Copy to prompt fills without sending; Send sends.
