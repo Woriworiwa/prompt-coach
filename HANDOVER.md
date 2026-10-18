@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.12.0
+# Handover: prompt-coach v0.13.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -18,7 +18,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 - **Inside a conversation,** each analysis also sends Claude's last reply (capped at 6,000 characters), and the draft is read as a reply to it.
 - **Tabs:** Coach (1), Analytics (2) and News (3) on the left, Settings (4) alone at the right end, the same on every surface. `tabs()` puts them in one `tabs` Box with `justifyContent: 'space-between'`. The terminal draws each tab as a plain button, with the open one in clay brackets. Desktop always draws a native button, so there the open tab is clay semibold `Text` and the others are `dimColor` buttons. News is the Week tab's label: its key is `tab-week`, the code calls it the Week tab, and the digest is still "Claude Week".
   - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove. A dim footer gives the rules' date and the path to Omar's rules file.
-  - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then the tips (`tips()`): "Using \<model\> well", in three groups: this draft, the session's model, and Claude Code in general. Tips appear only here.
+  - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then Rules (`ruleList`), then a hairline, then the tips (`tips()`): "Using \<model\> well", in three groups: this draft, the session's model, and Claude Code in general. Tips appear only here.
   - **Settings** is laid out like Desktop's own settings page, with four sections (`settingsGroup`): General, Your rules, Rules and tips, and Claude Week. Each section is a bold title with no box, then rows (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
     - **General:** Mode (Manual or Live; live is capped at 30 analyses a session), Rewrite model and Refresh model. Model changes are saved with `$.config.set`. A refused change makes them read-only, with the reason.
     - **Your rules** (`ownRulesSettings`): the rules file's path, each rule with Remove (`remove-rule-<rule>`), and an Add a rule field (`add-rule-<gen>`, emptied after each add; none on mobile). A note says Added, Removed, already there, or Not saved.
@@ -51,6 +51,13 @@ The goal, set by Omar, is to help him write better prompts by showing what he do
   8. Clear statistics (key `clear-lessons`).
 - **Bars** (`barRow`, `barText`): monospaced, both parts drawn with █ and the empty part dimmed, counts padded with no-break spaces. Omar picked Bars over three other layouts and confirmed in Desktop that they line up and both parts are the same height. In Desktop's fonts, ░ is shorter than █ and the proportional face gives each character a different width.
 
+## Rules list (Analytics tab)
+
+Omar's request (2026-10-18): read the general, model and own rules beside the statistics. He picked option A of three: a reference list with no link from the "changed most" bars to rules (option B, rule IDs cited by the analysis, stays open if he wants it; option C, guessing by word overlap, was dropped as misleading).
+
+- `parseRuleFile` (`lib.ts`) turns a rules file into `## ` sections with their "- " rules; `MODEL_RULES` lists every model file (`rulesFor` returns its entries). `loadRuleFiles` reads general.md and every model file on sync and on opening the Analytics tab, which also re-reads Omar's rules.
+- Picker buttons `rules-pick-<file>` start on the session model (`rulesPick` '' follows it); a model with no file picks nothing and says so. Groups General, the model and Your rules toggle with `rules-toggle-<group>`; only the model group starts open. `rules-edit-own` opens Settings.
+
 ## Claude Week
 
 Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the reader profile.
@@ -75,7 +82,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `analyticsTab`, `statistics`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 124 tests. `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
+| `hooks/*.test.ts` | 127 tests. `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
 | `rules/*.md`, `tips/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
@@ -131,6 +138,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.13.0 Rules on Analytics: the session model is bracketed, other models switch the list, Show and Hide work, the section names read well in Markdown, Edit in Settings opens Settings.
 - v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
 - v0.11.0 Analytics: after 5 analyses and an Apply, the score, Work on next, Missing or vague, What you do well, What the coach changed most for this model, Advice you took and tokens add up and read well.
 - v0.10.1: the third tab reads News.

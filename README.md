@@ -4,7 +4,7 @@ A Claude Code mod that helps you write better prompts, learn why they're better,
 
 It has two parts, plus a weekly digest:
 
-- **`/coach`** opens a side pane that reads the draft in your prompt box before you send it. It shows a checklist, a rewrite, the reason for each change, and, on a Tips tab, tips for the model you're on. Statistics under Settings track what your drafts most often miss.
+- **`/coach`** opens a side pane that reads the draft in your prompt box before you send it. It shows a checklist, a rewrite, the reason for each change, and, on the Analytics tab, statistics on what your drafts most often miss, the rules the coach uses for any model, and tips for the model you're on.
 - **`/improve <draft>`** is the quick path. It rewrites the draft straight into the prompt box, with a dim transcript line saying what changed.
 - **Claude Week**, on the pane's Week tab: a weekly digest about Claude, Claude Code, Claude Desktop, usage limits and Anthropic. Vote on stories and add your own take; the next edition reads them first.
 
@@ -35,7 +35,7 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left,
 - **Apply and send** (`p`): puts the rewrite in the prompt box and sends it. To copy the rewrite, use the copy icon Desktop draws in the rewrite box's corner.
 - **Live 3/30:** a dim reminder under the tabs while live mode is on, with the count used this session. Switch modes under Settings.
 
-**Analytics tab** (`2`): first **Statistics** (below), then a thin line and **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
+**Analytics tab** (`2`): first **Statistics** (below), then **Rules**: the rules the coach checks drafts against, to read beside the statistics. A row of model buttons starts on your session's model and switches to any other. Under it, **General**, the picked model's rules and **Your rules** each show their rule count with Show or Hide (the model's start open), and Your rules has **Edit in Settings**. Then a thin line and **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
 
 **Statistics** (rebuilt in v0.11.0 to help you write better prompts; the older statistics were cleared): from your last 200 analyzed drafts, in this order:
 - **Score:** your last 10 drafts' average out of 6 (a point for each checklist item covered or not needed, half for a vague one), and whether it went up or down from the 10 before.

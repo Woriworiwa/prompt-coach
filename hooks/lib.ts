@@ -16,11 +16,39 @@ export function rulesFor(model: string): ModelRules | undefined {
   const v55 = /5[-.]5(?!\d)/.test(m)
   const v51 = /5[-.]1(?!\d)/.test(m)
 
-  if (/fable|mythos/.test(m) && (v51 || bare)) return { file: 'fable-5-1.md', label: 'Fable 5.1' }
-  if (/opus/.test(m) && (v55 || bare)) return { file: 'opus-5-5.md', label: 'Opus 5.5' }
-  if (/sonnet/.test(m) && (v55 || bare)) return { file: 'sonnet-5-5.md', label: 'Sonnet 5.5' }
-  if (/haiku/.test(m) && (v55 || bare)) return { file: 'haiku-5-5.md', label: 'Haiku 5.5' }
+  const [opus, sonnet, haiku, fable] = MODEL_RULES
+  if (/fable|mythos/.test(m) && (v51 || bare)) return fable
+  if (/opus/.test(m) && (v55 || bare)) return opus
+  if (/sonnet/.test(m) && (v55 || bare)) return sonnet
+  if (/haiku/.test(m) && (v55 || bare)) return haiku
   return undefined
+}
+
+/** Every model with its own rule file, in the order the Analytics tab's picker shows them. */
+export const MODEL_RULES: readonly ModelRules[] = [
+  { file: 'opus-5-5.md', label: 'Opus 5.5' },
+  { file: 'sonnet-5-5.md', label: 'Sonnet 5.5' },
+  { file: 'haiku-5-5.md', label: 'Haiku 5.5' },
+  { file: 'fable-5-1.md', label: 'Fable 5.1' },
+]
+
+/** One `## ` section of a rules file and its rules; `section` is '' for rules above the first heading. */
+export type RuleSection = { section: string; rules: string[] }
+
+/**
+ * A rules file as its sections, for reading in the pane: each `## ` heading
+ * with the "- " lines under it. The title, source and As of lines are not
+ * rules and are skipped, and so are sections with no rules.
+ */
+export function parseRuleFile(md: string): RuleSection[] {
+  const out: RuleSection[] = [{ section: '', rules: [] }]
+  for (const line of md.split('\n')) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line)?.[1]
+    const rule = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
+    if (heading) out.push({ section: heading, rules: [] })
+    else if (rule) out[out.length - 1]!.rules.push(rule)
+  }
+  return out.filter(s => s.rules.length)
 }
 
 const SHARED_RULES = `- Keep the person's intent exactly. Do not add requirements, features, tests, constraints, or scope they did not ask for. If an addition would clearly help, leave it out of the rewrite and mention it in your notes as a suggestion ("Consider: ...").

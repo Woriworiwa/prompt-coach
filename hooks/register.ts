@@ -23,6 +23,9 @@ import {
   liveSkipReason,
   parseAnalysis,
   parseReply,
+  MODEL_RULES,
+  type RuleSection,
+  parseRuleFile,
   parseTips,
   rulesFor,
 } from './lib.ts'
@@ -42,7 +45,7 @@ import {
   toFetchUrl,
 } from './refresh.ts'
 import { type Analytics, NO_ANALYTICS, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
-import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
+import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
   type FeedbackStore,
@@ -148,6 +151,12 @@ let modelTips: string[] = []
 let codeTips: string[] = []
 let rulesAsOf = ''
 let sources: string[] = []
+/** The shipped rule files as sections, by file name (general.md and each model's), for the Analytics tab's rules list. */
+let ruleFiles: Record<string, RuleSection[]> = {}
+/** The model file picked in the rules list; '' follows the session's model. */
+let rulesPick = ''
+/** The rules list's groups that are open; the chosen model's starts open. */
+let rulesOpen: RuleGroup[] = ['model']
 
 let refresh: { isRunning: boolean; progress: string; results: RefreshResult[] } = { isRunning: false, progress: '', results: [] }
 
@@ -359,6 +368,12 @@ export const register: Register = (on, options) => {
       // An empty box after sending is not a changed draft.
       isStale: !!analysis && !!draft.trim() && draft.trim() !== analyzedText.trim(),
       ownRules: { path: ownRulesPath(), rules: ownRules, note: ownRulesNote, gen: ruleGen },
+      ruleList: {
+        general: ruleFiles['general.md'] ?? [],
+        models: MODEL_RULES.map(m => ({ ...m, sections: ruleFiles[m.file] ?? [] })),
+        picked: rulesPick || (rulesFor(model)?.file ?? ''),
+        open: rulesOpen,
+      },
       modelTips,
       codeTips,
       liveCalls,
@@ -383,6 +398,16 @@ export const register: Register = (on, options) => {
         $.ui.invalidate('ui.render')
         // The file may have been edited by hand since it was last read.
         if (t === 'settings') void loadOwnRules($).then(() => $.ui.invalidate('ui.render'))
+        // The Analytics tab lists every rule file; a refresh or a hand edit may have changed them.
+        if (t === 'analytics') void Promise.all([loadRuleFiles($), loadOwnRules($)]).then(() => $.ui.invalidate('ui.render'))
+      },
+      pickRules: file => {
+        rulesPick = file
+        $.ui.invalidate('ui.render')
+      },
+      toggleRules: group => {
+        rulesOpen = rulesOpen.includes(group) ? rulesOpen.filter(g => g !== group) : [...rulesOpen, group]
+        $.ui.invalidate('ui.render')
       },
       mode: m => setMode($, m),
       analyze: () => analyzeNow($),
@@ -460,6 +485,7 @@ export const register: Register = (on, options) => {
 
 async function openPane($: EngineInterface): Promise<void> {
   await syncModel($)
+  await loadOwnRules($)
   draft = (await $.prompt.read()).text
   const opened = await $.ui.open({ id: PANE, title: 'Prompt Coach', closeOnEscape: true })
   isPaneOpen = true
@@ -681,6 +707,7 @@ async function syncModel($: EngineInterface): Promise<boolean> {
     .map(asOfDate)
     .filter((d): d is string => !!d)
   rulesAsOf = dates.sort()[0] ?? ''
+  await loadRuleFiles($)
 
   try {
     const all = parseSources(await $.fs.read(`${root}/sources.json`)).targets
@@ -1162,6 +1189,14 @@ function lastPersonPrompt(messages: SessionMessage[]): { text: string; index: nu
     if (m && isPersonPrompt(m)) return { text: m.text.trim(), index: i }
   }
   return undefined
+}
+
+/** Reads general.md and every model's rule file as sections, for the rules list; a file that can't be read lists nothing. */
+async function loadRuleFiles($: EngineInterface): Promise<void> {
+  const dir = `${$.plugin.root}/rules`
+  const files = ['general.md', ...MODEL_RULES.map(m => m.file)]
+  const read = await Promise.all(files.map(async f => [f, parseRuleFile(await readOr($, `${dir}/${f}`))] as const))
+  ruleFiles = Object.fromEntries(read)
 }
 
 /** The general rules, the session model's own rules when there is a file for it, then Omar's own from the data folder. */

@@ -3,7 +3,7 @@
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, scoreTrend, strengths, tokenSummary } from './analytics.ts'
-import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, NO_PICK, type Placeholder } from './lib.ts'
+import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
@@ -14,6 +14,8 @@ export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 
 export type Tab = 'coach' | 'analytics' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
+/** The groups in the Analytics tab's rules list, each opened and closed on its own. */
+export type RuleGroup = 'general' | 'model' | 'own'
 /** Which part of the analysis shows below the buttons. */
 export type Detail = 'checklist' | 'why'
 
@@ -50,6 +52,7 @@ export type View = {
   liveCalls: number
   rulesAsOf: string
   ownRules: OwnRules
+  ruleList: RuleList
   sources: string[]
   analytics: Analytics
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
@@ -68,6 +71,15 @@ export type OwnRules = {
   note?: string
   /** Changes with each add, so the Add field starts empty again. */
   gen: number
+}
+
+/** The rules list on the Analytics tab: the shipped files as sections, the model picked, and which groups are open. */
+export type RuleList = {
+  general: RuleSection[]
+  models: (ModelRules & { sections: RuleSection[] })[]
+  /** The picked model's file; '' when the session's model has none and nothing was picked. */
+  picked: string
+  open: RuleGroup[]
 }
 
 /** What the Week tab shows: one stored edition, its feedback and read state, and the writer's job. */
@@ -121,6 +133,8 @@ export type ModelSetting = 'rewriteModel' | 'refreshModel' | 'weekModel'
 /** What the pane's controls do. Each may return the work it started, so a press can wait for it. */
 export type Actions = {
   tab: (tab: Tab) => void
+  pickRules: (file: string) => void
+  toggleRules: (group: RuleGroup) => void
   mode: (mode: Mode) => Promise<void>
   analyze: () => Promise<void>
   fill: () => Promise<void> | undefined
@@ -322,7 +336,59 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
  * Settings drew them, then a thin line and the tips.
  */
 function analyticsTab(E: UI, v: View, a: Actions): RenderElement[] {
-  return [settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]), ...hairline(E, v, 'analytics'), ...tips(E, v)]
+  return [
+    settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
+    ...hairline(E, v, 'analytics'),
+    ruleList(E, v, a),
+    ...hairline(E, v, 'analytics-rules'),
+    ...tips(E, v),
+  ]
+}
+
+/**
+ * The rules the coach checks drafts against, to read beside the statistics:
+ * a model picker (the session's model to start), then the general rules, the
+ * picked model's and Omar's own, each opened and closed on its own. Edit in
+ * Settings goes to where his own rules are changed.
+ */
+function ruleList(E: UI, v: View, a: Actions): RenderElement {
+  const r = v.ruleList
+  const picked = r.models.find(m => m.file === r.picked)
+  const picker = block(E, 'rules-picker', [
+    text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
+    row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) }))),
+  ])
+  const own: RuleSection[] = v.ownRules.rules.length ? [{ section: '', rules: v.ownRules.rules }] : []
+  return settingsGroup(E, v, 'rule-list', 'Rules', [
+    picker,
+    ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
+    ruleGroup(E, v, a, 'model', picked?.label ?? 'Model', picked?.sections ?? [], picked ? `No rules found for ${picked.label}.` : `${v.modelLabel || 'This model'} has no rules of its own. Pick a model above.`),
+    ruleGroup(E, v, a, 'own', 'Your rules', own, 'No rules yet.', [E.Button({ key: 'rules-edit-own', label: 'Edit in Settings', onPress: () => a.tab('settings') })]),
+  ])
+}
+
+/** One group in the rules list: its name, rule count and Show or Hide, then when open each section's rules. */
+function ruleGroup(E: UI, v: View, a: Actions, key: RuleGroup, label: string, sections: RuleSection[], empty: string, extra: RenderElement[] = []): RenderElement {
+  const isOpen = v.ruleList.open.includes(key)
+  const count = sections.reduce((n, s) => n + s.rules.length, 0)
+  const head = E.Box({
+    key: `rules-${key}-head`,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    columnGap: 2,
+    flexWrap: 'wrap',
+    children: [
+      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, label, { weight: 'semibold' }), text(E, plural(count, 'rule', 'rules'), { dimColor: true })] }),
+      row(E, [...extra, E.Button({ key: `rules-toggle-${key}`, label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleRules(key) })]),
+    ],
+  })
+  const body = !isOpen
+    ? []
+    : count
+      ? [E.Markdown({ key: `rules-${key}-list`, text: sections.map(s => [...(s.section ? [`**${s.section}**`] : []), s.rules.map(rule => `- ${rule}`).join('\n')].join('\n\n')).join('\n\n') })]
+      : [text(E, empty, { dimColor: true, wrap: 'wrap' })]
+  return block(E, `rules-${key}`, [head, ...body])
 }
 
 /** Tips for the analyzed draft, the session's model, and Claude Code in general. */

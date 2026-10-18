@@ -21,6 +21,7 @@ import {
   OWN_RULES_HEADER,
   parseAnalysis,
   parseTips,
+  parseRuleFile,
 } from './lib.ts'
 import { BAR_CELLS, barCount, barRuns } from './ui.ts'
 import { type Analytics, NO_ANALYTICS, recordDraft } from './analytics.ts'
@@ -171,6 +172,16 @@ describe('bars and live mode', () => {
     expect(ownRuleLines(OWN_RULES_HEADER)).toEqual([])
     expect(withoutOwnRule(md, 'One')).toBe('# Mine\n\nA note.\n- Two\n')
     expect(withoutOwnRule(md, 'Three')).toBe(md)
+  })
+
+  test('parseRuleFile: each ## section with its "- " rules; title, source and As of lines skipped', () => {
+    const md = '# Extra rules for Claude Opus 5.5\n\nSources, paraphrased:\n- https://docs.example/opus\nAs of: 2026-10\n\n## Task framing\n- Name the finish line.\n- Say why.\n\n## Empty\n\n## Remove\n  - Remove "think hard".\n'
+    expect(parseRuleFile(md)).toEqual([
+      { section: '', rules: ['https://docs.example/opus'] },
+      { section: 'Task framing', rules: ['Name the finish line.', 'Say why.'] },
+      { section: 'Remove', rules: ['Remove "think hard".'] },
+    ])
+    expect(parseRuleFile('# Your own rules\n\nOne rule per line.\n')).toEqual([])
   })
 })
 
@@ -1744,5 +1755,50 @@ test('Your rules: the mobile app lists the rules with no field to add one', asyn
   await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ text: 'End with a recap.' })).toBeDefined()
   expect(await ui.find({ text: /Add rules in Desktop/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Rules on the Analytics tab: the session model picked, any model one press away, groups shown and hidden, Edit in Settings', async ($, on) => {
+  world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-analytics' })
+  // The session's model is picked and its rules open; the general rules start hidden.
+  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-general-list' })).toBeUndefined()
+  expect(await ui.find({ text: '1 rule' })).toBeDefined()
+  // Rules sit between the statistics and the tips.
+  const order = (await ui.findAll({})).map(el => el.text ?? '')
+  expect(order.findIndex(t => t === 'Rules')).toBeGreaterThan(order.findIndex(t => t === 'Statistics'))
+  expect(order.findIndex(t => t === 'Rules')).toBeLessThan(order.findIndex(t => t === 'Using Opus 5.5 well'))
+  await ui.press({ key: 'rules-toggle-general' })
+  expect(await ui.find({ key: 'rules-general-list', text: 'Be explicit.' })).toBeDefined()
+  // Another model's rules, though the session runs Opus.
+  await ui.press({ key: 'rules-pick-sonnet-5-5.md' })
+  expect(await ui.find({ key: 'rules-pick-sonnet-5-5.md', text: '[Sonnet 5.5]' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Ask for a real check.' })).toBeDefined()
+  expect(await ui.find({ text: 'Name the finish line.' })).toBeUndefined()
+  // A model with no file reads as such.
+  await ui.press({ key: 'rules-pick-haiku-5-5.md' })
+  expect(await ui.find({ text: 'No rules found for Haiku 5.5.' })).toBeDefined()
+  // Your rules, hidden at first, then Edit in Settings opens the Settings tab.
+  expect(await ui.find({ key: 'rules-own-list' })).toBeUndefined()
+  await ui.press({ key: 'rules-toggle-own' })
+  expect(await ui.find({ key: 'rules-own-list', text: 'End with a recap.' })).toBeDefined()
+  await ui.press({ key: 'rules-edit-own' })
+  expect(boxNode(await ui.drawn(), 'group-own-rules')).toBeDefined()
+  await ui.unmount()
+})
+
+test('Rules on the Analytics tab: a model with no rule file picks nothing and says so', async ($, on) => {
+  world(on, { model: 'claude-opus-4-1' })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('terminal'))
+  await ui.press({ key: 'tab-analytics' })
+  expect(await ui.find({ text: /^\[/ , key: 'rules-pick-opus-5-5.md' })).toBeUndefined()
+  expect(await ui.find({ text: 'claude-opus-4-1 has no rules of its own. Pick a model above.' })).toBeDefined()
   await ui.unmount()
 })
