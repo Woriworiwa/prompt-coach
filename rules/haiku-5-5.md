@@ -1,7 +1,7 @@
 # Extra rules for Claude Haiku 5.5
 
-Source, paraphrased: Anthropic, "Prompting Claude Haiku 5.5"
-https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5
+Source, paraphrased:
+- Anthropic, "Prompting Claude Haiku 5.5": https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5
 As of: 2026-10
 
 ## Scope
