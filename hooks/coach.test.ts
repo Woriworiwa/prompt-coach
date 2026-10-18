@@ -620,6 +620,10 @@ test('when the session reports no model, the pane still loads the rules, then ta
   expect(await ui.find({ text: /No rules for/ })).toBeUndefined()
   expect(await ui.find({ text: /Rules as of 2026-10/ })).toBeDefined()
   await ui.press({ key: 'tab-analytics' })
+  // The model's rules start closed (v0.17.4); Show opens them.
+  expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
+  await ui.press({ key: 'rules-toggle-model' })
   expect(await ui.find({ text: /has no rules of its own/ })).toBeDefined()
   await ui.press({ key: 'tab-coach' })
 
@@ -1158,6 +1162,10 @@ test('switching model changes the label and rules while the pane is open', async
   await clock.advance(5000)
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
+  // The model's rules start closed (v0.17.4); Show opens them.
+  expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
+  await ui.press({ key: 'rules-toggle-model' })
   expect(await ui.find({ key: 'rules-model-list', text: 'Ask for a real check.' })).toBeDefined()
   await ui.unmount()
 })
@@ -1770,12 +1778,16 @@ test('Your rules: the mobile app lists the rules with no field to add one', asyn
   await ui.unmount()
 })
 
-test('Rules on the Analytics tab: General first and closed, then the model with its name a dropdown, then Your rules; no separate Checklist', async ($, on) => {
+test('Rules on the Analytics tab: General, then the model with its name a dropdown, then Your rules, all closed at first; no separate Checklist', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
+  // The model's rules start closed (v0.17.4); Show opens them.
+  expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
+  await ui.press({ key: 'rules-toggle-model' })
   // Rules sits in a box like the Week tab's sections: a round subtle border, the title on a subtle band.
   const box = boxNode(await ui.drawn(), 'group-rule-list')!
   expect(box.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
@@ -1823,6 +1835,10 @@ test('Rules on the Analytics tab: the mobile app picks the model with buttons; a
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'tab-analytics' })
+  // The model's rules start closed (v0.17.4); Show opens them.
+  expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
+  await ui.press({ key: 'rules-toggle-model' })
   expect(await ui.find({ type: 'Select' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: 'Opus 5.5' })).toBeDefined()
   expect(await ui.find({ text: 'claude-opus-4-1 has no rules of its own, so only the general rules apply. Pick a model to read its rules.' })).toBeDefined()
@@ -1850,6 +1866,10 @@ test('Checklist from the rule files: Analyze judges by the model\'s own list, wh
   expect(saved.get('analytics')).toBeUndefined()
 
   await ui.press({ key: 'tab-analytics' })
+  // The model's rules start closed (v0.17.4); Show opens them.
+  expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
+  await ui.press({ key: 'rules-toggle-model' })
   expect(await ui.find({ key: 'rules-model-list', text: '**Checklist**' })).toBeDefined()
   expect(await ui.find({ key: 'rules-model-list', text: 'Stop rule: when to stop and ask. Source: blog' })).toBeDefined()
   expect(await ui.find({ text: '4 rules' })).toBeDefined()

@@ -156,8 +156,8 @@ let ruleFiles: Record<string, RuleSection[]> = {}
 let ruleTexts: Record<string, string> = {}
 /** The model file picked in the rules list; '' follows the session's model. */
 let rulesPick = ''
-/** The rules list's groups that are open; the chosen model's starts open, the general rules closed. */
-let rulesOpen: RuleGroup[] = ['model']
+/** The rules list's groups that are open; all start closed. */
+let rulesOpen: RuleGroup[] = []
 
 let refresh: { isRunning: boolean; progress: string; results: RefreshResult[] } = { isRunning: false, progress: '', results: [] }
 
