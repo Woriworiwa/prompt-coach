@@ -26,5 +26,9 @@ As of: 2026-10
 - Remove "hold all findings until the end".
 
 ## Checklist
-- Add Stop rule: carry on with reversible steps the request covers; stop only for destructive actions or scope changes you must decide. Source: "Finish the whole task"
-- Change Constraints: keep changes to what the task asks; anything else it notices is a follow-up to report, not a change to make. Source: "Keep changes and tests to what the task asks for"
+- Goal: what outcome they want, said explicitly. Source: general guide, "Be clear and direct"
+- Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"
+- Constraints: keep changes to what the task asks; anything else it notices is a follow-up to report, not a change to make. Source: "Keep changes and tests to what the task asks for"
+- Output: what form the answer or result should take. Source: general guide, "Be clear and direct" and "Control the format of responses"
+- Done means: how the result will be checked (tests pass, the numbers add up). Source: general guide, "Ask Claude to self-check"
+- Stop rule: carry on with reversible steps the request covers; stop only for destructive actions or scope changes you must decide. Source: "Finish the whole task"

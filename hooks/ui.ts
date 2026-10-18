@@ -79,8 +79,10 @@ export type RuleList = {
   models: (ModelRules & { sections: RuleSection[] })[]
   /** The picked model's file; '' when the session's model has none and nothing was picked. */
   picked: string
-  /** The checklist for the picked model (general.md's when no model is picked), dropped items included. */
-  checklist: ChecklistItem[]
+  /** The checklist for the picked model, and where it comes from: its own file, general.md (no model picked), or the built-in list. */
+  checklist: { items: ChecklistItem[]; from: 'model' | 'general' | 'built in' }
+  /** Set when the session's model borrows an older model's file; '' otherwise. */
+  borrowed: string
   open: RuleGroup[]
 }
 
@@ -358,6 +360,7 @@ function ruleList(E: UI, v: View, a: Actions): RenderElement {
   const picked = r.models.find(m => m.file === r.picked)
   const picker = block(E, 'rules-picker', [
     text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
+    ...(r.borrowed ? [text(E, r.borrowed, { color: 'warning', wrap: 'wrap' })] : []),
     row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) }))),
   ])
   const own: RuleSection[] = v.ownRules.rules.length ? [{ section: '', rules: v.ownRules.rules }] : []
@@ -372,14 +375,14 @@ function ruleList(E: UI, v: View, a: Actions): RenderElement {
 
 /**
  * The checklist drafts are judged on for the picked model: each item with its
- * definition and source, tagged general, added or changed for the model (the
- * general wording dim under a changed one), or struck through when dropped.
+ * definition and source. A model's checklist is its own and inherits nothing;
+ * with no model picked it is general.md's, for older and unknown models.
  */
 function checklistGroup(E: UI, v: View, a: Actions, model: string | undefined): RenderElement {
-  const items = v.ruleList.checklist
+  const { items, from } = v.ruleList.checklist
   const isOpen = v.ruleList.open.includes('checklist')
-  const live = items.filter(i => i.how !== 'dropped').length
-  const tag = (i: ChecklistItem) => (i.how === 'general' ? 'general' : `${i.how} for ${model ?? 'this model'}`)
+  const whose =
+    from === 'model' ? `${model}'s own checklist.` : from === 'general' ? `${model ? `${model}'s file has no checklist, so the` : 'The'} general checklist, for older and unknown models.` : 'The built-in checklist: no rule file has one.'
   const head = E.Box({
     key: 'rules-checklist-head',
     flexDirection: 'row',
@@ -388,27 +391,21 @@ function checklistGroup(E: UI, v: View, a: Actions, model: string | undefined): 
     columnGap: 2,
     flexWrap: 'wrap',
     children: [
-      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, 'Checklist', { weight: 'semibold' }), text(E, plural(live, 'item', 'items'), { dimColor: true })] }),
+      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, 'Checklist', { weight: 'semibold' }), text(E, plural(items.length, 'item', 'items'), { dimColor: true })] }),
       E.Button({ key: 'rules-toggle-checklist', label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleRules('checklist') }),
     ],
   })
   const body = !isOpen
     ? []
     : [
-        text(E, 'What each draft is judged on. The general items apply to every model; a model adds, changes or drops some.', { dimColor: true, wrap: 'wrap' }),
+        text(E, `What each draft is judged on. ${whose}`, { dimColor: true, wrap: 'wrap' }),
         ...items.map(i =>
           E.Box({
             key: `checklist-${i.name}`,
             flexDirection: 'column',
             children: [
-              E.Box({
-                flexDirection: 'row',
-                columnGap: 1,
-                flexWrap: 'wrap',
-                children: [text(E, i.name, { weight: 'semibold', ...(i.how === 'dropped' ? { strikethrough: true, dimColor: true } : {}) }), text(E, `· ${tag(i)}`, { dimColor: true })],
-              }),
-              ...(i.how === 'dropped' ? [] : [text(E, i.definition, { wrap: 'wrap' })]),
-              ...(i.general ? [text(E, `General: ${i.general}`, { dimColor: true, wrap: 'wrap' })] : []),
+              text(E, i.name, { weight: 'semibold' }),
+              ...(i.definition ? [text(E, i.definition, { wrap: 'wrap' })] : []),
               ...(i.source ? [text(E, `Source: ${i.source}`, { dimColor: true, wrap: 'wrap' })] : []),
             ],
           }),

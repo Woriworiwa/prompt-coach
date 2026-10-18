@@ -190,27 +190,27 @@ describe('bars and live mode', () => {
     expect(parseRuleFile('## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: the outcome. Source: x\n')).toEqual([{ section: 'Clarity', rules: ['Be explicit.'] }])
   })
 
-  test('checklist: general items, then a model\'s Add, Change and Drop, each with its source', () => {
+  test('checklist: a model file\'s own, inheriting nothing; else general.md\'s; else the built-in list', () => {
     const general = '# General\n\n## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: what outcome they want. Source: "Be clear and direct"\n- Constraints: limits or scope. Source: "Be clear and direct"\n- Done means: how it will be checked. Source: "Ask Claude to self-check"\n'
-    const opus = '# Opus\n\n## Remove\n- Remove "think hard".\n\n## Checklist\n- Add Stop rule: when to stop and ask. Source: blog\n- Change Done means: the finish line. Source: blog, "name the finish line"\n- Drop Constraints. Source: guide\n- Change Output: what form. Source: y\n'
-    expect(parseChecklist(opus).map(l => [l.op, l.name])).toEqual([['add', 'Stop rule'], ['change', 'Done means'], ['drop', 'Constraints'], ['change', 'Output']])
-    expect(checklistFor(general, opus)).toEqual([
-      { name: 'Goal', definition: 'what outcome they want.', source: '"Be clear and direct"', how: 'general' },
-      { name: 'Constraints', definition: 'limits or scope.', source: 'guide', how: 'dropped' },
-      { name: 'Done means', definition: 'the finish line.', source: 'blog, "name the finish line"', how: 'changed', general: 'how it will be checked.' },
-      { name: 'Stop rule', definition: 'when to stop and ask.', source: 'blog', how: 'added' },
-      // A Change of an item general.md lacks counts as an Add.
-      { name: 'Output', definition: 'what form.', source: 'y', how: 'added' },
+    const opus = '# Opus\n\n## Remove\n- Remove "think hard".\n\n## Checklist\n- Goal: the whole task in one message. Source: blog\n<!-- Dropped Constraints: "a line" -->\n- Done means: the finish line. Source: blog, "name the finish line"\n- Stop rule: when to stop and ask. Source: blog\n'
+    expect(parseChecklist(opus)).toEqual([
+      { name: 'Goal', definition: 'the whole task in one message.', source: 'blog' },
+      { name: 'Done means', definition: 'the finish line.', source: 'blog, "name the finish line"' },
+      { name: 'Stop rule', definition: 'when to stop and ask.', source: 'blog' },
     ])
-    // No Checklist section in general.md: the built-in six stand in.
-    expect(checklistFor('# General\n- Be explicit.\n').map(i => i.name)).toEqual(['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'])
-    expect(analysisSystem(checklistFor('# General\n'))).toBe(ANALYSIS_SYSTEM)
-    // The system prompt lists the model's items, not the dropped ones.
-    const system = analysisSystem(checklistFor(general, opus))
-    expect(system).toContain('- Done means: the finish line.')
-    expect(system).toContain('- Stop rule: when to stop and ask.')
+    // The model's list stands alone: general.md's Constraints does not come back.
+    expect(checklistFor(general, opus)).toEqual({ items: parseChecklist(opus), from: 'model' })
+    expect(checklistFor(general, '# Older model\n- Be brief.\n')).toEqual({ items: parseChecklist(general), from: 'general' })
+    expect(checklistFor(general).from).toBe('general')
+    const fallback = checklistFor('# General\n- Be explicit.\n')
+    expect(fallback.from).toBe('built in')
+    expect(fallback.items.map(i => i.name)).toEqual(['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'])
+    expect(analysisSystem(fallback.items)).toBe(ANALYSIS_SYSTEM)
+    // The system prompt lists the model's items, in order.
+    const system = analysisSystem(checklistFor(general, opus).items)
+    expect(system).toContain('- Goal: the whole task in one message.\n- Done means: the finish line.\n- Stop rule: when to stop and ask.')
     expect(system).not.toContain('- Constraints:')
-    expect(system).toContain('one line for each of the 4 items')
+    expect(system).toContain('one line for each of the 3 items')
     // The rules sent with the draft leave the checklist out, and keep the rest.
     expect(withoutChecklist(opus)).toBe('# Opus\n\n## Remove\n- Remove "think hard".\n')
     expect(withoutChecklist(general)).toBe('# General\n\n## Clarity\n- Be explicit.\n')
@@ -1828,11 +1828,10 @@ test('Rules on the Analytics tab: a model with no rule file picks nothing and sa
   await ui.unmount()
 })
 
-test('Checklist from the rule files: Analyze judges by the model\'s list, and the Analytics tab shows it per model', async ($, on) => {
+test('Checklist from the rule files: Analyze judges by the model\'s own list, and the Analytics tab shows it per model', async ($, on) => {
   const general = '# General\n\nAs of: 2026-10\n\n- Be explicit.\n\n## Checklist\n- Goal: what outcome they want. Source: "Be clear and direct"\n- Done means: how it will be checked. Source: "Ask Claude to self-check"\n'
-  const opus = '# Opus\n\nAs of: 2026-09\n\n- Name the finish line.\n\n## Checklist\n- Add Stop rule: when to stop and ask. Source: blog\n- Change Done means: the finish line. Source: blog, "name the finish line"\n'
-  const haiku = '# Haiku\n\nAs of: 2026-10\n\n- Keep it short.\n\n## Checklist\n- Drop Goal. Source: guide\n'
-  const { s, saved } = world(on, { files: { 'rules/general.md': general, 'rules/opus-5-5.md': opus, 'rules/haiku-5-5.md': haiku } })
+  const opus = '# Opus\n\nAs of: 2026-09\n\n- Name the finish line.\n\n## Checklist\n- Goal: the whole task in one message. Source: blog\n- Done means: the finish line. Source: blog, "name the finish line"\n- Stop rule: when to stop and ask. Source: blog\n'
+  const { s, saved } = world(on, { files: { 'rules/general.md': general, 'rules/opus-5-5.md': opus } })
   s.box = 'fix the login thing'
   await $.session.start(START)
   await $.command.run(coach())
@@ -1840,30 +1839,42 @@ test('Checklist from the rule files: Analyze judges by the model\'s list, and th
   await ui.press({ key: 'analyze' })
   expect(s.analysisSystems[0]).toContain('- Done means: the finish line.')
   expect(s.analysisSystems[0]).toContain('- Stop rule: when to stop and ask.')
+  expect(s.analysisSystems[0]).not.toContain('how it will be checked')
   // The rules go with the draft without their checklist.
   expect(s.analyses[0]).toContain('Name the finish line.')
   expect(s.analyses[0]).not.toContain('## Checklist')
   expect(saved.get('analytics')).toBeUndefined()
 
   await ui.press({ key: 'tab-analytics' })
-  // The checklist for the session's model is open first: tags, definitions, sources, and the general wording under a change.
+  // The session model's own checklist is open first, each item with its definition and source.
   expect(await ui.find({ text: '3 items' })).toBeDefined()
-  expect(await ui.find({ text: '· general' })).toBeDefined()
-  expect(await ui.find({ text: '· added for Opus 5.5' })).toBeDefined()
-  expect(await ui.find({ text: '· changed for Opus 5.5' })).toBeDefined()
-  expect(await ui.find({ text: 'General: how it will be checked.' })).toBeDefined()
+  expect(await ui.find({ text: /Opus 5\.5's own checklist\./ })).toBeDefined()
+  expect(await ui.find({ text: 'the finish line.' })).toBeDefined()
   expect(await ui.find({ text: 'Source: blog, "name the finish line"' })).toBeDefined()
-  // Rules lists leave the checklist out.
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   expect(await ui.find({ key: 'rules-model-list', text: 'Stop rule' })).toBeUndefined()
-  // Another model: Haiku drops Goal, shown struck through.
-  await ui.press({ key: 'rules-pick-haiku-5-5.md' })
-  expect(await ui.find({ text: '1 item' })).toBeDefined()
-  expect(await ui.find({ text: '· dropped for Haiku 5.5' })).toBeDefined()
-  expect(textLook(await ui.drawn(), 'Goal')).toMatchObject({ found: true })
-  expect(await ui.find({ text: '· added for Opus 5.5' })).toBeUndefined()
+  // Sonnet's file here has no checklist, so it shows the general one and says so.
+  await ui.press({ key: 'rules-pick-sonnet-5-5.md' })
+  expect(await ui.find({ text: '2 items' })).toBeDefined()
+  expect(await ui.find({ text: /Sonnet 5\.5's file has no checklist, so the general checklist/ })).toBeDefined()
+  expect(await ui.find({ text: 'how it will be checked.' })).toBeDefined()
   // Hide folds it.
   await ui.press({ key: 'rules-toggle-checklist' })
-  expect(await ui.find({ text: '· dropped for Haiku 5.5' })).toBeUndefined()
+  expect(await ui.find({ text: 'how it will be checked.' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('A newer model borrows the newest older file of its family, and the pane says so; an older one gets general.md', async ($, on) => {
+  const { s } = world(on, { model: 'claude-opus-6' })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses[0]).toContain('Name the finish line.') // the Opus 5.5 file
+  expect(s.analyses[0]).toContain('The prompt will be sent to: Opus 6')
+  await ui.press({ key: 'tab-analytics' })
+  expect(await ui.find({ text: "No rules file for Opus 6 yet; it uses Opus 5.5's." })).toBeDefined()
+  expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
   await ui.unmount()
 })

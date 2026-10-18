@@ -20,5 +20,9 @@ As of: 2026-10
 - Remove "answer directly" if it is meant to stop thinking; it does not.
 
 ## Checklist
-- Add Stop rule: keep working until it's done; stop to ask only when it can't go on without you or before a risky step. Source: "Prevent early stopping in long agent prompts"
-- Change Done means: a real check that exercises the change (tests, type-checker, build), not just "done". Source: "Tell coding agents to verify their changes"
+- Goal: what outcome they want, said explicitly. Source: general guide, "Be clear and direct"
+- Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"
+- Constraints: limits, scope, or things to leave alone. Source: general guide, "Be clear and direct" (be specific about the desired output format and constraints)
+- Output: what form the answer or result should take. Source: general guide, "Be clear and direct" and "Control the format of responses"
+- Done means: a real check that exercises the change (tests, type-checker, build), not just "done". Source: "Tell coding agents to verify their changes"
+- Stop rule: keep working until it's done; stop to ask only when it can't go on without you or before a risky step. Source: "Prevent early stopping in long agent prompts"

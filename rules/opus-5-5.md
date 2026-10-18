@@ -23,6 +23,9 @@ As of: 2026-10
 - For code review, ask for only the problems that would block a merge, each with file and line, why it is wrong, and how to show it fails.
 
 ## Checklist
-- Change Goal: the whole task in one message, not one step at a time. Source: claude.dev blog, "give the whole task in one message"
-- Change Done means: the finish line, so it knows when it's done (every endpoint uses the new client and the tests pass). Source: claude.dev blog, "name the finish line"
-- Add Stop rule: when to stop and ask (only if a test fails for an unexplained reason, or before anything destructive), and otherwise to keep going. Source: claude.dev blog, "say when you want it to stop and ask"
+- Goal: the whole task in one message, not one step at a time. Source: claude.dev blog, "give the whole task in one message"
+- Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"
+- Constraints: limits, scope, or things to leave alone. Source: general guide, "Be clear and direct" (be specific about the desired output format and constraints)
+- Output: what form the answer or result should take. Source: general guide, "Be clear and direct" and "Control the format of responses"
+- Done means: the finish line, so it knows when it's done (every endpoint uses the new client and the tests pass). Source: claude.dev blog, "name the finish line"
+- Stop rule: when to stop and ask (only if a test fails for an unexplained reason, or before anything destructive), and otherwise to keep going. Source: claude.dev blog, "say when you want it to stop and ask"

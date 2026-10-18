@@ -1,21 +1,25 @@
 {
-  "note": "Where /coach refresh reads from. Each target file is rebuilt from its sources. Your own rules live in the mod's data folder, so refresh never touches them. Pages are fetched as their Markdown copy (the same URL plus .md).",
+  "note": "Where /coach refresh reads from. Each target file is rebuilt from its sources. Your own rules live in the mod's data folder, so refresh never touches them. Pages are fetched as their Markdown copy (the same URL plus .md). Every model rules file also reads the general guide, for the Goal, Context, Constraints and Output items of its checklist.",
   "targets": {
     "rules/general.md": [
       "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
     ],
     "rules/opus-5-5.md": [
       "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5",
-      "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/"
+      "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
     ],
     "rules/sonnet-5-5.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5"
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
     ],
     "rules/haiku-5-5.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5"
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
     ],
     "rules/fable-5-1.md": [
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1"
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
     ],
     "tips/opus-5-5.md": [
       "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/",

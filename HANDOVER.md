@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.14.0
+# Handover: prompt-coach v0.15.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -59,12 +59,11 @@ Omar's option A (2026-10-18): a reference list beside the statistics, with no li
 
 ## Checklist (in the rule files)
 
-Since v0.14.0 the checklist an Analyze judges by comes from the rule files, not the code (Omar chose "B, with layers" on 2026-10-18 after finding the old six had only partial sources). `general.md` has a `## Checklist` section of items (`- Name: definition. Source: …`); each model file's section has `Add`, `Change` (same name, its own definition) or `Drop` lines, each with its own source. Omar reviewed the first drafts: general has Goal, Context, Constraints, Output, Done means; every model adds Stop rule; Opus changes Goal and Done means, Sonnet Constraints and Done means, Haiku Done means, Fable Constraints. No model drops an item.
+Since v0.14.0 the checklist an Analyze judges by comes from the rule files, not the code. v0.15.0 (Omar, 2026-10-18): each model file's `## Checklist` is complete and inherits nothing (repeats across models accepted); `general.md` keeps one for older and unknown models. Lines are `- Name: definition. Source: …`. Today every model has Goal, Context, Constraints, Output (general guide, Constraints reworded for Sonnet and Fable, Goal for Opus) plus Done means and Stop rule worded per model; general.md has the first five.
 
-- `parseChecklist`, `checklistFor` (a Change of an item general lacks counts as an Add), `analysisSystem(items)` and `withoutChecklist` are in `lib.ts`. With no Checklist in general.md, `FALLBACK_CHECKLIST` (the old six) stands in, and `ANALYSIS_SYSTEM` is `analysisSystem` of it.
-- `analyze` re-reads the rule files and sends the model's items in the system prompt; the rules go with the draft without their Checklist sections, for `/improve` too. `parseAnalysis` and `parseAdditions` take the item names.
-- `REFRESH_SYSTEM` keeps the section's form and asks for a source on every line.
-- The Rules list's Checklist group shows the picked model's items (`checklist-<name>`); `parseRuleFile` leaves the section out of the rule groups.
+- `lib.ts`: `parseChecklist`, `checklistFor(general, model)` (model's own, else general, else `FALLBACK_CHECKLIST`, with `from`), `analysisSystem(items)`, `withoutChecklist` (the rules go with the draft without it, `/improve` too).
+- `rulesFor` borrows: a newer version than any file (Opus 6, Sonnet 6.1, Mythos 5.2) gets the newest older file of its family (`MODEL_FAMILIES`), `model` its own label and `isBorrowed`; the pane shows "No rules file for Opus 6 yet; it uses Opus 5.5's." Older models get general.md.
+- Refresh: each model target in `sources.json` also lists the general guide; `REFRESH_SYSTEM` asks for a complete checklist with the four general names kept exactly, a source on every line, and a quoted `<!-- Dropped … -->` comment for any general item dropped; general.md is refreshed first.
 - The model-guide lines it cites are written for system prompts in apps; applying them to prompts typed in Claude Code is a reading Omar accepted.
 
 ## Claude Week
@@ -91,7 +90,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `analyticsTab`, `statistics`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 123 tests (the statistics' pane tests are off with the statistics). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
+| `hooks/*.test.ts` | 125 tests (the statistics' pane tests are off with the statistics). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
 | `rules/*.md`, `tips/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
@@ -147,7 +146,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
-- v0.14.0 Checklist: the Analytics tab says statistics are off; Rules opens with the Checklist for your model, tags and sources read well, a changed item shows the general wording under it, other models switch it; an Analyze on Opus judges Stop rule, on another model its own list. Also from v0.13.0: picking another model switches the lists, Show and Hide work, Edit in Settings opens Settings.
+- v0.15.0 Checklist: the Analytics tab says statistics are off; Rules opens with your model's own Checklist (6 items with sources), another model switches it, no model picked shows general.md's; an Analyze on Opus judges Stop rule. Also from v0.13.0: Show and Hide work, Edit in Settings opens Settings.
 - v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
 - v0.10.1: the third tab reads News.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.

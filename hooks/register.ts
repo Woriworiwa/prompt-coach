@@ -377,6 +377,7 @@ export const register: Register = (on, options) => {
         models: MODEL_RULES.map(m => ({ ...m, sections: ruleFiles[m.file] ?? [] })),
         picked: rulesPick || (rulesFor(model)?.file ?? ''),
         checklist: checklistFor(ruleTexts['general.md'] ?? '', ruleTexts[rulesPick || (rulesFor(model)?.file ?? '')] ?? ''),
+        borrowed: borrowedNote(),
         open: rulesOpen,
       },
       modelTips,
@@ -554,8 +555,8 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     const rules = await loadRules($, file)
     // The checklist for this model, read fresh like the rules: general.md's items with the model file's changes.
     await loadRuleFiles($)
-    const items = checklistFor(ruleTexts['general.md'] ?? '', file ? ruleTexts[file] : '')
-    const names = items.filter(i => i.how !== 'dropped').map(i => i.name)
+    const { items } = checklistFor(ruleTexts['general.md'] ?? '', file ? ruleTexts[file] : '')
+    const names = items.map(i => i.name)
     const previous = lastReply(await transcript($))
     const reply = await $.model.complete({
       model: rewriteModel,
@@ -710,7 +711,7 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   isSynced = true
   model = current
   const target = rulesFor(current)
-  modelLabel = target?.label ?? current
+  modelLabel = target?.model ?? current
   hasModelRules = !!target
 
   const root = $.plugin.root
@@ -752,7 +753,8 @@ async function runRefresh($: EngineInterface, scope: 'changed' | 'all'): Promise
 
   let targets: [string, string[]][]
   try {
-    targets = Object.entries(parseSources(await $.fs.read(`${root}/sources.json`)).targets)
+    // general.md first: the general checklist the model files repeat is settled before them.
+    targets = Object.entries(parseSources(await $.fs.read(`${root}/sources.json`)).targets).sort(([a], [b]) => Number(b === 'rules/general.md') - Number(a === 'rules/general.md'))
   } catch (err) {
     refresh = { isRunning: false, progress: `Could not read sources.json: ${message(err)}`, results: [] }
     $.ui.invalidate('ui.render')
@@ -1203,6 +1205,12 @@ function lastPersonPrompt(messages: SessionMessage[]): { text: string; index: nu
     if (m && isPersonPrompt(m)) return { text: m.text.trim(), index: i }
   }
   return undefined
+}
+
+/** When the session's model has no file of its own and borrows an older one's: "No rules file for Opus 6 yet; it uses Opus 5.5's." */
+function borrowedNote(): string {
+  const target = rulesFor(model)
+  return target?.isBorrowed ? `No rules file for ${target.model} yet; it uses ${target.label}'s.` : ''
 }
 
 /** Reads general.md and every model's rule file as sections, for the rules list; a file that can't be read lists nothing. */

@@ -14,6 +14,15 @@ describe('rulesFor', () => {
     expect(rulesFor('claude-mythos-5-1')?.file).toBe('fable-5-1.md')
   })
 
+  test('a newer version borrows the newest older file of its family, labelled as itself', () => {
+    expect(rulesFor('claude-opus-6')).toEqual({ file: 'opus-5-5.md', label: 'Opus 5.5', model: 'Opus 6', isBorrowed: true })
+    expect(rulesFor('claude-opus-5-6')).toMatchObject({ file: 'opus-5-5.md', model: 'Opus 5.6', isBorrowed: true })
+    expect(rulesFor('claude-sonnet-6-1-20270301')).toMatchObject({ file: 'sonnet-5-5.md', model: 'Sonnet 6.1', isBorrowed: true })
+    expect(rulesFor('claude-mythos-5-2')).toMatchObject({ file: 'fable-5-1.md', model: 'Mythos 5.2', isBorrowed: true })
+    expect(rulesFor('claude-opus-5-5')).toEqual({ file: 'opus-5-5.md', label: 'Opus 5.5', model: 'Opus 5.5', isBorrowed: false })
+    expect(rulesFor('opus')).toMatchObject({ file: 'opus-5-5.md', isBorrowed: false })
+  })
+
   test('falls back to the general rules for other models', () => {
     expect(rulesFor('claude-opus-5')).toBeUndefined()
     expect(rulesFor('claude-sonnet-4-6')).toBeUndefined()

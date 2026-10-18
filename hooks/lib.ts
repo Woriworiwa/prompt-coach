@@ -4,24 +4,31 @@
 export type ModelRules = { file: string; label: string }
 
 /**
- * Picks the rule file for the model the session runs, from the id or alias
+ * The rule file for the session's model, from the id or alias
  * `$.session.model()` returns (`claude-opus-5-5`, `opus`, `claude-opus-5-5[1m]`).
- * A bare alias is read as the newest model of that family. Anything else,
- * such as an older model, gets the general rules only (undefined).
+ * `label` names the file's model and `model` the session's. A bare alias is
+ * read as the newest model of its family. A newer version than any file
+ * borrows the newest older file of its family (`isBorrowed`); an older model,
+ * or one with no family file, gets undefined and so general.md alone.
  * The same file name is used under `rules/` and `tips/`.
  */
-export function rulesFor(model: string): ModelRules | undefined {
+export function rulesFor(model: string): (ModelRules & { model: string; isBorrowed: boolean }) | undefined {
   const m = model.toLowerCase()
-  const bare = /^(opus|sonnet|haiku|fable|mythos)(\[.*\])?$/.test(m)
-  const v55 = /5[-.]5(?!\d)/.test(m)
-  const v51 = /5[-.]1(?!\d)/.test(m)
-
-  const [opus, sonnet, haiku, fable] = MODEL_RULES
-  if (/fable|mythos/.test(m) && (v51 || bare)) return fable
-  if (/opus/.test(m) && (v55 || bare)) return opus
-  if (/sonnet/.test(m) && (v55 || bare)) return sonnet
-  if (/haiku/.test(m) && (v55 || bare)) return haiku
-  return undefined
+  const family = MODEL_FAMILIES.find(f => f.names.some(n => m.includes(n)))
+  if (!family) return undefined
+  const name = family.names.find(n => m.includes(n))!
+  if (new RegExp(`^${name}(\\[.*\\])?$`).test(m)) return { ...family.newest, model: family.newest.label, isBorrowed: false }
+  // The version after the family name: a major, then a single-digit minor if any (5-5, 5.5, 6; not the date in 6-20270101).
+  const v = new RegExp(`${name}-(\\d+)(?:[-.](\\d)(?!\\d))?`).exec(m)
+  if (!v) return undefined
+  const major = Number(v[1])
+  const minor = Number(v[2] ?? 0)
+  const files = family.files.filter(f => f.major < major || (f.major === major && f.minor <= minor)).sort((x, y) => y.major - x.major || y.minor - x.minor)
+  const file = files[0]
+  if (!file) return undefined
+  const isBorrowed = file.major !== major || file.minor !== minor
+  const label = `${name[0]!.toUpperCase()}${name.slice(1)} ${v[2] === undefined ? major : `${major}.${minor}`}`
+  return { file: file.rules.file, label: file.rules.label, model: isBorrowed ? label : file.rules.label, isBorrowed }
 }
 
 /** Every model with its own rule file, in the order the Analytics tab's picker shows them. */
@@ -31,6 +38,14 @@ export const MODEL_RULES: readonly ModelRules[] = [
   { file: 'haiku-5-5.md', label: 'Haiku 5.5' },
   { file: 'fable-5-1.md', label: 'Fable 5.1' },
 ]
+
+/** Each family's names as they appear in model ids, and its rule files by version, newest first. Fable's file covers Mythos too. */
+const MODEL_FAMILIES = [
+  { names: ['opus'], files: [{ major: 5, minor: 5, rules: MODEL_RULES[0]! }] },
+  { names: ['sonnet'], files: [{ major: 5, minor: 5, rules: MODEL_RULES[1]! }] },
+  { names: ['haiku'], files: [{ major: 5, minor: 5, rules: MODEL_RULES[2]! }] },
+  { names: ['fable', 'mythos'], files: [{ major: 5, minor: 1, rules: MODEL_RULES[3]! }] },
+].map(f => ({ ...f, newest: f.files[0]!.rules }))
 
 /** One `## ` section of a rules file and its rules; `section` is '' for rules above the first heading. */
 export type RuleSection = { section: string; rules: string[] }
@@ -53,15 +68,10 @@ export function parseRuleFile(md: string): RuleSection[] {
 
 // ---- The checklist, from the rule files ----
 
-/**
- * One checklist item for a model, as the Analytics tab shows it: `how` says
- * whether it comes from general.md, was added or changed by the model's file,
- * or was dropped there (kept only to show it struck through). A changed item
- * keeps the general wording in `general` for comparison.
- */
-export type ChecklistItem = { name: string; definition: string; source: string; how: 'general' | 'added' | 'changed' | 'dropped'; general?: string }
+/** One checklist item: its name, what it asks of the draft, and the part of the guides it comes from. */
+export type ChecklistItem = { name: string; definition: string; source: string }
 
-/** The checklist before it moved into the rule files; used only when general.md has no Checklist section. */
+/** The checklist before it moved into the rule files; used only when no file has a Checklist section. */
 export const FALLBACK_CHECKLIST: readonly ChecklistItem[] = [
   ['Goal', 'what outcome they want.'],
   ['Context', 'the files, errors, project, or background the assistant cannot see on its own.'],
@@ -69,55 +79,36 @@ export const FALLBACK_CHECKLIST: readonly ChecklistItem[] = [
   ['Done means', 'the finish line, how they and the assistant will know the work is done (tests pass, the page shows X).'],
   ['Stop rule', 'when the assistant should stop and ask rather than keep going (for example before anything destructive).'],
   ['Output', 'what form the answer or result should take.'],
-].map(([name, definition]) => ({ name: name!, definition: definition!, source: 'built in', how: 'general' as const }))
+].map(([name, definition]) => ({ name: name!, definition: definition!, source: 'built in' }))
 const FALLBACK_NAMES = FALLBACK_CHECKLIST.map(i => i.name)
 
-/** One line of a Checklist section: a general item, or a model's Add, Drop or Change. */
-export type ChecklistLine = { op: 'item' | 'add' | 'drop' | 'change'; name: string; definition: string; source: string }
-
-/** The lines of a file's `## Checklist` section, from "- Name: definition. Source: …" or "- Add/Drop/Change Name…". */
-export function parseChecklist(md: string): ChecklistLine[] {
-  const out: ChecklistLine[] = []
+/** The items of a file's `## Checklist` section, each line "- Name: definition. Source: …". */
+export function parseChecklist(md: string): ChecklistItem[] {
+  const out: ChecklistItem[] = []
   for (const line of checklistSection(md).split('\n')) {
     const body = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
     if (!body) continue
     const at = body.search(/\sSource:\s/)
     const head = (at < 0 ? body : body.slice(0, at)).trim()
     const source = at < 0 ? '' : body.slice(at).replace(/^\s*Source:\s*/, '').trim()
-    const opMatch = /^(Add|Drop|Change)\s+/i.exec(head)
-    const op = (opMatch?.[1]?.toLowerCase() ?? 'item') as ChecklistLine['op']
-    const rest = opMatch ? head.slice(opMatch[0].length) : head
-    const colon = rest.indexOf(':')
-    const name = (colon < 0 ? rest : rest.slice(0, colon)).replace(/\.$/, '').trim()
-    const definition = colon < 0 ? '' : rest.slice(colon + 1).trim()
-    if (name) out.push({ op, name, definition, source })
+    const colon = head.indexOf(':')
+    const name = (colon < 0 ? head : head.slice(0, colon)).replace(/\.$/, '').trim()
+    if (name) out.push({ name, definition: colon < 0 ? '' : head.slice(colon + 1).trim(), source })
   }
   return out
 }
 
 /**
- * The checklist for a model: general.md's items, then the model file's lines
- * in order. Add appends an item, Change replaces an item's definition (or adds
- * it when general.md lacks it), and Drop marks it dropped. With no Checklist
- * section in general.md, the built-in list stands in for it.
+ * The checklist a draft is judged on: the model file's own when it has one,
+ * which inherits nothing, else general.md's (older and unknown models), else
+ * the built-in list. `from` says which.
  */
-export function checklistFor(generalMd: string, modelMd = ''): ChecklistItem[] {
-  const general = parseChecklist(generalMd).filter(l => l.op === 'item')
-  const items: ChecklistItem[] = general.length
-    ? general.map(l => ({ name: l.name, definition: l.definition, source: l.source, how: 'general' }))
-    : FALLBACK_CHECKLIST.map(i => ({ ...i }))
-  for (const l of parseChecklist(modelMd)) {
-    const at = items.findIndex(i => i.name.toLowerCase() === l.name.toLowerCase())
-    const found = at < 0 ? undefined : items[at]
-    if (l.op === 'drop') {
-      if (found) items[at] = { ...found, how: 'dropped', source: l.source || found.source }
-    } else if (l.op === 'change' && found) {
-      items[at] = { name: found.name, definition: l.definition, source: l.source, how: 'changed', general: found.definition }
-    } else if (!found) {
-      items.push({ name: l.name, definition: l.definition, source: l.source, how: 'added' })
-    }
-  }
-  return items
+export function checklistFor(generalMd: string, modelMd = ''): { items: ChecklistItem[]; from: 'model' | 'general' | 'built in' } {
+  const own = parseChecklist(modelMd)
+  if (own.length) return { items: own, from: 'model' }
+  const general = parseChecklist(generalMd)
+  if (general.length) return { items: general, from: 'general' }
+  return { items: [...FALLBACK_CHECKLIST], from: 'built in' }
 }
 
 /** A file's `## Checklist` section, without its heading; '' when it has none. */
@@ -198,7 +189,7 @@ export type Analysis = {
 
 /** The analysis call's system prompt, judging the draft against `items` (the checklist for the session's model). */
 export function analysisSystem(items: readonly ChecklistItem[]): string {
-  const active = items.filter(i => i.how !== 'dropped')
+  const active = items
   return `You coach a person on a draft prompt for an AI coding assistant. You check the draft, rewrite it, and explain each change so the person learns the pattern.
 
 The checklist (judge each item for this draft):

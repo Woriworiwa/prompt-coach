@@ -71,7 +71,7 @@ Rules:
 - Change a bullet only where the sources now say something different, add one only for new guidance, and remove one only when the sources no longer support it.
 - Keep exact command names, model names and settings as the sources give them.
 - Do not add an "As of" line; it is added for you.
-- A "## Checklist" section lists what drafts are judged on. Keep each line's form: "- Name: definition. Source: <the section of the source that supports it>", or in a model's file "- Add Name: …", "- Change Name: …" or "- Drop Name. Source: …". Add, change or drop an item only where the sources support it, and give every line a Source naming where in the sources it comes from.
+- A "## Checklist" section lists what drafts are judged on, one line each: "- Name: definition. Source: <the section of the sources that supports it>". Every line needs a Source. A model's rules file always has its own complete checklist and inherits nothing: Goal, Context, Constraints and Output come from the general prompting guide (keep those four names exactly), and you judge from the model's own sources which other items apply (such as Done means or Stop rule) and how each one reads for this model. Drop one of the four general items only when a source line says it does not apply to this model; then put a comment in its place, <!-- Dropped Constraints: "the quoted source line" -->, so the reviewer sees why.
 
 Reply with the complete updated file inside <file></file> and nothing else.`
 
