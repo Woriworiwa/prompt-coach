@@ -1,0 +1,41 @@
+{
+  "name": "prompt-coach",
+  "version": "0.8.1",
+  "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with model tips and your recurring gaps; /improve rewrites a draft straight into the prompt box; a Week tab with Claude Week, a weekly digest you vote on.",
+  "author": {
+    "name": "Omar"
+  },
+  "userConfig": {
+    "rewriteModel": {
+      "type": "string",
+      "title": "Rewrite model",
+      "description": "The model for Analyze, live mode and /improve. haiku is fastest and cheapest; sonnet writes better rewrites.",
+      "options": [
+        "haiku",
+        "sonnet",
+        "opus"
+      ],
+      "default": "sonnet"
+    },
+    "refreshModel": {
+      "type": "string",
+      "title": "Refresh model",
+      "description": "The model that rewrites rules and tips on /coach refresh, only for files whose source pages changed. opus changes the least it needs to.",
+      "options": [
+        "sonnet",
+        "opus"
+      ],
+      "default": "opus"
+    },
+    "weekModel": {
+      "type": "string",
+      "title": "Week model",
+      "description": "The model that writes each Claude Week edition in the coach pane's Week tab, from the source pages the mod fetches. opus sticks to its sources more closely.",
+      "options": [
+        "sonnet",
+        "opus"
+      ],
+      "default": "opus"
+    }
+  }
+}

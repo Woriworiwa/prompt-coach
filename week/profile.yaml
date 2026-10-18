@@ -1,0 +1,11 @@
+# Claude Week reader profile. The edition writer reads this every edition.
+# It is yours: edit it by hand. Nothing in prompt-coach rewrites it.
+name: Omar
+role: Senior full-stack developer
+uses_claude_code: daily, inside the Claude desktop app (Code tab), never from the terminal
+interests: Claude Code releases and features, tips for Claude Code, usage limits, models, Claude Desktop
+follows: Addy Osmani
+prefers:
+  - plain, factual wording that leads with the version or date
+  - no status tags such as "confirmed" or "reported"
+dislikes: []   # filled in from feedback over time

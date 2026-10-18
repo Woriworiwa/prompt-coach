@@ -1,0 +1,20 @@
+{
+  "note": "The pages Claude Week reads, in tier order. The mod fetches each one, cuts it to its text (links kept as <url>), and hands them all to the Week model in one request. kind 'github-releases' is the GitHub API's JSON, reduced to the last 14 days of release notes; 'link' is the page stories should link to instead.",
+  "pages": [
+    { "tier": 1, "label": "claude.dev blog", "url": "https://claude.dev/blog/" },
+    { "tier": 1, "label": "Anthropic newsroom", "url": "https://www.anthropic.com/news" },
+    { "tier": 1, "label": "Claude release notes (Help Center)", "url": "https://support.claude.com/en/articles/12138966-release-notes" },
+    {
+      "tier": 1,
+      "label": "Claude Code releases on GitHub",
+      "url": "https://api.github.com/repos/anthropics/claude-code/releases?per_page=30",
+      "kind": "github-releases",
+      "link": "https://github.com/anthropics/claude-code/releases"
+    },
+    { "tier": 2, "label": "Releasebot: Anthropic", "url": "https://releasebot.io/updates/anthropic" },
+    { "tier": 2, "label": "Havoptic: What's new in Claude Code", "url": "https://www.havoptic.com/whats-new/claude-code" },
+    { "tier": 2, "label": "Classmethod update summaries", "url": "https://dev.classmethod.jp/" },
+    { "tier": 3, "label": "Addy Osmani (feed)", "url": "https://addyosmani.com/rss.xml", "link": "https://addyosmani.com/" },
+    { "tier": 3, "label": "patterns.dev AI weekly", "url": "https://www.patterns.dev/ai/weekly" }
+  ]
+}

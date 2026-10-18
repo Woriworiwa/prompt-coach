@@ -1,0 +1,4 @@
+.DS_Store
+# Written by the installed Claude Code; regenerated on each release.
+.claude-plugin/types/
+node_modules/

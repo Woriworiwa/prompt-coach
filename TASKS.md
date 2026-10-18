@@ -1,0 +1,58 @@
+# prompt-coach tasks
+
+Plan: `~/.claude-personal/plans/let-us-work-on-compiled-sphinx.md`
+
+- [x] Step 0: generate types (`.claude-plugin/types/`), confirm APIs
+  - `$.prompt.read()` → `{ text, cursor }`, never rejects
+  - `prompt.edit`: `const r = await next(e)` gives the draft after the edit (`r.text`); 50 ms own-time limit
+  - `$.clock.after(ms, fn)` → `{ cancel() }`; `mock.clock(on)` in tests
+  - Pane `e.props.placement` is `'dock' | 'inline'`, decided by the surface
+  - Tests can `$.ui.mount({ plugin, surface: 'desktop', component: 'Pane', props })` and `press`/`select`
+- [x] Step 0: all 6 source URLs return 200; Claude Code pages picked from llms.txt
+- [x] tips/*.md, sources.json, rules/omar.md
+- [x] lib.ts: analysis prompt, parseAnalysis, tipsFor, recordLesson
+- [x] ui.ts + register.ts: /coach pane, manual/live, lessons
+- [x] refresh.ts: /coach refresh with pending diff, accept/reject
+- [x] tests; validate; test
+- [x] README, HANDOVER, plugin.json 0.2.0; review pass; report
+
+Notes from the build:
+- Pending refresh files are kept in `$.store` (`pendingRefresh`), not `.pending/`: `$.fs` has no delete.
+- Review pass fixed: Apply in live mode re-analyzing the rewrite; empty box after sending shown as a changed draft.
+- Loading: tried CLAUDE_CODE_PLUGIN_DIRS for Desktop; Desktop ignores it. Reverted, and reinstalled 0.2.0 as an installed plugin (runs from the cache).
+- Not verified in the Desktop app: pane placement, prompt.edit firing, a real Sonnet analysis, a real refresh.
+- v0.2.1: dropped the `prompt.change` hook (not in Desktop's 2.1.299, so the module was refused); `prompt.submit` clears the draft instead. Validated and tested on 2.1.299 and 2.1.302. Desktop then registered /improve and /coach (113 → 115 commands).
+- v0.2.2: /coach checks `$.session.surfaces()` when it runs; Desktop reports no surface at session.start, so the old check refused the pane there.
+- Desktop: /coach opens the pane (confirmed by Omar, v0.2.2).
+- Desktop: real Analyze shows checklist + rewrite; Apply fills the box (confirmed by Omar).
+- Desktop: live mode analyzes once per pause (confirmed by Omar).
+- v0.2.3: refresh compares page fingerprints and rewrites only changed files; new `refreshModel` setting (default opus); Rewrite all / `/coach refresh all`; first run records a baseline. 32 tests pass on 2.1.299 and 2.1.302.
+- Desktop: v0.2.3 first refresh recorded a baseline and proposed nothing (confirmed by Omar).
+- Business config (~/.claude, SmartArena): /coach opens the pane (confirmed by Omar).
+- Desktop: the pane docks on the right, beside the transcript (confirmed by Omar).
+- v0.2.4: Analyze, live mode and /improve send Claude's last reply as context (capped at 6,000 characters), and the pane notes it. 40 tests pass on 2.1.299 and 2.1.302. Installed in both configs on 2026-10-17; not yet checked in Desktop.
+- v0.2.5: Desktop's `$.session.model()` returned '' so the pane showed no model rules and no tips; it now falls back to the model that answered the last turn and always loads tips once. 41 tests pass on 2.1.299 and 2.1.302.
+- v0.2.6: pane buttons needed two clicks in Desktop (a focus redraw dropped the press handles); unchanged Buttons are now reused so they keep their handles. 42 tests pass on 2.1.299 and 2.1.302.
+- v0.2.7: Apply (now "Apply and send", p) fills the box and submits the rewrite as Omar's prompt, then empties the box. 43 tests pass on 2.1.299 and 2.1.302.
+- v0.2.8: tips grouped under labels (this draft, the model, Claude Code) with spacing between tips. 43 tests pass on 2.1.299 and 2.1.302.
+- v0.2.9: new Apply button (fill only) right before Apply and send. 44 tests pass on 2.1.299 and 2.1.302.
+- v0.2.10: Rewrite box moved directly under Your draft. 44 tests pass on 2.1.299 and 2.1.302.
+- v0.3.0: Fill in the gaps: a dropdown of likely answers and a text field per placeholder; Apply, send and Copy use the filled rewrite; mobile gets a list. 49 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.3.1: Suggestions you can add: each suggested addition has an Add/Remove button that appends its sentence to the rewrite. 52 tests pass on 2.1.299 and 2.1.302.
+- v0.3.2: Checklist and Why each change moved into two tabs. 52 tests pass on 2.1.299 and 2.1.302.
+- v0.3.3: pane buttons colored with theme colors (colored Text labels, primary variant for the main action). 53 tests pass on 2.1.299 and 2.1.302.
+- v0.3.4: suggestions merged into the Checklist tab, each under the item it fills (analysis lines tagged with the item); untied ones under Other suggestions. 55 tests pass on 2.1.299 and 2.1.302.
+- v0.3.5: Enter in an empty gap field removes the gap and its sentence; an answer brings it back. 59 tests pass on 2.1.299 and 2.1.302.
+- v0.3.6: the Fill in the gaps help note moved into a hover reveal behind an ⓘ next to the heading. 59 tests pass on 2.1.299 and 2.1.302; the hover itself is Omar's to test.
+- v0.4.0: Settings tab (mode, rewrite and refresh models via $.config.set, sources); Coach tab keeps a dim Live n/30. 63 tests pass on 2.1.299 and 2.1.302. Model change not yet run in Desktop.
+- v0.4.1: removed the pane's Copy button and its c shortcut; Desktop's copy icon on the rewrite box stays. 63 tests pass on 2.1.299 and 2.1.302.
+- v0.4.2: pane restyled to the desktop design system (CDS): neutral buttons, primary for the main action, red only for destructive, clay only on the open tab, neutral headings. 63 tests pass on 2.1.299 and 2.1.302.
+- v0.4.3: removed the For <model> line under the tabs. 63 tests pass on 2.1.299 and 2.1.302.
+- v0.4.4: Desktop tabs: the open tab is clay semibold text with no frame, the others dim buttons (Desktop ignores `plain`); terminal unchanged; keys 1-4 kept. 65 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- Desktop: v0.4.4 tabs look right (confirmed by Omar).
+- v0.5.0: Lessons and Refresh tabs moved into Settings; Lessons renamed Statistics (Clear statistics) and Recent drafts dropped from the pane; tabs are now Coach (1) and Settings (2) on every surface; /coach refresh opens Settings. 65 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.6.0: new Tips tab (2) holds the tips for the draft, the model and Claude Code; the Coach tab no longer shows them; Settings moves to 3. 65 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.7.0: Settings in four bordered groups (round border, subtle color, title on a subtle background band); each setting's label and help on the left, control on the right (flex row, space-between, wraps when narrow). 66 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.8.0: new Week tab (4) with Claude Week: a background subagent (weekModel, default opus; WebFetch, WebSearch, Read) writes the edition from week/edition-prompt.md and week/profile.yaml; votes, reasons, takes and read marks in $.store steer the next edition; Put in prompt box for story and question prompts; Week model under Settings. 87 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- Desktop: v0.8.0 Week tab draws (confirmed by Omar's screenshot); Write failed: auto mode's classifier refused the mod's Agent spawn.
+- v0.8.1: Claude Week is written without a subagent: the mod fetches week/sources.json's pages (pageText, releasesText) and one model.complete writes the edition; no web search (Tier 4 dropped), edition-prompt.md says so; progress shown on the tab. 92 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.

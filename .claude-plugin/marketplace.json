@@ -1,0 +1,13 @@
+{
+  "name": "prompt-coach",
+  "owner": {
+    "name": "Omar"
+  },
+  "plugins": [
+    {
+      "name": "prompt-coach",
+      "source": "./"
+    }
+  ],
+  "description": "prompt-coach: rewrite your draft prompts for the model you are using."
+}

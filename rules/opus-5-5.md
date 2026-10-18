@@ -1,0 +1,23 @@
+# Extra rules for Claude Opus 5.5
+
+Sources, paraphrased:
+- Anthropic, "Prompting Claude Opus 5.5": https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5
+- claude.dev, "Getting the most out of Opus 5.5" (Sep 22, 2026): https://claude.dev/blog/getting-the-most-out-of-opus-5-5/
+As of: 2026-10
+
+## Task framing
+- Give the whole task in one message and name the finish line ("done means the tests pass and the old client is deleted"). Opus 5.5 keeps going on long, multi-part work and uses the finish line to know when to stop.
+- Say when it should stop and ask (for example only if a test fails for an unexplained reason, or before anything destructive), and when it should keep going without checking in.
+- For a large audit, migration, or review, suggest splitting the work across subagents and checking each one's evidence before accepting it.
+- For a long run, suggest keeping the task list in a file (for example TASKS.md) and ticking items off.
+
+## Remove
+- Remove "think carefully", "think step by step", "think hard" and similar lines. Opus 5.5 always thinks before replying and decides how much; these lines only delay the reply.
+- Remove requests to show or write out its reasoning in the reply. These can be declined. Ask instead for a short explanation ("explain why you chose this in three sentences") or a summary of what it did.
+
+## Add when relevant
+- For a quick, simple question, add "Answer directly."
+- For design work (a page, app, or artifact), list the specific styles to leave out (for example cream backgrounds, italic accent words, numbered "01 / 02" labels, pill buttons). "Avoid a generic look" mostly swaps one default for another.
+- For research or analysis, ask it to mark anything it could not confirm and to say where it looked.
+- When pasting text from elsewhere (an email, a web page, a log), wrap it in a tag such as <pasted_content> so it is treated as material, not as instructions.
+- For code review, ask for only the problems that would block a merge, each with file and line, why it is wrong, and how to show it fails.

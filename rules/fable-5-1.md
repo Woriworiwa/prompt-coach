@@ -1,0 +1,26 @@
+# Extra rules for Claude Fable 5.1 and Claude Mythos 5.1
+
+Source, paraphrased: Anthropic, "Prompting Claude Fable 5.1"
+https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1
+As of: 2026-10
+
+## Scope
+- Make the scope explicit: the request (or an approved plan) is the scope, and other issues it notices should be reported as follow-ups, not fixed.
+- When describing a problem or asking a question, say whether you want an assessment only or a fix. Without that, an assessment is the deliverable and no fix should be applied.
+- For implementation, say not to fix nearby bugs or extend behavior unless required, and to note them in the summary.
+- For small file changes, ask for targeted edits, not whole-file rewrites.
+- Limit tests to what the task needs, roughly one focused test per stated behavior.
+
+## Working style
+- If it should work without checking in, say so: proceed on reversible steps, stop only for destructive actions or real scope changes, and finish the work rather than describe the next step.
+- If you want progress updates, ask it to say what it is about to do before starting and to end with a recap of what it found, did, and what is next.
+- Ask it to search for any name it does not recognize, or one from a fast-changing area, using the name exactly as written.
+
+## Wording
+- For a bug hunt, ask "Are there any bugs in this program?" rather than "Does this compile without errors?".
+- For a lesser-known language or framework, include context or documentation.
+- Ask for plain, direct prose if you want it; Fable 5.1 already formats lightly, so do not add blanket "no lists, no headers" rules.
+
+## Remove
+- Remove requests to write out its reasoning; ask for a short explanation or a summary of actions instead.
+- Remove "hold all findings until the end".

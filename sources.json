@@ -1,0 +1,47 @@
+{
+  "note": "Where /coach refresh reads from. Each target file is rebuilt from its sources. rules/omar.md is never listed here, so refresh never touches it. Pages are fetched as their Markdown copy (the same URL plus .md).",
+  "targets": {
+    "rules/general.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"
+    ],
+    "rules/opus-5-5.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5",
+      "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/"
+    ],
+    "rules/sonnet-5-5.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5"
+    ],
+    "rules/haiku-5-5.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5"
+    ],
+    "rules/fable-5-1.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1"
+    ],
+    "tips/opus-5-5.md": [
+      "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5",
+      "https://code.claude.com/docs/en/model-config",
+      "https://code.claude.com/docs/en/fast-mode"
+    ],
+    "tips/sonnet-5-5.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5",
+      "https://code.claude.com/docs/en/model-config"
+    ],
+    "tips/haiku-5-5.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5",
+      "https://code.claude.com/docs/en/model-config"
+    ],
+    "tips/fable-5-1.md": [
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1",
+      "https://code.claude.com/docs/en/model-config"
+    ],
+    "tips/claude-code.md": [
+      "https://code.claude.com/docs/en/best-practices",
+      "https://code.claude.com/docs/en/permission-modes",
+      "https://code.claude.com/docs/en/common-workflows",
+      "https://code.claude.com/docs/en/sub-agents",
+      "https://code.claude.com/docs/en/memory",
+      "https://code.claude.com/docs/en/context-window"
+    ]
+  }
+}
