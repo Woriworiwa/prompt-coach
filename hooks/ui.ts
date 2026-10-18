@@ -283,7 +283,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   out.push(heading(E, 'Your draft'))
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
-  // Analyze sits under the draft it reads, always active (the gray-out of v0.22.0–0.24.1 is gone at Omar's say).
+  // Rewrite (the analyze button) sits under the draft it reads, always active (the gray-out of v0.22.0–0.24.1 is gone at Omar's say).
   out.push(
     row(E, [
       E.Button({
@@ -314,7 +314,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   if (v.analysis) {
     const an = v.analysis
-    if (v.isStale) out.push(text(E, 'Your draft changed since this analysis. Press Analyze to update it.', { dimColor: true }))
+    if (v.isStale) out.push(text(E, 'Your draft changed since this rewrite. Press Rewrite to update it.', { dimColor: true }))
     if (v.analyzedReply) {
       const cut = v.analyzedReply.isCut ? ' It was long, so only its start and end were read.' : ''
       out.push(text(E, `Read as a reply to Claude's last message.${cut}`, { dimColor: true, wrap: 'wrap' }))
@@ -610,7 +610,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const st = v.settings
 
   const modeHelp =
-    v.mode === 'live' ? `Analyzes each draft when you pause typing (${v.liveCalls}/${LIVE_CAP} this session).` : 'Analyzes only when you press Analyze.'
+    v.mode === 'live' ? `Analyzes each draft when you pause typing (${v.liveCalls}/${LIVE_CAP} this session).` : 'Rewrites only when you press Rewrite.'
   const modeControl = F
     ? F.Select({ key: 'mode', options: [{ value: 'manual', label: 'Manual' }, { value: 'live', label: 'Live' }], value: v.mode, onSelect: m => void a.mode(m === 'live' ? 'live' : 'manual') })
     : row(
@@ -622,7 +622,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       )
   const general: RenderElement[] = [
     settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
-    modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Analyze, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
+    modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Rewrite, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
     modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites the rules on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
   ]
   const generalNote = st.readOnlyReason
@@ -837,7 +837,7 @@ function modelSetting(
 function statistics(E: UI, v: View, a: Actions): RenderElement[] {
   if (!STATS_ON) return [text(E, 'Statistics are off while the checklist design changes.', { dimColor: true, wrap: 'wrap' })]
   const an = v.analytics
-  if (!an.drafts.length && !tokenSummary(an)) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
+  if (!an.drafts.length && !tokenSummary(an)) return [text(E, 'No analyses yet. Each Rewrite adds to these statistics.', { dimColor: true })]
   return [
     ...(an.drafts.length
       ? [scoreLine(E, an), ...focusBlock(E, an), gapBars(E, an), strengthsBlock(E, an), changedBars(E, an, v.modelLabel), adviceLine(E, an)]

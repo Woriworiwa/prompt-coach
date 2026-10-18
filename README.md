@@ -44,12 +44,12 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left,
 - **What you do well:** up to three items present in most of your drafts.
 - **What the coach changed most:** the rules behind its changes, for your session's model only, each counted once per draft.
 - **Advice you took:** suggestions you added of those offered, and rewrites you applied.
-- **Tokens:** what the analyses used, last and dim. Analyze and live mode count; /improve doesn't.
+- **Tokens:** what the analyses used, last and dim. Rewrite and live mode count; /improve doesn't.
 
 It's all kept between sessions on this Mac, with no draft text, and no extra model calls. **Clear statistics** resets it.
 
 **Settings tab** (`4`), laid out like the Desktop app's own settings: four sections (General, Your rules, Rules, Claude Week), each in a bordered box like the Analytics tab's Rules, with a bold title (on no background) and rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
-- **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
+- **Mode** (a Manual / Live dropdown; buttons on mobile): Manual rewrites only when you press Rewrite. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model** and **Refresh model:** two of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
 - **Rules:** the source pages the rules come from, always listed, then the refresh (see "Keeping the rules current" below).
@@ -105,7 +105,7 @@ The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLA
 
 ## Settings
 
-- `rewriteModel` (default `sonnet`): the model for Analyze, live mode and `/improve`. `haiku` is faster and cheaper, and `opus` is slower and more careful.
+- `rewriteModel` (default `sonnet`): the model for Rewrite, live mode and `/improve`. `haiku` is faster and cheaper, and `opus` is slower and more careful.
 - `refreshModel` (default `opus`): the model that rewrites the rules on `/coach refresh`. Refresh is rare, and the job is to change only what the sources changed, which Opus does with fewer needless rewordings.
 
 - `weekModel` (default `opus`): the model that writes each Claude Week edition. Writing an edition means reading and checking many pages.
@@ -114,7 +114,7 @@ Change them in the pane's Settings tab, in `/config`, or under `pluginConfigs` i
 
 ## Cost and access
 
-Each Analyze, each live analysis, each `/improve` and each file a refresh rewrites is one model request on your own login, counted against your plan or billed to your API key. Like every mod, it runs with your permissions. It reads your prompt box only while the pane is open, sends Claude's last reply with each analysis or `/improve`, reads its own files, and writes only its own `rules/` and `tips/` files, and only when you accept a refresh. It reaches the network only during `/coach refresh`, for the pages in `sources.json`, and when you press Write on the Week tab, for the pages in `week/sources.json`. Writing an edition is one Week model request of about 30,000 tokens in and up to 16,000 out. These fetches and requests are the mod's own, not tool calls, so they need no permission prompt and auto mode doesn't review them.
+Each Rewrite, each live analysis, each `/improve` and each file a refresh rewrites is one model request on your own login, counted against your plan or billed to your API key. Like every mod, it runs with your permissions. It reads your prompt box only while the pane is open, sends Claude's last reply with each analysis or `/improve`, reads its own files, and writes only its own `rules/` and `tips/` files, and only when you accept a refresh. It reaches the network only during `/coach refresh`, for the pages in `sources.json`, and when you press Write on the Week tab, for the pages in `week/sources.json`. Writing an edition is one Week model request of about 30,000 tokens in and up to 16,000 out. These fetches and requests are the mod's own, not tool calls, so they need no permission prompt and auto mode doesn't review them.
 
 ## Develop
 
