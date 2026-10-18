@@ -17,7 +17,6 @@ export type Mode = 'manual' | 'live'
 /** The groups in the Analytics tab's rules list, each opened and closed on its own. */
 export type RuleGroup = 'general' | 'model' | 'own'
 /** Which part of the analysis shows below the buttons. */
-export type Detail = 'checklist' | 'why'
 
 export type View = {
   /** The app drawing the pane (`e.surface`): Desktop draws a native button even for `plain`, so its tabs differ. */
@@ -35,7 +34,6 @@ export type View = {
   /** What was typed and picked for each placeholder, by its token. */
   typed: Record<string, string>
   picked: Record<string, string>
-  detail: Detail
   /** Gaps dropped with an empty Enter, whose sentences are out of the rewrite. */
   removed: string[]
   /** Which suggestions are added to the rewrite, by their index in the analysis. */
@@ -139,7 +137,6 @@ export type Actions = {
   fill: () => Promise<void> | undefined
   apply: () => Promise<void> | undefined
   toggleAddition: (index: number) => void
-  detail: (detail: Detail) => void
   pick: (token: string, value: string) => void
   type: (token: string, value: string) => void
   submitAnswer: (token: string, value: string) => void
@@ -315,15 +312,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       out.push(text(E, `Read as a reply to Claude's last message.${cut}`, { dimColor: true, wrap: 'wrap' }))
     }
 
-    out.push(detailTabs(E, v, a))
-    if (v.detail === 'checklist') {
-      out.push(...checklistWithSuggestions(E, v, a, an))
-    } else {
-      if (an.changes.length === 0) out.push(text(E, 'No changes needed.', { dimColor: true }))
-      for (const [i, c] of an.changes.entries()) {
-        out.push(E.Box({ key: `change-${i}`, flexDirection: 'column', children: [text(E, c.rule, { weight: 'semibold' }), text(E, c.why, { wrap: 'wrap' })] }))
-      }
-    }
+    out.push(heading(E, 'Checklist'), ...checklistWithFixes(E, v, a, an))
   }
 
   out.push(footer(E, v))
@@ -418,23 +407,21 @@ function ruleGroup(
   return block(E, `rules-${key}`, [head, ...notes, ...body])
 }
 
-/** The Checklist and Why each change tabs, drawn like the pane's own tabs: the open one in brackets. */
-function detailTabs(E: UI, v: View, a: Actions): RenderElement {
-  const tab = (key: Detail, label: string) =>
-    E.Button({ key: `detail-${key}`, ...tabLabel(E, label, v.detail === key), plain: true, onPress: () => a.detail(key) })
-  return row(E, [tab('checklist', 'Checklist'), tab('why', 'Why each change')])
-}
-
 /**
- * The checklist with the suggestions merged in: each item (what is missing),
- * then right under it the suggestions that fill it, each with Add/Remove.
- * Suggestions that fill no item follow under "Other suggestions".
+ * One list for the draft and the rewrite: each checklist item (how the draft
+ * does), then right under it what the rewrite changed for it and the
+ * suggestions that fill it, each with Add/Remove. A change belongs to an item
+ * when its rule is named like the item. Changes and suggestions that fill no
+ * item follow at the end, under "Other changes", "Other suggestions" or both.
  */
-function checklistWithSuggestions(E: UI, v: View, a: Actions, an: Analysis): RenderElement[] {
+function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): RenderElement[] {
   const indexed = an.additions.map((s, i) => ({ s, i }))
+  const changes = an.changes.map((c, i) => ({ c, i }))
+  const fills = (rule: string, item: string) => rule.trim().toLowerCase() === item.toLowerCase()
   const out: RenderElement[] = []
   for (const c of an.checklist) {
     const m = MARK[c.status]
+    const fixes = changes.filter(x => fills(x.c.rule, c.item))
     const mine = indexed.filter(x => x.s.item === c.item)
     out.push(
       E.Box({
@@ -447,8 +434,19 @@ function checklistWithSuggestions(E: UI, v: View, a: Actions, an: Analysis): Ren
             columnGap: 1,
             children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' }), text(E, c.note, { dimColor: true, wrap: 'wrap' })],
           }),
+          ...fixes.map(x => fix(E, x.i, 'Rewrite', x.c.why)),
           ...mine.map(x => suggestion(E, v, a, x.s, x.i)),
         ],
+      }),
+    )
+  }
+  const otherChanges = changes.filter(x => !an.checklist.some(c => fills(x.c.rule, c.item)))
+  if (otherChanges.length) {
+    out.push(
+      E.Box({
+        key: 'other-changes',
+        flexDirection: 'column',
+        children: [text(E, 'Other changes', { weight: 'semibold', dimColor: true }), ...otherChanges.map(x => fix(E, x.i, x.c.rule, x.c.why))],
       }),
     )
   }
@@ -462,7 +460,18 @@ function checklistWithSuggestions(E: UI, v: View, a: Actions, an: Analysis): Ren
       }),
     )
   }
+  if (an.changes.length === 0) out.push(text(E, 'The rewrite made no changes.', { dimColor: true }))
   return out
+}
+
+/** One change the rewrite made, indented under what it fixes: who made it (the rewrite, or the rule's name) and why it helps. */
+function fix(E: UI, i: number, label: string, why: string): RenderElement {
+  return E.Box({
+    key: `change-${i}`,
+    flexDirection: 'column',
+    paddingLeft: 2,
+    children: [text(E, label, { weight: 'semibold', wrap: 'wrap' }), text(E, why, { wrap: 'wrap' })],
+  })
 }
 
 /** One suggestion, indented under what it fills: its label, its sentence, and Add (or Remove once added). */

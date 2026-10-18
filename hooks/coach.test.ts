@@ -473,16 +473,11 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.analyses[0]).toContain('End with a recap.') // your own rules, from the data folder, are sent too
   expect(s.analyses[0]).toContain('think step by step and fix the login thing')
   expect(await ui.find({ type: 'Code', text: '[which file?]' })).toBeDefined()
-  // Checklist and Why each change are tabs: the checklist shows first, the reasons one press away, and back.
-  expect(await ui.find({ key: 'detail-checklist', text: '[Checklist]' })).toBeDefined()
+  // One list, no tabs (v0.18.0): the checklist and the rewrite's changes show together.
+  expect(await ui.find({ key: 'detail-checklist' })).toBeUndefined()
+  expect(await ui.find({ key: 'detail-why' })).toBeUndefined()
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
-  expect(await ui.find({ text: 'Name the finish line' })).toBeUndefined()
-  await ui.press({ key: 'detail-why' })
-  expect(await ui.find({ key: 'detail-why', text: '[Why each change]' })).toBeDefined()
   expect(await ui.find({ text: 'Name the finish line' })).toBeDefined()
-  expect(await ui.find({ text: 'no file or error named' })).toBeUndefined()
-  await ui.press({ key: 'detail-checklist' })
-  expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
   // The rewrite box comes right after the draft box, before the buttons and the checklist.
   const order = (await ui.findAll({})).filter(el => ['Code', 'Text', 'Button'].includes(el.type)).map(el => el.text ?? '')
   const draftAt = order.findIndex(t => t.includes('think step by step and fix the login thing'))
@@ -490,7 +485,7 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(draftAt).toBeGreaterThan(-1)
   expect(rewriteAt).toBeGreaterThan(draftAt)
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Analyze'))
-  expect(rewriteAt).toBeLessThan(order.findIndex(t => t === '[Checklist]'))
+  expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.
   expect(s.analysisSystems[0]).not.toContain('<tips>')
 
@@ -1098,7 +1093,7 @@ const MERGED = WITH_GAPS.replace(
   '<additions>\nStop rule | Say when to stop | Stop and ask me before deleting anything.\nOutput | Ask for a summary | End with a two-line summary.\nOther | Mention the branch | Work on the main branch.\n</additions>\n<placeholders>',
 )
 
-test('the Checklist tab shows each missing item with its suggestion right under it, and Other suggestions last', async ($, on) => {
+test('the checklist shows each missing item with its suggestion right under it, and Other suggestions last', async ($, on) => {
   const { s } = world(on, { analysis: MERGED })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1120,13 +1115,49 @@ test('the Checklist tab shows each missing item with its suggestion right under 
   // Items with no suggestion are shown as before.
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
 
-  // Add from the merged view works as before, and the Why tab still shows only the reasons.
+  // Add from the merged view works as before.
   await ui.press({ key: 'add-1-0' })
   expect(await ui.find({ type: 'Code', text: 'Stop and ask me before deleting anything.' })).toBeDefined()
   expect(await ui.find({ key: 'add-1-0', text: 'Remove' })).toBeDefined()
-  await ui.press({ key: 'detail-why' })
-  expect(await ui.find({ text: 'Say when to stop' })).toBeUndefined()
-  expect(await ui.find({ text: 'Name the finish line' })).toBeDefined()
+  await ui.unmount()
+})
+
+const FIXED = MERGED.replace(
+  '<changes>\nName the finish line | The assistant knows when to stop.',
+  '<changes>\nDone means | Naming the finish line tells it when the work is complete.\nclarity | "Remove completely" spells out what remove means.',
+)
+
+test('each change the rewrite made sits under the item it fixes, and the rest under Other changes', async ($, on) => {
+  const { s } = world(on, { analysis: FIXED })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const order = (await ui.findAll({})).filter(el => ['Text', 'Button'].includes(el.type)).map(el => el.text ?? '')
+  const at = (t: string) => order.indexOf(t)
+  // Done means (missing in the draft) shows the rewrite's fix right under it, before the next item.
+  expect(at('Naming the finish line tells it when the work is complete.')).toBeGreaterThan(at('no finish line'))
+  expect(at('Naming the finish line tells it when the work is complete.')).toBeLessThan(at('Stop rule'))
+  expect(order[at('Naming the finish line tells it when the work is complete.') - 1]).toBe('Rewrite')
+  // Changes named like no item (any case) go under Other changes, after the items and before Other suggestions.
+  expect(at('Other changes')).toBeGreaterThan(at('Ask for a summary'))
+  expect(at('clarity')).toBeGreaterThan(at('Other changes'))
+  expect(at('Remove "think step by step"')).toBeGreaterThan(at('Other changes'))
+  expect(at('Other suggestions')).toBeGreaterThan(at('Remove "think step by step"'))
+  expect(await ui.find({ text: 'The rewrite made no changes.' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a rewrite with no changes says so under the checklist', async ($, on) => {
+  const { s } = world(on, { analysis: ANALYSIS.replace(/<changes>[\s\S]*<\/changes>/, '<changes>\nNone | The draft already works.\n</changes>') })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect(await ui.find({ text: 'The rewrite made no changes.' })).toBeDefined()
+  expect(await ui.find({ text: 'Other changes' })).toBeUndefined()
   await ui.unmount()
 })
 

@@ -46,7 +46,7 @@ import {
   toFetchUrl,
 } from './refresh.ts'
 import { type Analytics, NO_ANALYTICS, STATS_ON, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
-import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
+import { type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
   type FeedbackStore,
@@ -114,7 +114,6 @@ let weekModel = 'opus'
 // mode and analytics come back from $.store.
 let isPaneOpen = false
 let tab: Tab = 'coach'
-let detail: Detail = 'checklist'
 let mode: Mode = 'manual'
 let draft = ''
 let analysis: Analysis | undefined
@@ -363,7 +362,6 @@ export const register: Register = (on, options) => {
       picked,
       added,
       removed: droppedGaps(),
-      detail,
       formGen,
       analyzedReply,
       // An empty box after sending is not a changed draft.
@@ -413,10 +411,6 @@ export const register: Register = (on, options) => {
       analyze: () => analyzeNow($),
       fill: () => (analysis ? fillRewrite($, filled()) : undefined),
       apply: () => (analysis ? applyRewrite($, filled()) : undefined),
-      detail: d => {
-        detail = d
-        $.ui.invalidate('ui.render')
-      },
       toggleAddition: index => {
         added = added.includes(index) ? added.filter(i => i !== index) : [...added, index]
         $.ui.invalidate('ui.render')

@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.17.4
+# Handover: prompt-coach v0.18.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -6,7 +6,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 
 ## Start here
 
-1. In your first reply, give the current version and what's open (see "Left to do").
+1. In your first reply, give the current version and what's open (see "Left to do"), and ask Omar about "Option B, parked": whether he wants it built, kept, or the note removed.
 2. Don't change code until Omar asks for something. He often starts with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
 4. Open sessions in `~/projects/claude-mods/prompt-coach` so `.claude/CLAUDE.md` loads at launch. It sits in `.claude/` because a `CLAUDE.md` at the plugin root fails `validate --strict`. A session there loads the mod straight from this folder, not from the installed copy.
@@ -17,7 +17,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 - **`/coach`** opens a pane that Desktop docks beside the transcript. Running it again closes it. `/coach live` and `/coach manual` set the mode and open it. `/coach refresh` (and `refresh all`) opens Settings and proposes rules updates for files whose source pages changed. Nothing is written until Omar accepts.
 - **Inside a conversation,** each analysis also sends Claude's last reply (capped at 6,000 characters), and the draft is read as a reply to it.
 - **Tabs:** Coach (1), Analytics (2) and News (3) on the left, Settings (4) alone at the right end, the same on every surface. `tabs()` puts them in one `tabs` Box with `justifyContent: 'space-between'`. The terminal draws each tab as a plain button, with the open one in clay brackets. Desktop always draws a native button, so there the open tab is clay semibold `Text` and the others are `dimColor` buttons. News is the Week tab's label: its key is `tab-week`, the code calls it the Week tab, and the digest is still "Claude Week".
-  - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove. A dim footer gives the rules' date and the path to Omar's rules file.
+  - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, one Checklist (`checklistWithFixes`, v0.18.0, Omar's option A; the Checklist and Why each change sub-tabs are gone): each item with its mark and note on the draft, then under it the rewrite's changes whose rule is named like the item (case-insensitive, labelled "Rewrite"), then the suggestions that fill it, with Add/Remove. Unmatched changes follow under Other changes (with their rule name), then untied suggestions under Other suggestions; "The rewrite made no changes." when there are none. A dim footer gives the rules' date and the path to Omar's rules file.
   - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then Rules (`ruleList`). The Tips section was removed in v0.17.0 at Omar's say (he didn't find it useful): no tips files, no `<tips>` in the analysis, no model or Claude Code tips.
   - **Settings** is laid out like Desktop's own settings page, with four sections (`settingsGroup`): General, Your rules, Rules and tips, and Claude Week. Each section is a bold title with no box, then rows (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
     - **General:** Mode (Manual or Live; live is capped at 30 analyses a session), Rewrite model and Refresh model. Model changes are saved with `$.config.set`. A refused change makes them read-only, with the reason.
@@ -42,15 +42,7 @@ Omar's own rules for the coach, chosen on 2026-10-18 so he can change them from 
 The goal, set by Omar, is to help him write better prompts by showing what he does well and where he can improve. `hooks/analytics.ts` (pure) keeps one `DraftRecord` per analyzed draft, with no draft text: each checklist item's status, the rules behind the changes (each once), the suggestions offered (item and sentence), how many were added, whether the rewrite was applied, and the session's model label. Up to 200 drafts are kept (`MAX_DRAFTS`), newest first, under the store key `analytics`, together with `tokens`. Nothing here calls a model.
 
 - **Recording:** `analyze` calls `addUsage` before parsing, so an unreadable answer still counts its tokens, then `recordDraft`. Apply and Apply and send call `noteApplied` (`recordUse` with the number of suggestions added). Only Analyze and live mode are counted, not /improve; Omar chose that. Session start deletes the store keys `lessons` (statistics before v0.11.0, cleared at Omar's say) and `statsLayout`.
-- **Drawn by `statistics` in `ui.ts`, in this order:**
-  1. `scoreLine`: the average `draftScore` of the last 10 drafts (`RECENT`) against the 10 before, once there are 5 of them. A draft scores a point per item present or n/a and half for a vague one, out of 6.
-  2. `focusBlock`: the item most often missing or vague lately, with the newest sentence the coach suggested for it.
-  3. `gapBars`: a bar per item missing or vague, with a dim note of how often it was left out, how often vague, and the last 10 against the 10 before.
-  4. `strengthsBlock`: up to 3 items present in at least 60% of drafts.
-  5. `changedBars`: "What the coach changed most", for the session's model only, each rule counted once per draft and shown as "x of y".
-  6. `adviceLine`: suggestions added of those offered, and rewrites applied.
-  7. `tokensLine`: last and dim.
-  8. Clear statistics (key `clear-lessons`).
+- **Drawn by `statistics` in `ui.ts`, in this order:** `scoreLine` (the average `draftScore` of the last 10 drafts, `RECENT`, against the 10 before, once there are 5; a point per item present or n/a, half for vague, out of 6), `focusBlock` (the item most often missing or vague lately, with the newest sentence suggested for it), `gapBars` (a bar per item missing or vague, with left out vs vague and last 10 vs the 10 before), `strengthsBlock` (up to 3 items present in at least 60% of drafts), `changedBars` ("What the coach changed most", session model only, each rule once per draft, "x of y"), `adviceLine` (suggestions added of those offered, rewrites applied), `tokensLine` (last, dim), and Clear statistics (`clear-lessons`).
 - **Bars** (`barRow`, `barText`): monospaced, both parts drawn with █ and the empty part dimmed, counts padded with no-break spaces. Omar picked Bars over three other layouts and confirmed in Desktop that they line up and both parts are the same height. In Desktop's fonts, ░ is shorter than █ and the proportional face gives each character a different width.
 
 ## Rules list (Analytics tab)
@@ -65,6 +57,16 @@ Since v0.14.0 the checklist an Analyze judges by comes from the rule files, not 
 - `rulesFor` borrows: a newer version than any file (Opus 6, Sonnet 6.1, Mythos 5.2) gets the newest older file of its family (`MODEL_FAMILIES`), `model` its own label and `isBorrowed`; the pane shows "No rules file for Opus 6 yet; it uses Opus 5.5's." Older models get general.md.
 - Refresh: each model target in `sources.json` also lists the general guide; `REFRESH_SYSTEM` asks for a complete checklist with the four general names kept exactly, a source on every line, and a quoted `<!-- Dropped … -->` comment for any general item dropped; general.md is refreshed first.
 - The model-guide lines it cites are written for system prompts in apps; applying them to prompts typed in Claude Code is a reading Omar accepted.
+
+## Option B, parked (ask Omar about it)
+
+Omar chose option A for merging the Checklist and Why each change (v0.18.0) and asked to keep this for if A doesn't work out. Ask him about it at the start of the next session, and whether to remove this note.
+
+- **Idea:** A groups a change under an item only when the model happens to name its rule like the item; anything else lands in Other changes. B asks the model to tag each change with the item it fixes, the way `<additions>` already are, so the grouping no longer depends on naming. The layout stays as in A, and the label under an item can show the rule's own name instead of "Rewrite".
+- **Format:** each `<changes>` line becomes `item | rule | why`, the item one of the session model's checklist names or Other, e.g. `Done means | Name the finish line | Naming the finish line tells it when the work is complete.` "None" for no changes stays. This changes the analysis format (see Decisions), so it is Omar's call.
+- **Prompt and parser (`lib.ts`):** `analysisSystem`'s `<changes>` instruction and example; `Change` gains `item?: string` like `Addition`; `parseAnalysis` splits on the first two bars and matches the item case-insensitively to the checklist names (as `parseAdditions` does), Other or unknown giving no item. A two-part line (an older reply, or the model ignoring the format) parses as today, falling back to A's name match. `checklistWithFixes` groups by `item`.
+- **Tests:** the `ANALYSIS` fixture in `coach.test.ts` gets three-part lines; `parseAnalysis` tests for tagged, Other, unknown-item and two-part lines; the `analysisSystem(...)` test that compares to the expected system prompt; the pane test "each change the rewrite made sits under the item it fixes" uses tags. `analytics.test.ts` builds changes as `{ rule, why }`, which still compiles with `item` optional.
+- **Statistics (`analytics.ts`):** a draft records `rules` (each change's rule once), which "What the coach changed most" counts. That keeps working if the rule stays the middle field. Tags would also allow counting which items the rewrite fixed most, per model, which fits the open Statistics decision. Statistics are off, so this would land with that redesign; old records simply have no items.
 
 ## Claude Week
 
@@ -149,6 +151,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
+- v0.18.0 Coach: one Checklist, no sub-tabs; under a missing item, "Rewrite" and why when the rewrite fixed it; Other changes and Other suggestions at the end.
 - Coach: Apply and send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
 - A real `/coach refresh` after a source page changes. So far only the baseline run has happened.
 
