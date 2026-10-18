@@ -969,17 +969,24 @@ async function toggleRead($: EngineInterface, id: string): Promise<void> {
 }
 
 /**
- * Asks `text` in a side chat, as typing `/btw <text>` would: Claude Code's own
- * side question, which reads the conversation but stays out of it and runs no
- * tools. If the session refuses the command, the text goes in the prompt box instead.
+ * Puts `/btw <text>` in the prompt box, so Enter opens the side chat. A mod
+ * can't open it itself: in Desktop the app draws /btw, not the engine, so
+ * `$.command.run` finds no /btw in the session. When the box can't take the
+ * text (a dialog is open), it goes on the clipboard and a toast says so.
  */
 async function askAside($: EngineInterface, text: string): Promise<void> {
-  try {
-    await $.command.run({ command: 'btw', args: text })
-  } catch (err) {
-    await fillPrompt($, text, 'Prompt')
-    $.ui.toast(`Couldn't open a side chat (${message(err)}), so the prompt is in the prompt box.`)
+  const btw = `/btw ${text}`
+  const filled = await $.prompt.fill({ text: btw, mode: 'replace' })
+  if (filled.isFilled) {
+    $.ui.toast('Press Enter to ask it in the side chat.')
+    return
   }
+  const copied = await $.ui.copy({ text: btw })
+  $.ui.toast(
+    copied.isCopied
+      ? "Couldn't put the side question in the prompt box, so it's on the clipboard: paste it there and press Enter."
+      : "Couldn't put the side question in the prompt box or on the clipboard.",
+  )
 }
 
 /** An ISO time to the second, as feedback records carry it. */

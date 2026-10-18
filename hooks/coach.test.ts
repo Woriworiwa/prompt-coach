@@ -208,7 +208,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; noBtw?: boolean } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -232,7 +232,7 @@ function world(
     toasts: [] as string[],
     transcript: [] as { role: 'user' | 'assistant'; text: string }[],
     weekRequests: [] as { prompt: string; system: string; model: string }[],
-    asides: [] as string[],
+    copied: [] as string[],
   }
   const rel = (path: string) => path.replace(/^.*?\/(rules|tips|week|sources\.json)/, (_m, dir: string) => dir)
 
@@ -289,6 +289,8 @@ function world(
     return { text, cursor: e.start + e.inputText.length }
   })
   on('prompt.fill', async ($, e) => {
+    // A dialog open over the prompt box: nothing can be filled.
+    if (opts.boxBlocked) return { isFilled: false }
     s.filled.push(e.text)
     s.box = e.text
     return { isFilled: true }
@@ -308,15 +310,11 @@ function world(
     s.toasts.push(String(e.text))
     return { value: undefined }
   })
-  on('ui.copy', async () => ({ value: { isCopied: true } }))
+  on('ui.copy', async ($, e) => {
+    s.copied.push(e.text)
+    return { value: { isCopied: true } }
+  })
   on('turn.complete', async ($, e) => ({ text: e.answer, ...(e.usage ? { usage: e.usage } : {}) }))
-  // Claude Code's own /btw, beneath the mod: it records the side question.
-  if (!opts.noBtw) {
-    on('command.run', { command: 'btw' }, async ($, e) => {
-      s.asides.push(e.args)
-      return {}
-    })
-  }
   return { s, saved, clock }
 }
 
@@ -1301,15 +1299,16 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   await ui.press({ key: 'detail-2026-W42-idle' })
   expect(await ui.find({ text: 'Terminal only.' })).toBeDefined()
 
-  // The prompt goes to a side chat (/btw) with the story it's about, and the prompt box is left alone.
+  // The prompt box gets /btw with the prompt and the story it's about, so Enter opens the side chat. Nothing is sent.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-idle')?.label).toBe('Ask in side chat')
   await ui.press({ key: 'aside-2026-W42-idle' })
-  expect(s.asides).toEqual([
-    'Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
-  ])
+  expect(s.box).toBe(
+    '/btw Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
+  )
+  expect(s.toasts.at(-1)).toBe('Press Enter to ask it in the side chat.')
   await ui.press({ key: 'week-q-aside-2026-W42-0' })
-  expect(s.asides[1]).toBe('Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
-  expect(s.filled).toEqual([])
+  expect(s.box).toBe('/btw Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
+  expect(s.submitted).toEqual([])
   // A story with no prompt has no side chat button.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')).toBeUndefined()
 
@@ -1357,10 +1356,10 @@ test('Week: a redraw keeps the story buttons\' press handles', async ($, on) => 
   await ui.unmount()
 })
 
-test('Week: when the session refuses /btw, the side question goes in the prompt box instead, and says so', async ($, on) => {
-  const { s, ui } = await weekPane($, on, { saved: storedEdition(), noBtw: true })
+test('Week: when the prompt box can\'t take the side question, it goes on the clipboard and a toast says so', async ($, on) => {
+  const { s, ui } = await weekPane($, on, { saved: storedEdition(), boxBlocked: true })
   await ui.press({ key: 'aside-2026-W42-idle' })
-  expect(s.box).toContain('Explain idle compaction. (This is about the Claude Week story')
-  expect(s.toasts.at(-1)).toContain("Couldn't open a side chat")
+  expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\. \(This is about the Claude Week story/)
+  expect(s.toasts.at(-1)).toContain("Couldn't put the side question in the prompt box, so it's on the clipboard")
   await ui.unmount()
 })

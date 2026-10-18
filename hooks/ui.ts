@@ -135,7 +135,7 @@ export type WeekActions = {
   submitTake: (storyId: string, text: string) => Promise<void>
   toggleRead: (storyId: string) => Promise<void>
   toggleDetail: (storyId: string) => void
-  /** Opens a side chat (`/btw`) that asks `text`, beside the conversation and not in it. */
+  /** Puts `/btw <text>` in the prompt box, so Enter asks it in the side chat, beside the conversation and not in it. */
   askAside: (text: string) => Promise<void>
 }
 

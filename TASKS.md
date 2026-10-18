@@ -57,3 +57,5 @@ Notes from the build:
 - Desktop: v0.8.0 Week tab draws (confirmed by Omar's screenshot); Write failed: auto mode's classifier refused the mod's Agent spawn.
 - v0.8.1: Claude Week is written without a subagent: the mod fetches week/sources.json's pages (pageText, releasesText) and one model.complete writes the edition; no web search (Tier 4 dropped), edition-prompt.md says so; progress shown on the tab. 92 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.8.2: Week's Put in prompt box became Ask in side chat: it runs /btw (via $.command.run) with the story's prompt and the story; falls back to the prompt box if /btw is refused. 93 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- Desktop: v0.8.2 Ask in side chat failed: $.command.run found no /btw (Desktop draws /btw itself; the headless engine doesn't list it). Fallback and toast worked.
+- v0.8.3: Ask in side chat puts "/btw <question>" in the prompt box, so Enter opens Desktop's side chat; clipboard and toast if the box can't be filled. 93 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
