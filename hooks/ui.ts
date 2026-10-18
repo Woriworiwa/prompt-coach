@@ -11,7 +11,7 @@ export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | '
 /** The form fields the terminal, Desktop and VS Code draw; the mobile app has none. */
 export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 
-export type Tab = 'coach' | 'tips' | 'settings' | 'week'
+export type Tab = 'coach' | 'analytics' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
 /** Which part of the analysis shows below the buttons. */
 export type Detail = 'checklist' | 'why'
@@ -214,7 +214,7 @@ const MARK: Record<CheckStatus, { mark: string; color: string }> = {
 
 export function coachPane(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   const body =
-    v.tab === 'tips' ? tipsTab(E, v) : v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
+    v.tab === 'analytics' ? analyticsTab(E, v, a) : v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
   return E.Box({ flexDirection: 'column', gap: 1, children: [tabs(E, v, a), ...body] })
 }
 
@@ -231,7 +231,15 @@ function tabs(E: UI, v: View, a: Actions): RenderElement {
     if (isDesktop) return E.Button({ key: `tab-${key}`, label, hotkey, dimColor: true, onPress: () => a.tab(key) })
     return E.Button({ key: `tab-${key}`, ...tabLabel(E, label, isOpen), hotkey, plain: true, onPress: () => a.tab(key) })
   }
-  return row(E, [tab('coach', 'Coach', '1'), tab('tips', 'Tips', '2'), tab('settings', 'Settings', '3'), tab('week', 'Week', '4')])
+  // Settings stands apart at the right end; the tabs for the work sit on the left, numbered in the order shown.
+  return E.Box({
+    key: 'tabs',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    columnGap: 2,
+    children: [row(E, [tab('coach', 'Coach', '1'), tab('analytics', 'Analytics', '2'), tab('week', 'Week', '3')]), tab('settings', 'Settings', '4')],
+  })
 }
 
 function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
@@ -296,8 +304,16 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   return out
 }
 
-/** The Tips tab: tips for the analyzed draft, the session's model, and Claude Code in general. */
-function tipsTab(E: UI, v: View): RenderElement[] {
+/**
+ * The Analytics tab (the Tips tab until v0.10.0): the statistics first, as
+ * Settings drew them, then a thin line and the tips.
+ */
+function analyticsTab(E: UI, v: View, a: Actions): RenderElement[] {
+  return [settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]), ...hairline(E, v, 'analytics'), ...tips(E, v)]
+}
+
+/** Tips for the analyzed draft, the session's model, and Claude Code in general. */
+function tips(E: UI, v: View): RenderElement[] {
   const groups = [
     { key: 'draft', label: 'For this draft', tips: v.analysis?.tips ?? [] },
     { key: 'model', label: v.modelLabel, tips: v.modelTips },
@@ -506,7 +522,6 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       gap: 'xl',
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote),
-        settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
         settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
       ],

@@ -423,14 +423,14 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.opened).toEqual(['prompt-coach'])
 
   const ui = await $.ui.mount(pane('desktop'))
-  // No "For <model>" line under the tabs; the model shows in the tips heading, on the Tips tab.
+  // No "For <model>" line under the tabs; the model shows in the tips heading, on the Analytics tab.
   expect(await ui.find({ text: /^For / })).toBeUndefined()
   expect(await ui.find({ type: 'Code', text: 'think step by step' })).toBeDefined()
   expect(await ui.find({ text: /Rules as of 2026-09/ })).toBeDefined()
-  // Tips live only on the Tips tab.
+  // Tips live only on the Analytics tab.
   expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeUndefined()
   expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeUndefined()
-  await ui.press({ key: 'tab-tips' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeDefined()
   expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
   expect(await ui.find({ key: 'analyze' })).toBeUndefined()
@@ -460,9 +460,9 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(rewriteAt).toBeGreaterThan(draftAt)
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Analyze'))
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === '[Checklist]'))
-  // Tips come in groups on the Tips tab: this draft's, the model's, then Claude Code's, each labelled.
+  // Tips come in groups on the Analytics tab: this draft's, the model's, then Claude Code's, each labelled.
   expect(await ui.find({ text: 'For this draft' })).toBeUndefined()
-  await ui.press({ key: 'tab-tips' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: 'For this draft' })).toBeDefined()
   expect(await ui.find({ key: 'tips-draft-list', text: 'Raise /effort to high for this bug fix.' })).toBeDefined()
   expect(await ui.find({ key: 'tips-model-list', text: 'Use /effort, not "think hard".' })).toBeDefined()
@@ -478,9 +478,9 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.box).toBe('')
   expect((saved.get('lessons') as { analyses: number }).analyses).toBe(1)
 
-  // Lessons now live in Settings, under Statistics, without the recent drafts.
+  // Lessons now live on the Analytics tab, under Statistics, without the recent drafts.
   expect(buttonProps(await ui.drawn(), 'tab-lessons')).toBeUndefined()
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(textLook(await ui.drawn(), 'Statistics')).toEqual({ found: true, color: undefined, weight: 'semibold' })
   // Statistics as bars: a title per list, then one line per item with its bar and count on the right.
   const asNode = (b: ReturnType<typeof boxNode>) => b && { type: 'Box', props: b.props, children: b.kids }
@@ -614,13 +614,13 @@ test('when the session reports no model, the pane still loads tips, then takes t
   expect(await ui.find({ text: /hasn't said which model/ })).toBeDefined()
   expect(await ui.find({ text: /No rules for/ })).toBeUndefined()
   expect(await ui.find({ text: /Rules as of 2026-10/ })).toBeDefined()
-  await ui.press({ key: 'tab-tips' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
   await ui.press({ key: 'tab-coach' })
 
   const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'claude-opus-5-5' }
   await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', usage })
-  await ui.press({ key: 'tab-tips' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeDefined()
   expect(s.model).toBe('')
   await ui.unmount()
@@ -687,7 +687,7 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   expect(buttonProps(await ui.drawn(), 'tab-coach')).toBeUndefined()
   expect(textLook(await ui.drawn(), 'Coach')).toEqual({ found: true, color: 'claude', weight: 'semibold' })
   expect(await ui.find({ text: '[Coach]' })).toBeUndefined()
-  for (const [key, hotkey] of [['tab-tips', '2'], ['tab-settings', '3'], ['tab-week', '4']] as const) {
+  for (const [key, hotkey] of [['tab-analytics', '2'], ['tab-week', '3'], ['tab-settings', '4']] as const) {
     const props = buttonProps(await ui.drawn(), key)
     expect(props?.hotkey).toBe(hotkey)
     expect(props?.dimColor).toBe(true)
@@ -700,10 +700,18 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   expect(buttonProps(await ui.drawn(), 'tab-coach')?.hotkey).toBe('1')
   await ui.press({ key: 'tab-coach' })
   expect(textLook(await ui.drawn(), 'Coach').color).toBe('claude')
+  // Settings stands alone at the right end; Coach, Analytics and Week sit together on the left.
+  const row = boxNode(await ui.drawn(), 'tabs')!
+  expect(row.props.justifyContent).toBe('space-between')
+  expect(row.kids).toHaveLength(2)
+  expect(buttonProps(row.kids[0], 'tab-analytics')).toBeDefined()
+  expect(buttonProps(row.kids[0], 'tab-week')).toBeDefined()
+  expect(buttonProps(row.kids[0], 'tab-settings')).toBeUndefined()
+  expect(buttonProps(row.kids[1], 'tab-settings')?.label).toBe('Settings')
   await ui.unmount()
 })
 
-test('terminal tabs are unchanged: plain Buttons with keys 1-4, the open one in clay brackets', async ($, on) => {
+test('terminal tabs: plain Buttons with keys 1-4, the open one in clay brackets', async ($, on) => {
   world(on)
   await $.session.start({ ...START, surface: 'terminal' })
   await $.command.run(coach())
@@ -713,7 +721,7 @@ test('terminal tabs are unchanged: plain Buttons with keys 1-4, the open one in 
   expect(open?.plain).toBe(true)
   expect(open?.hotkey).toBe('1')
   expect(buttonLook(await ui.drawn(), 'tab-coach')?.color).toBe('claude')
-  for (const [key, hotkey] of [['tab-tips', '2'], ['tab-settings', '3'], ['tab-week', '4']] as const) {
+  for (const [key, hotkey] of [['tab-analytics', '2'], ['tab-week', '3'], ['tab-settings', '4']] as const) {
     const props = buttonProps(await ui.drawn(), key)
     expect(props?.hotkey).toBe(hotkey)
     expect(props?.plain).toBe(true)
@@ -742,7 +750,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
-  for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
+  for (const [key, title] of [['general', 'General'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)
     // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
@@ -757,7 +765,9 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
-  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-statistics', 'group-rules', 'group-week'])
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-rules', 'group-week'])
+  // Statistics moved to the Analytics tab in v0.10.0.
+  expect(boxNode(tree, 'group-statistics')).toBeUndefined()
   // Rules and tips: the sources first, always listed (no Show sources button), a thin line, then the refresh.
   const rules = boxNode(tree, 'group-rules-box')!
   expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-sources', 'line-rules-1', 'block-refresh'])
@@ -836,7 +846,7 @@ test('a redraw (the pane taking focus) keeps each unchanged Button\'s press hand
   await ui.unmount()
 })
 
-test('Settings (tab 3) holds the mode, and the Coach tab only shows a dim Live label while live mode is on', async ($, on) => {
+test('Settings (tab 4) holds the mode, and the Coach tab only shows a dim Live label while live mode is on', async ($, on) => {
   const { s } = world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -1141,7 +1151,7 @@ test('switching model changes the label and tips while the pane is open', async 
   s.model = 'sonnet'
   await clock.advance(5000)
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-tips' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: 'Using Sonnet 5.5 well' })).toBeDefined()
   expect(await ui.find({ type: 'Markdown', text: 'Sonnet is the everyday model.' })).toBeDefined()
   await ui.unmount()
@@ -1582,7 +1592,7 @@ test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Cl
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   // The stub's usage is 1 input and 1 output token.
   expect(await ui.find({ text: '1 analysis · 2 tokens (≈2 each)' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
@@ -1602,7 +1612,7 @@ test('Statistics: an answer that is not an analysis still counts its tokens', as
   const l = saved.get('lessons') as { analyses: number; tokens: { calls: number } }
   expect(l.analyses).toBe(0)
   expect(l.tokens.calls).toBe(1)
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: '0 analyses · 2 tokens (≈2 each)' })).toBeDefined()
   await ui.unmount()
 })
@@ -1613,7 +1623,7 @@ test('Statistics: statistics saved before v0.9.4 show as before, with a note tha
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: '2 analyses' })).toBeDefined()
   expect(await ui.find({ text: 'Tokens are counted from v0.9.4 on.' })).toBeDefined()
   await ui.unmount()
@@ -1624,7 +1634,7 @@ test('Statistics: bars show the tokens in the opening line and each item scaled 
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
   expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
   // "Done means" and "Be explicit" are 2 of 2; "Context" and "Say why" 1 of 2.
@@ -1640,7 +1650,7 @@ test('Statistics: on mobile the bars show too, and Clear statistics empties them
   await $.session.start({ ...START, surface: 'mobile' })
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
   expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
@@ -1652,7 +1662,7 @@ test('Statistics: a rule count saved before v0.9.5, higher than the analyses, sh
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-settings' })
+  await ui.press({ key: 'tab-analytics' })
   expect(barsIn(boxNode(await ui.drawn(), 'bars-rules'))).toEqual(['15+0d 2 of 2'])
   expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
   await ui.unmount()
@@ -1663,4 +1673,20 @@ test('Statistics: the layout trial\'s saved choice is deleted from the store whe
   await $.session.start(START)
   expect(saved.has('statsLayout')).toBe(false)
   expect((saved.get('lessons') as { analyses: number }).analyses).toBe(2)
+})
+
+test('Analytics: the statistics first, then a thin line and the tips', async ($, on) => {
+  world(on, { saved: { lessons: STATS } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-analytics' })
+  const tree = await ui.drawn()
+  const text = JSON.stringify(tree)
+  expect(boxNode(tree, 'group-statistics')).toBeDefined()
+  expect(boxNode(tree, 'line-analytics')).toBeDefined()
+  expect(text.indexOf('2 analyses')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
+  expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
+  expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
+  await ui.unmount()
 })
