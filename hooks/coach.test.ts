@@ -1626,3 +1626,10 @@ test('Statistics: a rule count saved before v0.9.5, higher than the analyses, sh
   expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
   await ui.unmount()
 })
+
+test('Statistics: the layout trial\'s saved choice is deleted from the store when a session starts', async ($, on) => {
+  const { saved } = world(on, { saved: { lessons: STATS, statsLayout: 'side' } })
+  await $.session.start(START)
+  expect(saved.has('statsLayout')).toBe(false)
+  expect((saved.get('lessons') as { analyses: number }).analyses).toBe(2)
+})

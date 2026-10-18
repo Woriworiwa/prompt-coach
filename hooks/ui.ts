@@ -649,20 +649,6 @@ const MISSING_EMPTY = 'Nothing yet. Your drafts have covered the checklist.'
 const RULES_TITLE = 'What the coach changed most'
 const NO_TOKENS_YET = 'Tokens are counted from v0.9.4 on.'
 const fmt = (n: number) => n.toLocaleString('en-US')
-const analysesLine = (E: UI, l: Lessons) => text(E, `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'} so far.`)
-
-/** The tokens as name and amount pairs: total, per analysis, then each kind (cache only once there is some). */
-function tokenRows(l: Lessons): [string, string][] {
-  const t = tokenSummary(l)
-  if (!t) return []
-  return [
-    ['Total', fmt(t.total)],
-    ['Per analysis', fmt(t.perCall)],
-    ['Input', fmt(t.input)],
-    ['Output', fmt(t.output)],
-    ...(t.cache ? [['Cache', fmt(t.cache)] as [string, string]] : []),
-  ]
-}
 
 /** How many cells a bar has. */
 export const BAR_CELLS = 15
@@ -702,32 +688,6 @@ function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, 
     lines('missing', 'Most often missing', gaps, l.analyses, n => `${n} of ${l.analyses}`, MISSING_EMPTY),
     lines('rules', RULES_TITLE, rules, l.analyses, n => `${n} of ${l.analyses}`, 'None yet.'),
   ]
-}
-
-/**
- * A two-column table made of Boxes: its title, a bold header row, then one
- * row per entry with a thin line between rows, as in the rest of Settings.
- * The name wraps on the left; the count sits on the right.
- */
-function statTable(E: UI, v: View, key: string, title: string, headers: [string, string], rows: [string, string][], empty: string): RenderElement {
-  const line = (cells: [string, string], i: number, props: Record<string, unknown> = {}) =>
-    E.Box({
-      key: `table-${key}-${i}`,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      columnGap: 2,
-      children: [
-        E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, cells[0], { ...props, wrap: 'wrap' })] }),
-        text(E, cells[1], props),
-      ],
-    })
-  const body = rows.length ? rows.flatMap((r, i) => [...hairline(E, v, `table-${key}-${i}`), line(r, i + 1)]) : [text(E, empty, { dimColor: true })]
-  return E.Box({
-    key: `table-${key}`,
-    flexDirection: 'column',
-    gap: 1,
-    children: [text(E, title, { weight: 'semibold' }), line(headers, 0, { weight: 'semibold', dimColor: true }), ...body],
-  })
 }
 
 /** /coach refresh: the check, its progress, and each changed file's diff to accept or reject. */

@@ -195,6 +195,8 @@ export const register: Register = (on, options) => {
     })
     mode = (await $.store.get(STORE.mode)) === 'live' ? 'live' : 'manual'
     lessons = asLessons(await $.store.get(STORE.lessons))
+    // The v0.9.4 layout trial's choice; Bars is the only layout since v0.9.6.
+    if ((await $.store.get('statsLayout')) !== undefined) await $.store.delete('statsLayout')
     const pending = (await $.store.get(STORE.pending)) as { results?: unknown; seen?: unknown } | undefined
     if (pending && Array.isArray(pending.results)) {
       refresh = { isRunning: false, progress: 'Proposed updates from your last refresh, not yet accepted.', results: pending.results as RefreshResult[] }
