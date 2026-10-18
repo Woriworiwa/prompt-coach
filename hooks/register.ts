@@ -1,7 +1,6 @@
 import type { EngineInterface, Register, SessionMessage, Timer } from 'claude-code'
 
 import {
-  ANALYSIS_SYSTEM,
   type Analysis,
   LIVE_DEBOUNCE_MS,
   SYSTEM,
@@ -25,7 +24,10 @@ import {
   parseReply,
   MODEL_RULES,
   type RuleSection,
+  analysisSystem,
+  checklistFor,
   parseRuleFile,
+  withoutChecklist,
   parseTips,
   rulesFor,
 } from './lib.ts'
@@ -44,7 +46,7 @@ import {
   stampAsOf,
   toFetchUrl,
 } from './refresh.ts'
-import { type Analytics, NO_ANALYTICS, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
+import { type Analytics, NO_ANALYTICS, STATS_ON, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
 import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
@@ -153,10 +155,12 @@ let rulesAsOf = ''
 let sources: string[] = []
 /** The shipped rule files as sections, by file name (general.md and each model's), for the Analytics tab's rules list. */
 let ruleFiles: Record<string, RuleSection[]> = {}
+/** The same files as read, by file name, for the checklist each model gets. */
+let ruleTexts: Record<string, string> = {}
 /** The model file picked in the rules list; '' follows the session's model. */
 let rulesPick = ''
-/** The rules list's groups that are open; the chosen model's starts open. */
-let rulesOpen: RuleGroup[] = ['model']
+/** The rules list's groups that are open; the checklist and the chosen model's start open. */
+let rulesOpen: RuleGroup[] = ['checklist', 'model']
 
 let refresh: { isRunning: boolean; progress: string; results: RefreshResult[] } = { isRunning: false, progress: '', results: [] }
 
@@ -372,6 +376,7 @@ export const register: Register = (on, options) => {
         general: ruleFiles['general.md'] ?? [],
         models: MODEL_RULES.map(m => ({ ...m, sections: ruleFiles[m.file] ?? [] })),
         picked: rulesPick || (rulesFor(model)?.file ?? ''),
+        checklist: checklistFor(ruleTexts['general.md'] ?? '', ruleTexts[rulesPick || (rulesFor(model)?.file ?? '')] ?? ''),
         open: rulesOpen,
       },
       modelTips,
@@ -545,11 +550,16 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
   status = modelLabel ? `Analyzing for ${modelLabel}…` : 'Analyzing…'
   $.ui.invalidate('ui.render')
   try {
-    const rules = await loadRules($, rulesFor(model)?.file)
+    const file = rulesFor(model)?.file
+    const rules = await loadRules($, file)
+    // The checklist for this model, read fresh like the rules: general.md's items with the model file's changes.
+    await loadRuleFiles($)
+    const items = checklistFor(ruleTexts['general.md'] ?? '', file ? ruleTexts[file] : '')
+    const names = items.filter(i => i.how !== 'dropped').map(i => i.name)
     const previous = lastReply(await transcript($))
     const reply = await $.model.complete({
       model: rewriteModel,
-      system: ANALYSIS_SYSTEM,
+      system: analysisSystem(items),
       prompt: buildAnalysisRequest(text, rules, modelLabel || 'Claude', previous.text),
       maxTokens: 3000,
       timeoutMs: 90_000,
@@ -559,9 +569,11 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
       return
     }
     // Counted before parsing: an answer that can't be read still cost its tokens.
-    analytics = addUsage(analytics, reply.usage)
-    await $.store.set(STORE.analytics, analytics)
-    const parsed = parseAnalysis(reply.text)
+    if (STATS_ON) {
+      analytics = addUsage(analytics, reply.usage)
+      await $.store.set(STORE.analytics, analytics)
+    }
+    const parsed = parseAnalysis(reply.text, names)
     if (!parsed) {
       status = 'The analysis came back in an unexpected format. Try again.'
       return
@@ -576,8 +588,10 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     analyzedReply = previous.text ? { chars: previous.text.length, isCut: previous.isCut } : undefined
     status = ''
     analyzedAt = await $.clock.now()
-    analytics = recordDraft(analytics, parsed, modelLabel, analyzedAt)
-    await $.store.set(STORE.analytics, analytics)
+    if (STATS_ON) {
+      analytics = recordDraft(analytics, parsed, modelLabel, analyzedAt)
+      await $.store.set(STORE.analytics, analytics)
+    }
   } catch (err) {
     status = `Analysis failed: ${err instanceof Error ? err.message : String(err)}`
   } finally {
@@ -607,7 +621,7 @@ function droppedGaps(): string[] {
 
 /** Records for Analytics that the analysis on screen was applied, with the suggestions added to it. */
 async function noteApplied($: EngineInterface): Promise<void> {
-  if (!analysis || !analyzedAt) return
+  if (!STATS_ON || !analysis || !analyzedAt) return
   analytics = recordUse(analytics, analyzedAt, added.length)
   await $.store.set(STORE.analytics, analytics)
 }
@@ -1195,15 +1209,16 @@ function lastPersonPrompt(messages: SessionMessage[]): { text: string; index: nu
 async function loadRuleFiles($: EngineInterface): Promise<void> {
   const dir = `${$.plugin.root}/rules`
   const files = ['general.md', ...MODEL_RULES.map(m => m.file)]
-  const read = await Promise.all(files.map(async f => [f, parseRuleFile(await readOr($, `${dir}/${f}`))] as const))
-  ruleFiles = Object.fromEntries(read)
+  const read = await Promise.all(files.map(async f => [f, await readOr($, `${dir}/${f}`)] as const))
+  ruleTexts = Object.fromEntries(read)
+  ruleFiles = Object.fromEntries(read.map(([f, md]) => [f, parseRuleFile(md)]))
 }
 
 /** The general rules, the session model's own rules when there is a file for it, then Omar's own from the data folder. */
 async function loadRules($: EngineInterface, file: string | undefined): Promise<string> {
   const dir = `${$.plugin.root}/rules`
-  const parts = [await $.fs.read(`${dir}/general.md`)]
-  if (file) parts.push(await readOr($, `${dir}/${file}`))
+  const parts = [withoutChecklist(await $.fs.read(`${dir}/general.md`))]
+  if (file) parts.push(withoutChecklist(await readOr($, `${dir}/${file}`)))
   parts.push(await loadOwnRules($))
   return parts.filter(Boolean).join('\n\n')
 }

@@ -5,7 +5,20 @@
 // whether the rewrite was applied. Every figure is worked out from these, so
 // nothing else needs a model call.
 
-import { type Analysis, CHECKLIST, type CheckName, type CheckStatus } from './lib.ts'
+import type { Analysis, CheckStatus } from './lib.ts'
+
+/**
+ * Statistics are off while the checklist's design changes (v0.14.0): nothing
+ * is recorded and the Analytics tab says so. Stored records are kept as they are.
+ */
+export const STATS_ON = false
+
+/**
+ * The six items the stored records were judged on, before the checklist moved
+ * into the rule files. The statistics read only these, so old records stay readable.
+ */
+export const CHECKLIST = ['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'] as const
+export type CheckName = (typeof CHECKLIST)[number]
 
 /** How many drafts are kept, newest first; older ones drop off. */
 export const MAX_DRAFTS = 200
@@ -73,13 +86,13 @@ export function asAnalytics(value: unknown): Analytics {
 /** Adds one analysis, newest first, keeping at most MAX_DRAFTS. */
 export function recordDraft(a: Analytics, analysis: Analysis, model: string, at: number): Analytics {
   const status: DraftRecord['status'] = {}
-  for (const c of analysis.checklist) status[c.item] = c.status
+  for (const c of analysis.checklist) if (isItem(c.item)) status[c.item] = c.status
   const draft: DraftRecord = {
     at,
     model,
     status,
     rules: [...new Set(analysis.changes.map(c => c.rule))],
-    offered: analysis.additions.map(s => ({ text: s.text, ...(s.item ? { item: s.item } : {}) })),
+    offered: analysis.additions.map(s => ({ text: s.text, ...(isItem(s.item) ? { item: s.item } : {}) })),
     added: 0,
     applied: false,
   }

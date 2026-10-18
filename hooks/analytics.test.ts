@@ -16,8 +16,9 @@ import {
   scoreTrend,
   strengths,
   tokenSummary,
+  type CheckName,
 } from './analytics.ts'
-import type { Analysis, CheckName, CheckStatus } from './lib.ts'
+import type { Analysis, CheckStatus } from './lib.ts'
 
 /** An analysis with the given statuses (others unjudged), rules and suggestions. */
 function analysis(status: Partial<Record<CheckName, CheckStatus>>, rules: string[] = [], additions: Analysis['additions'] = []): Analysis {

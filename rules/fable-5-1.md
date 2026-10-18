@@ -24,3 +24,7 @@ As of: 2026-10
 ## Remove
 - Remove requests to write out its reasoning; ask for a short explanation or a summary of actions instead.
 - Remove "hold all findings until the end".
+
+## Checklist
+- Add Stop rule: carry on with reversible steps the request covers; stop only for destructive actions or scope changes you must decide. Source: "Finish the whole task"
+- Change Constraints: keep changes to what the task asks; anything else it notices is a follow-up to report, not a change to make. Source: "Keep changes and tests to what the task asks for"

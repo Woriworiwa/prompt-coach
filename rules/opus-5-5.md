@@ -21,3 +21,8 @@ As of: 2026-10
 - For research or analysis, ask it to mark anything it could not confirm and to say where it looked.
 - When pasting text from elsewhere (an email, a web page, a log), wrap it in a tag such as <pasted_content> so it is treated as material, not as instructions.
 - For code review, ask for only the problems that would block a merge, each with file and line, why it is wrong, and how to show it fails.
+
+## Checklist
+- Change Goal: the whole task in one message, not one step at a time. Source: claude.dev blog, "give the whole task in one message"
+- Change Done means: the finish line, so it knows when it's done (every endpoint uses the new client and the tests pass). Source: claude.dev blog, "name the finish line"
+- Add Stop rule: when to stop and ask (only if a test fails for an unexplained reason, or before anything destructive), and otherwise to keep going. Source: claude.dev blog, "say when you want it to stop and ask"

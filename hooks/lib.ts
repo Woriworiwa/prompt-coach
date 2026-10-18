@@ -42,13 +42,92 @@ export type RuleSection = { section: string; rules: string[] }
  */
 export function parseRuleFile(md: string): RuleSection[] {
   const out: RuleSection[] = [{ section: '', rules: [] }]
-  for (const line of md.split('\n')) {
+  for (const line of withoutChecklist(md).split('\n')) {
     const heading = /^##\s+(.+?)\s*$/.exec(line)?.[1]
     const rule = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
     if (heading) out.push({ section: heading, rules: [] })
     else if (rule) out[out.length - 1]!.rules.push(rule)
   }
   return out.filter(s => s.rules.length)
+}
+
+// ---- The checklist, from the rule files ----
+
+/**
+ * One checklist item for a model, as the Analytics tab shows it: `how` says
+ * whether it comes from general.md, was added or changed by the model's file,
+ * or was dropped there (kept only to show it struck through). A changed item
+ * keeps the general wording in `general` for comparison.
+ */
+export type ChecklistItem = { name: string; definition: string; source: string; how: 'general' | 'added' | 'changed' | 'dropped'; general?: string }
+
+/** The checklist before it moved into the rule files; used only when general.md has no Checklist section. */
+export const FALLBACK_CHECKLIST: readonly ChecklistItem[] = [
+  ['Goal', 'what outcome they want.'],
+  ['Context', 'the files, errors, project, or background the assistant cannot see on its own.'],
+  ['Constraints', 'limits, scope, or things to leave alone.'],
+  ['Done means', 'the finish line, how they and the assistant will know the work is done (tests pass, the page shows X).'],
+  ['Stop rule', 'when the assistant should stop and ask rather than keep going (for example before anything destructive).'],
+  ['Output', 'what form the answer or result should take.'],
+].map(([name, definition]) => ({ name: name!, definition: definition!, source: 'built in', how: 'general' as const }))
+const FALLBACK_NAMES = FALLBACK_CHECKLIST.map(i => i.name)
+
+/** One line of a Checklist section: a general item, or a model's Add, Drop or Change. */
+export type ChecklistLine = { op: 'item' | 'add' | 'drop' | 'change'; name: string; definition: string; source: string }
+
+/** The lines of a file's `## Checklist` section, from "- Name: definition. Source: …" or "- Add/Drop/Change Name…". */
+export function parseChecklist(md: string): ChecklistLine[] {
+  const out: ChecklistLine[] = []
+  for (const line of checklistSection(md).split('\n')) {
+    const body = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
+    if (!body) continue
+    const at = body.search(/\sSource:\s/)
+    const head = (at < 0 ? body : body.slice(0, at)).trim()
+    const source = at < 0 ? '' : body.slice(at).replace(/^\s*Source:\s*/, '').trim()
+    const opMatch = /^(Add|Drop|Change)\s+/i.exec(head)
+    const op = (opMatch?.[1]?.toLowerCase() ?? 'item') as ChecklistLine['op']
+    const rest = opMatch ? head.slice(opMatch[0].length) : head
+    const colon = rest.indexOf(':')
+    const name = (colon < 0 ? rest : rest.slice(0, colon)).replace(/\.$/, '').trim()
+    const definition = colon < 0 ? '' : rest.slice(colon + 1).trim()
+    if (name) out.push({ op, name, definition, source })
+  }
+  return out
+}
+
+/**
+ * The checklist for a model: general.md's items, then the model file's lines
+ * in order. Add appends an item, Change replaces an item's definition (or adds
+ * it when general.md lacks it), and Drop marks it dropped. With no Checklist
+ * section in general.md, the built-in list stands in for it.
+ */
+export function checklistFor(generalMd: string, modelMd = ''): ChecklistItem[] {
+  const general = parseChecklist(generalMd).filter(l => l.op === 'item')
+  const items: ChecklistItem[] = general.length
+    ? general.map(l => ({ name: l.name, definition: l.definition, source: l.source, how: 'general' }))
+    : FALLBACK_CHECKLIST.map(i => ({ ...i }))
+  for (const l of parseChecklist(modelMd)) {
+    const at = items.findIndex(i => i.name.toLowerCase() === l.name.toLowerCase())
+    const found = at < 0 ? undefined : items[at]
+    if (l.op === 'drop') {
+      if (found) items[at] = { ...found, how: 'dropped', source: l.source || found.source }
+    } else if (l.op === 'change' && found) {
+      items[at] = { name: found.name, definition: l.definition, source: l.source, how: 'changed', general: found.definition }
+    } else if (!found) {
+      items.push({ name: l.name, definition: l.definition, source: l.source, how: 'added' })
+    }
+  }
+  return items
+}
+
+/** A file's `## Checklist` section, without its heading; '' when it has none. */
+function checklistSection(md: string): string {
+  return /^##\s+Checklist\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m.exec(md)?.[1] ?? ''
+}
+
+/** A rules file without its `## Checklist` section: the checklist goes in the system prompt, not with the rules. */
+export function withoutChecklist(md: string): string {
+  return md.replace(/^##\s+Checklist\s*$[\s\S]*?(?=^##\s|(?![\s\S]))/m, '').trimEnd() + (md.endsWith('\n') ? '\n' : '')
 }
 
 const SHARED_RULES = `- Keep the person's intent exactly. Do not add requirements, features, tests, constraints, or scope they did not ask for. If an addition would clearly help, leave it out of the rewrite and mention it in your notes as a suggestion ("Consider: ...").
@@ -98,10 +177,8 @@ export function parseReply(reply: string): { rewrite: string; notes: string[] } 
 // ---- The coach pane's analysis ----
 
 /** What a good task prompt carries, in the order the pane lists them. */
-export const CHECKLIST = ['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'] as const
-export type CheckName = (typeof CHECKLIST)[number]
 export type CheckStatus = 'present' | 'partial' | 'missing' | 'n/a'
-export type CheckItem = { item: CheckName; status: CheckStatus; note: string }
+export type CheckItem = { item: string; status: CheckStatus; note: string }
 export type Change = { rule: string; why: string }
 /** One `[placeholder]` in the rewrite: the text exactly as written, a question for it, and likely answers. */
 export type Placeholder = { token: string; question: string; options: string[] }
@@ -109,7 +186,7 @@ export type Placeholder = { token: string; question: string; options: string[] }
  * A suggestion the person may add to the rewrite with one click: a short
  * label, the sentence to add, and the checklist item it fills, if any.
  */
-export type Addition = { label: string; text: string; item?: CheckName }
+export type Addition = { label: string; text: string; item?: string }
 export type Analysis = {
   checklist: CheckItem[]
   rewrite: string
@@ -119,16 +196,14 @@ export type Analysis = {
   additions: Addition[]
 }
 
-export const ANALYSIS_SYSTEM = `You coach a person on a draft prompt for an AI coding assistant. You check the draft, rewrite it, and explain each change so the person learns the pattern.
+/** The analysis call's system prompt, judging the draft against `items` (the checklist for the session's model). */
+export function analysisSystem(items: readonly ChecklistItem[]): string {
+  const active = items.filter(i => i.how !== 'dropped')
+  return `You coach a person on a draft prompt for an AI coding assistant. You check the draft, rewrite it, and explain each change so the person learns the pattern.
 
 The checklist (judge each item for this draft):
-- Goal: what outcome they want.
-- Context: the files, errors, project, or background the assistant cannot see on its own.
-- Constraints: limits, scope, or things to leave alone.
-- Done means: the finish line, how they and the assistant will know the work is done (tests pass, the page shows X).
-- Stop rule: when the assistant should stop and ask rather than keep going (for example before anything destructive).
-- Output: what form the answer or result should take.
-Mark an item "n/a" when it does not apply, such as Done means and Stop rule for a quick question. Mark it "partial" when it is there but vague. When the previous reply already settles an item (the plan it proposed names the files or the finish line), mark it "present" and say so in the note.
+${active.map(i => `- ${i.name}: ${i.definition}`).join('\n')}
+Mark an item "n/a" when it does not apply, such as a finish line or a stop rule for a quick question. Mark it "partial" when it is there but vague. When the previous reply already settles an item (the plan it proposed names the files or the finish line), mark it "present" and say so in the note.
 
 Also flag these patterns when present: "think step by step", "think carefully" and similar lines; asking to see its reasoning instead of a short explanation; vague "avoid X" asks that do not name the specific thing to avoid.
 
@@ -142,7 +217,7 @@ Reply in exactly this format and nothing else:
 <checklist>
 Goal | present | one short note
 Context | missing | one short note
-(one line for each of the six items, in this order, status one of present, partial, missing, n/a)
+(one line for each of the ${active.length} items, in this order, status one of present, partial, missing, n/a)
 </checklist>
 <rewrite>
 the rewritten prompt
@@ -156,12 +231,16 @@ Rule name | why this change helps, in one sentence
 </tips>
 <additions>
 Done means | Name the finish line | Done means the login test passes.
-(at most 3 lines: checklist item | label | sentence, the item one of the six above or Other; leave the block empty when nothing is worth adding)
+(at most 3 lines: checklist item | label | sentence, the item one of the checklist items above or Other; leave the block empty when nothing is worth adding)
 </additions>
 <placeholders>
 [which file?] | Which file has the login bug? | auth.ts ; login.ts
 (one line per placeholder in the rewrite: the placeholder exactly as written, a short question, then up to 3 likely answers separated by " ; ". Take answers only from the draft or the previous reply; leave them out when neither gives any. Leave the block empty when the rewrite has no placeholders.)
 </placeholders>`
+}
+
+/** The analysis system prompt with the built-in checklist, used when general.md has none. */
+export const ANALYSIS_SYSTEM = analysisSystem(FALLBACK_CHECKLIST)
 
 /** The user message for the analysis call. `reply` is Claude's last reply, or '' at the start of a conversation. */
 export function buildAnalysisRequest(draft: string, rules: string, targetLabel: string, reply = ''): string {
@@ -221,19 +300,19 @@ export function capReply(text: string): { text: string; isCut: boolean } {
 
 const STATUSES: readonly CheckStatus[] = ['present', 'partial', 'missing', 'n/a']
 
-/** Splits the analysis reply into its four parts; undefined when it has no rewrite. */
-export function parseAnalysis(reply: string): Analysis | undefined {
+/** Splits the analysis reply into its parts, judged against the checklist `names`; undefined when it has no rewrite. */
+export function parseAnalysis(reply: string, names: readonly string[] = FALLBACK_NAMES): Analysis | undefined {
   const rewrite = tag(reply, 'rewrite')
   if (!rewrite) return undefined
 
   const found = new Map<string, CheckItem>()
   for (const line of lines(tag(reply, 'checklist') ?? '')) {
     const [name = '', status = '', ...note] = line.split('|').map(s => s.trim())
-    const item = CHECKLIST.find(c => c.toLowerCase() === name.toLowerCase())
+    const item = names.find(c => c.toLowerCase() === name.toLowerCase())
     const st = STATUSES.find(s => s === status.toLowerCase())
     if (item && st && !found.has(item)) found.set(item, { item, status: st, note: note.join(' | ') })
   }
-  const checklist = CHECKLIST.map(item => found.get(item) ?? { item, status: 'n/a' as const, note: 'Not judged.' })
+  const checklist = names.map(item => found.get(item) ?? { item, status: 'n/a' as const, note: 'Not judged.' })
 
   const changes = lines(tag(reply, 'changes') ?? '')
     .map(line => {
@@ -248,7 +327,7 @@ export function parseAnalysis(reply: string): Analysis | undefined {
     changes,
     tips: bullets(tag(reply, 'tips') ?? '').slice(0, 2),
     placeholders: parsePlaceholders(rewrite, tag(reply, 'placeholders') ?? ''),
-    additions: parseAdditions(tag(reply, 'additions') ?? ''),
+    additions: parseAdditions(tag(reply, 'additions') ?? '', names),
   }
 }
 
@@ -257,11 +336,11 @@ export function parseAnalysis(reply: string): Analysis | undefined {
  * sentence is dropped. A line is `item | label | sentence`, the item a
  * checklist name or Other; an older `label | sentence` line has no item.
  */
-export function parseAdditions(block: string): Addition[] {
+export function parseAdditions(block: string, names: readonly string[] = FALLBACK_NAMES): Addition[] {
   const out: Addition[] = []
   for (const line of lines(block)) {
     const parts = line.split('|').map(x => x.trim())
-    const named = parts.length >= 3 ? CHECKLIST.find(c => c.toLowerCase() === parts[0]!.toLowerCase()) : undefined
+    const named = parts.length >= 3 ? names.find(c => c.toLowerCase() === parts[0]!.toLowerCase()) : undefined
     const tagged = parts.length >= 3 && (named !== undefined || parts[0]!.toLowerCase() === 'other')
     const [label = '', ...rest] = tagged ? parts.slice(1) : parts
     const text = (rest.length ? rest.join(' | ') : parts.length === 1 ? label : '').trim()

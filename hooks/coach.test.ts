@@ -22,9 +22,13 @@ import {
   parseAnalysis,
   parseTips,
   parseRuleFile,
+  analysisSystem,
+  checklistFor,
+  parseChecklist,
+  withoutChecklist,
 } from './lib.ts'
 import { BAR_CELLS, barCount, barRuns } from './ui.ts'
-import { type Analytics, NO_ANALYTICS, recordDraft } from './analytics.ts'
+import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -182,6 +186,39 @@ describe('bars and live mode', () => {
       { section: 'Remove', rules: ['Remove "think hard".'] },
     ])
     expect(parseRuleFile('# Your own rules\n\nOne rule per line.\n')).toEqual([])
+    // The Checklist section is not a list of rules.
+    expect(parseRuleFile('## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: the outcome. Source: x\n')).toEqual([{ section: 'Clarity', rules: ['Be explicit.'] }])
+  })
+
+  test('checklist: general items, then a model\'s Add, Change and Drop, each with its source', () => {
+    const general = '# General\n\n## Clarity\n- Be explicit.\n\n## Checklist\n- Goal: what outcome they want. Source: "Be clear and direct"\n- Constraints: limits or scope. Source: "Be clear and direct"\n- Done means: how it will be checked. Source: "Ask Claude to self-check"\n'
+    const opus = '# Opus\n\n## Remove\n- Remove "think hard".\n\n## Checklist\n- Add Stop rule: when to stop and ask. Source: blog\n- Change Done means: the finish line. Source: blog, "name the finish line"\n- Drop Constraints. Source: guide\n- Change Output: what form. Source: y\n'
+    expect(parseChecklist(opus).map(l => [l.op, l.name])).toEqual([['add', 'Stop rule'], ['change', 'Done means'], ['drop', 'Constraints'], ['change', 'Output']])
+    expect(checklistFor(general, opus)).toEqual([
+      { name: 'Goal', definition: 'what outcome they want.', source: '"Be clear and direct"', how: 'general' },
+      { name: 'Constraints', definition: 'limits or scope.', source: 'guide', how: 'dropped' },
+      { name: 'Done means', definition: 'the finish line.', source: 'blog, "name the finish line"', how: 'changed', general: 'how it will be checked.' },
+      { name: 'Stop rule', definition: 'when to stop and ask.', source: 'blog', how: 'added' },
+      // A Change of an item general.md lacks counts as an Add.
+      { name: 'Output', definition: 'what form.', source: 'y', how: 'added' },
+    ])
+    // No Checklist section in general.md: the built-in six stand in.
+    expect(checklistFor('# General\n- Be explicit.\n').map(i => i.name)).toEqual(['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'])
+    expect(analysisSystem(checklistFor('# General\n'))).toBe(ANALYSIS_SYSTEM)
+    // The system prompt lists the model's items, not the dropped ones.
+    const system = analysisSystem(checklistFor(general, opus))
+    expect(system).toContain('- Done means: the finish line.')
+    expect(system).toContain('- Stop rule: when to stop and ask.')
+    expect(system).not.toContain('- Constraints:')
+    expect(system).toContain('one line for each of the 4 items')
+    // The rules sent with the draft leave the checklist out, and keep the rest.
+    expect(withoutChecklist(opus)).toBe('# Opus\n\n## Remove\n- Remove "think hard".\n')
+    expect(withoutChecklist(general)).toBe('# General\n\n## Clarity\n- Be explicit.\n')
+    // An analysis reads the items it was given.
+    const reply = '<checklist>\nGoal | present | ok\nStop rule | missing | none\n</checklist>\n<rewrite>\nx\n</rewrite>\n<additions>\nStop rule | Say when to stop | Stop before deleting anything.\n</additions>'
+    const parsed = parseAnalysis(reply, ['Goal', 'Stop rule'])!
+    expect(parsed.checklist.map(c => [c.item, c.status])).toEqual([['Goal', 'present'], ['Stop rule', 'missing']])
+    expect(parsed.additions[0]?.item).toBe('Stop rule')
   })
 })
 
@@ -274,7 +311,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string> } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -290,6 +327,7 @@ function world(
     dropSubmit: '',
     opened: [] as string[],
     analyses: [] as string[],
+    analysisSystems: [] as string[],
     analysisModels: [] as string[],
     refreshes: [] as string[],
     refreshModels: [] as string[],
@@ -322,7 +360,7 @@ function world(
     const text = fileAt(file)
     return text === undefined ? { deny: `no such file: ${file}` } : { value: text }
   })
-  const fileAt = (file: string) => s.written.get(file) ?? ((opts.noProfile && file === PROFILE) || (opts.noOwnRules && file === OWN_RULES) ? undefined : FILES[file])
+  const fileAt = (file: string) => s.written.get(file) ?? ((opts.noProfile && file === PROFILE) || (opts.noOwnRules && file === OWN_RULES) ? undefined : (opts.files?.[file] ?? FILES[file]))
   on('fs.exists', async ($, e) => ({ value: fileAt(rel(String(e.path))) !== undefined }))
   on('env.get', async ($, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? '/home/u/.claude' : undefined }))
   on('fs.write', async ($, e) => {
@@ -336,8 +374,9 @@ function world(
   })
   on('model.complete', async ($, e) => {
     const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
-    if (e.system === ANALYSIS_SYSTEM) {
+    if (String(e.system).startsWith(ANALYSIS_SYSTEM.slice(0, 60))) {
       s.analyses.push(String(e.prompt))
+      s.analysisSystems.push(String(e.system))
       s.analysisModels.push(e.model)
       return { value: { isAnswered: true as const, text: opts.analysis ?? ANALYSIS, usage } }
     }
@@ -389,6 +428,8 @@ function world(
 }
 
 const START = { cwd: '/tmp', surface: 'desktop', isInteractive: true } as const
+/** The statistics' pane tests, which run only while statistics are on (STATS_ON in analytics.ts). */
+const statsTest: typeof test = STATS_ON ? test : (() => {}) as unknown as typeof test
 const coach = (args = '') =>
   ({ command: 'coach', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } }) as const
 
@@ -473,28 +514,12 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.filled).toEqual([rewrite, ''])
   expect(s.submitted).toEqual([{ text: rewrite, origin: { kind: 'plugin', name: 'prompt-coach', asUser: true } }])
   expect(s.box).toBe('')
-  // The analysis is recorded for Analytics, and Apply and send marks it applied.
-  const stored = saved.get('analytics') as Analytics
-  expect(stored.drafts).toHaveLength(1)
-  expect(stored.drafts[0]).toMatchObject({ model: 'Opus 5.5', applied: true, added: 0, rules: ['Name the finish line', 'Remove "think step by step"'] })
-  expect(stored.drafts[0]!.status).toEqual({ Goal: 'partial', Context: 'missing', Constraints: 'n/a', 'Done means': 'missing', 'Stop rule': 'missing', Output: 'present' })
-
-  // Statistics live on the Analytics tab.
-  expect(buttonProps(await ui.drawn(), 'tab-lessons')).toBeUndefined()
+  // Statistics are off (v0.14.0): nothing is recorded, and the Analytics tab says so instead of drawing them.
+  expect(saved.get('analytics')).toBeUndefined()
   await ui.press({ key: 'tab-analytics' })
-  expect(textLook(await ui.drawn(), 'Statistics')).toEqual({ found: true, color: undefined, weight: 'semibold' })
-  const missing = boxNode(await ui.drawn(), 'stats-missing')!
-  expect(textLook({ type: 'Box', props: missing.props, children: missing.kids }, 'Missing or vague').weight).toBe('semibold')
-  // Each item missing or vague is a line: its name and a dim note on the left, a full bar and "1 of 1" on the right.
-  const context = boxNode(await ui.drawn(), 'bars-missing-Context')!
-  expect(context.props.justifyContent).toBe('space-between')
-  expect(barsIn(context)).toEqual(['15+0d 1 of 1'])
-  expect(await ui.find({ text: '1 left out · 0 vague · last 1: 1' })).toBeDefined()
-  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 1 of 1'])
-  expect(await ui.find({ text: 'What the coach changed most · Opus 5.5' })).toBeDefined()
-  expect(await ui.find({ text: 'Added 0 of 0 suggestions · applied 1 of 1 rewrite' })).toBeDefined()
-  expect(await ui.find({ text: 'Recent drafts' })).toBeUndefined()
-  expect(await ui.find({ key: 'clear-lessons', text: 'Clear statistics' })).toBeDefined()
+  expect(await ui.find({ text: 'Statistics are off while the checklist design changes.' })).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'stats-missing')).toBeUndefined()
+  expect(await ui.find({ key: 'clear-lessons' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -1580,7 +1605,7 @@ function stats(model = 'Opus 5.5'): Analytics {
 }
 const STATS = stats()
 
-test('Statistics: the eight parts, in order: score, work on next, missing or vague, strengths, changes, advice, tokens, clear', async ($, on) => {
+statsTest('Statistics: the eight parts, in order: score, work on next, missing or vague, strengths, changes, advice, tokens, clear', async ($, on) => {
   world(on, { saved: { analytics: STATS } })
   await $.session.start(START)
   await $.command.run(coach())
@@ -1605,7 +1630,7 @@ test('Statistics: the eight parts, in order: score, work on next, missing or vag
   await ui.unmount()
 })
 
-test('Statistics: what the coach changed most counts only drafts for the session\'s model', async ($, on) => {
+statsTest('Statistics: what the coach changed most counts only drafts for the session\'s model', async ($, on) => {
   world(on, { saved: { analytics: stats('Sonnet 5.5') } })
   await $.session.start(START)
   await $.command.run(coach())
@@ -1617,7 +1642,7 @@ test('Statistics: what the coach changed most counts only drafts for the session
   await ui.unmount()
 })
 
-test('Statistics: Add and Apply are counted as advice taken, with the suggestion offered as the example to work on', async ($, on) => {
+statsTest('Statistics: Add and Apply are counted as advice taken, with the suggestion offered as the example to work on', async ($, on) => {
   const { s, saved } = world(on, { analysis: MERGED })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1634,7 +1659,7 @@ test('Statistics: Add and Apply are counted as advice taken, with the suggestion
   await ui.unmount()
 })
 
-test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Clear statistics resets them', async ($, on) => {
+statsTest('Statistics: each Analyze adds its tokens, an unreadable answer too, and Clear statistics resets them', async ($, on) => {
   const { s, saved } = world(on)
   s.box = 'fix the login thing so it works'
   await $.session.start(START)
@@ -1651,7 +1676,7 @@ test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Cl
   await ui.unmount()
 })
 
-test('Statistics: an answer that is not an analysis still counts its tokens, but adds no draft', async ($, on) => {
+statsTest('Statistics: an answer that is not an analysis still counts its tokens, but adds no draft', async ($, on) => {
   const { s, saved } = world(on, { analysis: 'no tags here' })
   s.box = 'fix the login thing so it works'
   await $.session.start(START)
@@ -1673,7 +1698,7 @@ test('Statistics: the statistics kept before v0.11.0 are deleted when a session 
   expect(saved.has('statsLayout')).toBe(false)
 })
 
-test('Statistics: on mobile the statistics show too, and Clear statistics empties them', async ($, on) => {
+statsTest('Statistics: on mobile the statistics show too, and Clear statistics empties them', async ($, on) => {
   world(on, { saved: { analytics: STATS }, surfaces: ['mobile'] })
   await $.session.start({ ...START, surface: 'mobile' })
   await $.command.run(coach())
@@ -1800,5 +1825,45 @@ test('Rules on the Analytics tab: a model with no rule file picks nothing and sa
   await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: /^\[/ , key: 'rules-pick-opus-5-5.md' })).toBeUndefined()
   expect(await ui.find({ text: 'claude-opus-4-1 has no rules of its own. Pick a model above.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Checklist from the rule files: Analyze judges by the model\'s list, and the Analytics tab shows it per model', async ($, on) => {
+  const general = '# General\n\nAs of: 2026-10\n\n- Be explicit.\n\n## Checklist\n- Goal: what outcome they want. Source: "Be clear and direct"\n- Done means: how it will be checked. Source: "Ask Claude to self-check"\n'
+  const opus = '# Opus\n\nAs of: 2026-09\n\n- Name the finish line.\n\n## Checklist\n- Add Stop rule: when to stop and ask. Source: blog\n- Change Done means: the finish line. Source: blog, "name the finish line"\n'
+  const haiku = '# Haiku\n\nAs of: 2026-10\n\n- Keep it short.\n\n## Checklist\n- Drop Goal. Source: guide\n'
+  const { s, saved } = world(on, { files: { 'rules/general.md': general, 'rules/opus-5-5.md': opus, 'rules/haiku-5-5.md': haiku } })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect(s.analysisSystems[0]).toContain('- Done means: the finish line.')
+  expect(s.analysisSystems[0]).toContain('- Stop rule: when to stop and ask.')
+  // The rules go with the draft without their checklist.
+  expect(s.analyses[0]).toContain('Name the finish line.')
+  expect(s.analyses[0]).not.toContain('## Checklist')
+  expect(saved.get('analytics')).toBeUndefined()
+
+  await ui.press({ key: 'tab-analytics' })
+  // The checklist for the session's model is open first: tags, definitions, sources, and the general wording under a change.
+  expect(await ui.find({ text: '3 items' })).toBeDefined()
+  expect(await ui.find({ text: '· general' })).toBeDefined()
+  expect(await ui.find({ text: '· added for Opus 5.5' })).toBeDefined()
+  expect(await ui.find({ text: '· changed for Opus 5.5' })).toBeDefined()
+  expect(await ui.find({ text: 'General: how it will be checked.' })).toBeDefined()
+  expect(await ui.find({ text: 'Source: blog, "name the finish line"' })).toBeDefined()
+  // Rules lists leave the checklist out.
+  expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
+  expect(await ui.find({ key: 'rules-model-list', text: 'Stop rule' })).toBeUndefined()
+  // Another model: Haiku drops Goal, shown struck through.
+  await ui.press({ key: 'rules-pick-haiku-5-5.md' })
+  expect(await ui.find({ text: '1 item' })).toBeDefined()
+  expect(await ui.find({ text: '· dropped for Haiku 5.5' })).toBeDefined()
+  expect(textLook(await ui.drawn(), 'Goal')).toMatchObject({ found: true })
+  expect(await ui.find({ text: '· added for Opus 5.5' })).toBeUndefined()
+  // Hide folds it.
+  await ui.press({ key: 'rules-toggle-checklist' })
+  expect(await ui.find({ text: '· dropped for Haiku 5.5' })).toBeUndefined()
   await ui.unmount()
 })

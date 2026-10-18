@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.13.0
+# Handover: prompt-coach v0.14.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -37,6 +37,8 @@ Omar's own rules for the coach, chosen on 2026-10-18 so he can change them from 
 
 ## Statistics (Analytics tab)
 
+**Off since v0.14.0** (Omar, 2026-10-18), until the checklist design is agreed: `STATS_ON = false` in `analytics.ts` skips `addUsage`, `recordDraft` and `noteApplied`, `statistics` draws one dim line instead, and the statistics' pane tests run only when it is true (`statsTest`). The stored `analytics` is kept untouched, and it reads only the old six items (`CHECKLIST` now lives in `analytics.ts`). What follows is how they work when on; the v0.11.0 Desktop check waits until they are back.
+
 The goal, set by Omar, is to help him write better prompts by showing what he does well and where he can improve. `hooks/analytics.ts` (pure) keeps one `DraftRecord` per analyzed draft, with no draft text: each checklist item's status, the rules behind the changes (each once), the suggestions offered (item and sentence), how many were added, whether the rewrite was applied, and the session's model label. Up to 200 drafts are kept (`MAX_DRAFTS`), newest first, under the store key `analytics`, together with `tokens`. Nothing here calls a model.
 
 - **Recording:** `analyze` calls `addUsage` before parsing, so an unreadable answer still counts its tokens, then `recordDraft`. Apply and Apply and send call `noteApplied` (`recordUse` with the number of suggestions added). Only Analyze and live mode are counted, not /improve; Omar chose that. Session start deletes the store keys `lessons` (statistics before v0.11.0, cleared at Omar's say) and `statsLayout`.
@@ -53,10 +55,17 @@ The goal, set by Omar, is to help him write better prompts by showing what he do
 
 ## Rules list (Analytics tab)
 
-Omar's request (2026-10-18): read the general, model and own rules beside the statistics. He picked option A of three: a reference list with no link from the "changed most" bars to rules (option B, rule IDs cited by the analysis, stays open if he wants it; option C, guessing by word overlap, was dropped as misleading).
+Omar's option A (2026-10-18): a reference list beside the statistics, with no link from the "changed most" bars to rules. Picker `rules-pick-<file>` starts on the session model (`rulesPick` '' follows it); groups Checklist, General, the model and Your rules toggle with `rules-toggle-<group>` (Checklist and the model start open); `rules-edit-own` opens Settings. `loadRuleFiles` reads every rule file on sync, on opening Analytics and on each Analyze.
 
-- `parseRuleFile` (`lib.ts`) turns a rules file into `## ` sections with their "- " rules; `MODEL_RULES` lists every model file (`rulesFor` returns its entries). `loadRuleFiles` reads general.md and every model file on sync and on opening the Analytics tab, which also re-reads Omar's rules.
-- Picker buttons `rules-pick-<file>` start on the session model (`rulesPick` '' follows it); a model with no file picks nothing and says so. Groups General, the model and Your rules toggle with `rules-toggle-<group>`; only the model group starts open. `rules-edit-own` opens Settings.
+## Checklist (in the rule files)
+
+Since v0.14.0 the checklist an Analyze judges by comes from the rule files, not the code (Omar chose "B, with layers" on 2026-10-18 after finding the old six had only partial sources). `general.md` has a `## Checklist` section of items (`- Name: definition. Source: …`); each model file's section has `Add`, `Change` (same name, its own definition) or `Drop` lines, each with its own source. Omar reviewed the first drafts: general has Goal, Context, Constraints, Output, Done means; every model adds Stop rule; Opus changes Goal and Done means, Sonnet Constraints and Done means, Haiku Done means, Fable Constraints. No model drops an item.
+
+- `parseChecklist`, `checklistFor` (a Change of an item general lacks counts as an Add), `analysisSystem(items)` and `withoutChecklist` are in `lib.ts`. With no Checklist in general.md, `FALLBACK_CHECKLIST` (the old six) stands in, and `ANALYSIS_SYSTEM` is `analysisSystem` of it.
+- `analyze` re-reads the rule files and sends the model's items in the system prompt; the rules go with the draft without their Checklist sections, for `/improve` too. `parseAnalysis` and `parseAdditions` take the item names.
+- `REFRESH_SYSTEM` keeps the section's form and asks for a source on every line.
+- The Rules list's Checklist group shows the picked model's items (`checklist-<name>`); `parseRuleFile` leaves the section out of the rule groups.
+- The model-guide lines it cites are written for system prompts in apps; applying them to prompts typed in Claude Code is a reading Omar accepted.
 
 ## Claude Week
 
@@ -82,7 +91,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `analyticsTab`, `statistics`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 127 tests. `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
+| `hooks/*.test.ts` | 123 tests (the statistics' pane tests are off with the statistics). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
 | `rules/*.md`, `tips/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
@@ -122,7 +131,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 
 - Keep Omar's intent and language. Add no scope, invent no context, and leave a `[placeholder]` instead.
 - Suggestions enter the rewrite only when Omar clicks Add.
-- The analysis format is a `<checklist>`, `<rewrite>`, `<changes>`, `<tips>`, `<additions>` (each line `item | label | sentence`) and `<placeholders>` (each line `[token] | question | a ; b`). Ask Omar before changing it. The six checklist items are fixed for every model; only the rules differ per model.
+- The analysis format is a `<checklist>`, `<rewrite>`, `<changes>`, `<tips>`, `<additions>` (each line `item | label | sentence`) and `<placeholders>` (each line `[token] | question | a ; b`). Ask Omar before changing it. The checklist items come from the rule files and differ per model (see Checklist).
 - Ask before reversing an earlier choice of his. He asks for options first on bigger UI changes. The models default to sonnet (`rewriteModel`), opus (`refreshModel`) and opus (`weekModel`).
 - Made on his requests and not objected to: tab changes apply on every surface, not only Desktop; tabs are numbered in the order shown.
 - Session handover: keep this file current as you go (`CLAUDE.md`). Rewrite rather than add, keep history in TASKS.md and the commits, and keep this file under about 150 lines. NEXT-SESSION.md was dropped on 2026-10-18.
@@ -138,9 +147,8 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
-- v0.13.0 Rules on Analytics: the session model is bracketed, other models switch the list, Show and Hide work, the section names read well in Markdown, Edit in Settings opens Settings.
+- v0.14.0 Checklist: the Analytics tab says statistics are off; Rules opens with the Checklist for your model, tags and sources read well, a changed item shows the general wording under it, other models switch it; an Analyze on Opus judges Stop rule, on another model its own list. Also from v0.13.0: picking another model switches the lists, Show and Hide work, Edit in Settings opens Settings.
 - v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
-- v0.11.0 Analytics: after 5 analyses and an Apply, the score, Work on next, Missing or vague, What you do well, What the coach changed most for this model, Advice you took and tokens add up and read well.
 - v0.10.1: the third tab reads News.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
 - Settings: it reads like Desktop's own settings page, the hairlines are 1 pixel and span the width in light and dark, the Mode dropdown switches, the space between sections is enough, Rules and tips lists the sources first, and Claude Week shows the Week model, the profile path (`…/plugins/data/prompt-coach-prompt-coach/profile.yaml`, with no "blank profile" note) and source links that open.

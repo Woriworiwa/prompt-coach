@@ -18,3 +18,7 @@ As of: 2026-10
 
 ## Remove
 - Remove "answer directly" if it is meant to stop thinking; it does not.
+
+## Checklist
+- Add Stop rule: keep working until it's done; stop to ask only when it can't go on without you or before a risky step. Source: "Prevent early stopping in long agent prompts"
+- Change Done means: a real check that exercises the change (tests, type-checker, build), not just "done". Source: "Tell coding agents to verify their changes"

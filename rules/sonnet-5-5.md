@@ -20,3 +20,8 @@ As of: 2026-10
 - Remove "only use tools when strictly necessary" or "minimize tool calls".
 - Remove requests to include its reasoning in the reply; ask for a short explanation or a summary of actions instead.
 - Remove "think less" or "don't think" lines; they do not reliably work.
+
+## Checklist
+- Add Stop rule: keep working until it's done; stop to ask only when it can't go on without you or before a risky step. Source: "Steer initiative and scope" (carrying work through)
+- Change Constraints: what to leave out, since it tends to add tests, docs and files nobody asked for. Source: "Steer initiative and scope" (unrequested additions when coding)
+- Change Done means: a real check that exercises the change (tests, type-checker, build), not just "done". Source: "Verification on coding tasks"

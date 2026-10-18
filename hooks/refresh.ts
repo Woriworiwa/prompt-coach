@@ -71,6 +71,7 @@ Rules:
 - Change a bullet only where the sources now say something different, add one only for new guidance, and remove one only when the sources no longer support it.
 - Keep exact command names, model names and settings as the sources give them.
 - Do not add an "As of" line; it is added for you.
+- A "## Checklist" section lists what drafts are judged on. Keep each line's form: "- Name: definition. Source: <the section of the source that supports it>", or in a model's file "- Add Name: …", "- Change Name: …" or "- Drop Name. Source: …". Add, change or drop an item only where the sources support it, and give every line a Source naming where in the sources it comes from.
 
 Reply with the complete updated file inside <file></file> and nothing else.`
 

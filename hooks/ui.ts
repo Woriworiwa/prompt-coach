@@ -2,8 +2,8 @@
 // element tree. No `$`; the hooks module hands in the elements and actions.
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
-import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, scoreTrend, strengths, tokenSummary } from './analytics.ts'
-import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
+import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, STATS_ON, scoreTrend, strengths, tokenSummary } from './analytics.ts'
+import { type Addition, type Analysis, type ChecklistItem, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
@@ -15,7 +15,7 @@ export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 export type Tab = 'coach' | 'analytics' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
 /** The groups in the Analytics tab's rules list, each opened and closed on its own. */
-export type RuleGroup = 'general' | 'model' | 'own'
+export type RuleGroup = 'checklist' | 'general' | 'model' | 'own'
 /** Which part of the analysis shows below the buttons. */
 export type Detail = 'checklist' | 'why'
 
@@ -79,6 +79,8 @@ export type RuleList = {
   models: (ModelRules & { sections: RuleSection[] })[]
   /** The picked model's file; '' when the session's model has none and nothing was picked. */
   picked: string
+  /** The checklist for the picked model (general.md's when no model is picked), dropped items included. */
+  checklist: ChecklistItem[]
   open: RuleGroup[]
 }
 
@@ -361,10 +363,58 @@ function ruleList(E: UI, v: View, a: Actions): RenderElement {
   const own: RuleSection[] = v.ownRules.rules.length ? [{ section: '', rules: v.ownRules.rules }] : []
   return settingsGroup(E, v, 'rule-list', 'Rules', [
     picker,
+    checklistGroup(E, v, a, picked?.label),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
     ruleGroup(E, v, a, 'model', picked?.label ?? 'Model', picked?.sections ?? [], picked ? `No rules found for ${picked.label}.` : `${v.modelLabel || 'This model'} has no rules of its own. Pick a model above.`),
     ruleGroup(E, v, a, 'own', 'Your rules', own, 'No rules yet.', [E.Button({ key: 'rules-edit-own', label: 'Edit in Settings', onPress: () => a.tab('settings') })]),
   ])
+}
+
+/**
+ * The checklist drafts are judged on for the picked model: each item with its
+ * definition and source, tagged general, added or changed for the model (the
+ * general wording dim under a changed one), or struck through when dropped.
+ */
+function checklistGroup(E: UI, v: View, a: Actions, model: string | undefined): RenderElement {
+  const items = v.ruleList.checklist
+  const isOpen = v.ruleList.open.includes('checklist')
+  const live = items.filter(i => i.how !== 'dropped').length
+  const tag = (i: ChecklistItem) => (i.how === 'general' ? 'general' : `${i.how} for ${model ?? 'this model'}`)
+  const head = E.Box({
+    key: 'rules-checklist-head',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    columnGap: 2,
+    flexWrap: 'wrap',
+    children: [
+      E.Box({ flexDirection: 'row', columnGap: 1, children: [text(E, 'Checklist', { weight: 'semibold' }), text(E, plural(live, 'item', 'items'), { dimColor: true })] }),
+      E.Button({ key: 'rules-toggle-checklist', label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleRules('checklist') }),
+    ],
+  })
+  const body = !isOpen
+    ? []
+    : [
+        text(E, 'What each draft is judged on. The general items apply to every model; a model adds, changes or drops some.', { dimColor: true, wrap: 'wrap' }),
+        ...items.map(i =>
+          E.Box({
+            key: `checklist-${i.name}`,
+            flexDirection: 'column',
+            children: [
+              E.Box({
+                flexDirection: 'row',
+                columnGap: 1,
+                flexWrap: 'wrap',
+                children: [text(E, i.name, { weight: 'semibold', ...(i.how === 'dropped' ? { strikethrough: true, dimColor: true } : {}) }), text(E, `· ${tag(i)}`, { dimColor: true })],
+              }),
+              ...(i.how === 'dropped' ? [] : [text(E, i.definition, { wrap: 'wrap' })]),
+              ...(i.general ? [text(E, `General: ${i.general}`, { dimColor: true, wrap: 'wrap' })] : []),
+              ...(i.source ? [text(E, `Source: ${i.source}`, { dimColor: true, wrap: 'wrap' })] : []),
+            ],
+          }),
+        ),
+      ]
+  return block(E, 'rules-checklist', [head, ...body])
 }
 
 /** One group in the rules list: its name, rule count and Show or Hide, then when open each section's rules. */
@@ -783,6 +833,7 @@ function modelSetting(
  * coach changed most for this model, how much advice was taken, then tokens.
  */
 function statistics(E: UI, v: View, a: Actions): RenderElement[] {
+  if (!STATS_ON) return [text(E, 'Statistics are off while the checklist design changes.', { dimColor: true, wrap: 'wrap' })]
   const an = v.analytics
   if (!an.drafts.length && !tokenSummary(an)) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
   return [

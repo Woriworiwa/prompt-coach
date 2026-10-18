@@ -28,3 +28,10 @@ As of: 2026-10
 
 ## Verification
 - For tasks where correctness matters, say how to check the result (the tests pass, the command runs, the numbers add up).
+
+## Checklist
+- Goal: what outcome they want, said explicitly. Source: "Be clear and direct" (be explicit; Claude won't infer "above and beyond" from a vague request)
+- Context: the files, errors, background and reasons the assistant can't see on its own. Source: "Be clear and direct" (a brilliant new employee with no context on your norms) and "Add context to improve performance"
+- Constraints: limits, scope, or things to leave alone. Source: "Be clear and direct" (be specific about the desired output format and constraints)
+- Output: what form the answer or result should take. Source: "Be clear and direct" (same line) and "Control the format of responses"
+- Done means: how the result will be checked (tests pass, the numbers add up). Source: "Ask Claude to self-check" (verify the answer against test criteria before finishing)
