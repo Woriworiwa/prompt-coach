@@ -21,7 +21,7 @@ import {
   asLessons,
   tokenSummary,
 } from './lib.ts'
-import { BAR_CELLS, bar } from './ui.ts'
+import { BAR_CELLS, bar, barLine } from './ui.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -160,6 +160,15 @@ describe('lessons and live mode', () => {
     const twice = { ...a, changes: [...a.changes, { ...a.changes[0]!, what: 'another change' }] }
     const l = recordLesson(recordLesson(NO_LESSONS, twice, 'one', 0), twice, 'two', 1)
     expect(l.rules[a.changes[0]!.rule]).toBe(2)
+  })
+
+  test('barLine pads the count to a fixed width with no-break spaces, so every line is as long', () => {
+    const a = barLine(5, 80, '5 of 80', 8)
+    const b = barLine(54, 80, '54 of 80', 8)
+    expect(a).toHaveLength(b.length)
+    expect(a.endsWith('\u00A0\u00A0\u00A05 of 80')).toBe(true)
+    // Only the count keeps its own single spaces; the gap and the padding never fold.
+    expect(a.slice(0, -'5 of 80'.length).includes(' ')).toBe(false)
   })
 
   test('liveSkipReason waits for enough text, a new draft, no running analysis, and the cap', () => {
@@ -458,8 +467,10 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   const entries = [0, 1, 2, 3].map(i => boxNode(asNode(missing), `bars-missing-${i}`)!)
   const context = entries.find(r => textLook(asNode(r), 'Context').found)!
   expect(context.props.justifyContent).toBe('space-between')
-  expect(textLook(asNode(context), `${'█'.repeat(15)}  1 of 1`).found).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'bars-rules-0')), `${'█'.repeat(15)}  1 of 1`).found).toBe(true)
+  expect(textLook(asNode(context), `${'█'.repeat(15)}\u00A0\u00A01 of 1`).found).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'bars-rules-0')), `${'█'.repeat(15)}\u00A0\u00A01 of 1`).found).toBe(true)
+  // The bar and count are in the monospaced face, so every bar is as wide in Desktop.
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'bars-rules-0'))).toContain('"mono":true')
   // Bars is the only layout: no tables and no Layout switch.
   expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
   expect(await ui.find({ key: 'stats-layout' })).toBeUndefined()
@@ -1598,8 +1609,8 @@ test('Statistics: bars show the tokens in the opening line and each item scaled 
   for (const key of ['bars-missing', 'bars-rules']) {
     const lines = boxNode(await ui.drawn(), key)!
     const asNode = { type: 'Box', props: lines.props, children: lines.kids }
-    expect(textLook(asNode, `${'█'.repeat(15)}  2 of 2`).found).toBe(true)
-    expect(textLook(asNode, `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2`).found).toBe(true)
+    expect(textLook(asNode, `${'█'.repeat(15)}\u00A0\u00A02 of 2`).found).toBe(true)
+    expect(textLook(asNode, `${'█'.repeat(8)}${'░'.repeat(7)}\u00A0\u00A01 of 2`).found).toBe(true)
   }
   await ui.unmount()
 })
@@ -1622,7 +1633,7 @@ test('Statistics: a rule count saved before v0.9.5, higher than the analyses, sh
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-  expect(textLook(await ui.drawn(), `${'█'.repeat(15)}  2 of 2`).found).toBe(true)
+  expect(textLook(await ui.drawn(), `${'█'.repeat(15)}\u00A0\u00A02 of 2`).found).toBe(true)
   expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
   await ui.unmount()
 })

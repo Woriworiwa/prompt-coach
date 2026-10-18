@@ -659,10 +659,25 @@ export function bar(n: number, of: number): string {
   return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled)
 }
 
+/** A no-break space: Desktop keeps it, where it would fold ordinary spaces together. */
+const NBSP = '\u00A0'
+
+/**
+ * A bar line's right-hand text: the bar, two spaces, then the count padded on
+ * the left to `width` characters. Drawn in the monospaced face, every line is
+ * the same width, so the bars line up (Desktop's own face is proportional:
+ * █ and ░ differ in width there).
+ */
+export function barLine(n: number, of: number, count: string, width: number): string {
+  return `${bar(n, of)}${NBSP}${NBSP}${count.padStart(width, NBSP)}`
+}
+
 /** Bars: one line per item, its share of the analyses as a text bar, the count after it; the tokens in the opening line. */
 function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
   const t = tokenSummary(l)
   const head = `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'}${t ? ` · ${fmt(t.total)} tokens (≈${fmt(t.perCall)} each)` : ''}`
+  // Every count is padded to the widest one possible, "N of N", so both lists line up.
+  const width = `${l.analyses} of ${l.analyses}`.length
   const lines = (key: string, title: string, items: [string, number][], of: number, value: (n: number) => string, empty: string) =>
     E.Box({
       key: `bars-${key}`,
@@ -676,7 +691,7 @@ function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, 
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 columnGap: 2,
-                children: [E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' })] }), text(E, `${bar(n, of)}  ${value(n)}`)],
+                children: [E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' })] }), text(E, barLine(n, of, value(n), width), { mono: true })],
               }),
             )
           : [text(E, empty, { dimColor: true, wrap: 'wrap' })]),
