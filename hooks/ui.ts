@@ -238,7 +238,7 @@ function tabs(E: UI, v: View, a: Actions): RenderElement {
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     columnGap: 2,
-    children: [row(E, [tab('coach', 'Coach', '1'), tab('analytics', 'Analytics', '2'), tab('week', 'Week', '3')]), tab('settings', 'Settings', '4')],
+    children: [row(E, [tab('coach', 'Coach', '1'), tab('analytics', 'Analytics', '2'), tab('week', 'News', '3')]), tab('settings', 'Settings', '4')],
   })
 }
 
@@ -778,7 +778,7 @@ function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
   return out
 }
 
-// ---- The Week tab ----
+// ---- The Week tab (labelled News since v0.10.1; its key stays tab-week) ----
 
 /**
  * The Week tab: one Claude Week edition. The title, range, intro and what

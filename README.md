@@ -22,7 +22,7 @@ Inside a conversation, both read your draft as a reply to Claude's last message,
 /coach refresh all  rewrite every rules and tips file from today's pages
 ```
 
-The pane has four tabs: Coach (`1`), Analytics (`2`) and Week (`3`) on the left, and Settings (`4`) at the right end. In the terminal the open tab shows in clay brackets. In the Desktop app it shows as clay text, and the other tabs are dim buttons.
+The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left, and Settings (`4`) at the right end. In the terminal the open tab shows in clay brackets. In the Desktop app it shows as clay text, and the other tabs are dim buttons.
 
 **Coach tab**
 
@@ -45,7 +45,7 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and Week (`3`) on the left,
 - **Rules and tips:** the source pages the rules and tips come from, always listed, then the refresh (see "Keeping the rules current" below).
 - **Claude Week:** the **Week model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
 
-**Week tab** (`3`): Claude Week.
+**News tab** (`3`): Claude Week.
 - **Write Claude Week NN** fetches the pages in `week/sources.json` (Anthropic's own pages, the Claude Code release notes on GitHub, the release trackers and the people you follow), cuts each to its text, and asks the Week model once to write the edition from them, following `week/edition-prompt.md`: up to 15 stories in sections, a Top 3, questions to think about, and a note on what it changed because of your feedback. It links only to pages it was given. There's no web search, so news Anthropic hasn't posted itself (deals, outages, policy) is left out. The tab shows its progress; it takes a few minutes, and you can keep working. A page that can't be read is named to the model, which says so where it leaves a section thin. The button shows only while this week has no edition, since editions are never overwritten. If the answer can't be read, the tab says why and offers **Try again**.
 - At the top: the title and dates, the intro, what changed from your feedback, the Top 3, and how much you've read ("3 of 15 stories read", then each section's count). **‹ Older** and **Newer ›** step through past editions. Once there are two or more, **Archive** lists every edition, newest first, with its dates, stories read and stories voted on; **Open** shows that week as it was written, with your votes, reasons, takes and read marks, all still editable. **Back** returns to the edition.
 - Each story has its summary and links, then **▲ Up** / **▼ Down** (the same again clears it, and opens a "Why upvote?" or "Why downvote?" field), **Your take** (your own view, with or without a vote), **Mark read** (folds it to its title; **Reopen** unfolds it), **More detail** and **Ask in side chat**: it puts `/btw` with the story's prompt and the story itself (title, summary, detail, links) in the prompt box; press Enter and Desktop's side chat answers it, beside the conversation and not in it. Like any `/btw`, it reads the conversation but runs no tools. Nothing is sent until you press Enter. Questions have **Ask in side chat** too. If the prompt box can't take it (a dialog is open), it goes on the clipboard and a toast says so.

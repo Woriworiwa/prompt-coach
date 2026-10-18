@@ -705,7 +705,8 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   expect(row.props.justifyContent).toBe('space-between')
   expect(row.kids).toHaveLength(2)
   expect(buttonProps(row.kids[0], 'tab-analytics')).toBeDefined()
-  expect(buttonProps(row.kids[0], 'tab-week')).toBeDefined()
+  // The Week tab is labelled News (v0.10.1); its key is still tab-week.
+  expect(buttonProps(row.kids[0], 'tab-week')?.label).toBe('News')
   expect(buttonProps(row.kids[0], 'tab-settings')).toBeUndefined()
   expect(buttonProps(row.kids[1], 'tab-settings')?.label).toBe('Settings')
   await ui.unmount()
