@@ -653,23 +653,32 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 /** How many cells a bar has. */
 export const BAR_CELLS = 15
 
-/** A text bar: `n` of `of` filled with █, the rest ░, always BAR_CELLS long. */
-export function bar(n: number, of: number): string {
+/**
+ * A bar's filled and empty runs: `n` of `of` cells, always BAR_CELLS in all.
+ * Both are █, the empty run drawn dim, so the two parts are the same height
+ * (Desktop's monospaced face draws ░ shorter than █).
+ */
+export function barRuns(n: number, of: number): [string, string] {
   const filled = of > 0 ? Math.max(0, Math.min(BAR_CELLS, Math.round((BAR_CELLS * n) / of))) : 0
-  return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled)
+  return ['█'.repeat(filled), '█'.repeat(BAR_CELLS - filled)]
 }
 
 /** A no-break space: Desktop keeps it, where it would fold ordinary spaces together. */
 const NBSP = '\u00A0'
 
 /**
- * A bar line's right-hand text: the bar, two spaces, then the count padded on
- * the left to `width` characters. Drawn in the monospaced face, every line is
- * the same width, so the bars line up (Desktop's own face is proportional:
- * █ and ░ differ in width there).
+ * The count after a bar: two spaces, then the count padded on the left to
+ * `width` characters, so in the monospaced face every line is as wide and
+ * the bars line up (Desktop's own face is proportional).
  */
-export function barLine(n: number, of: number, count: string, width: number): string {
-  return `${bar(n, of)}${NBSP}${NBSP}${count.padStart(width, NBSP)}`
+export function barCount(count: string, width: number): string {
+  return `${NBSP}${NBSP}${count.padStart(width, NBSP)}`
+}
+
+/** One bar line's right-hand side, monospaced: the filled run, the empty run dimmed, then the count. */
+function barText(E: UI, n: number, of: number, count: string, width: number): RenderElement {
+  const [filled, empty] = barRuns(n, of)
+  return E.Text({ mono: true, children: [filled, E.Text({ dimColor: true, children: [empty] }), barCount(count, width)] })
 }
 
 /** Bars: one line per item, its share of the analyses as a text bar, the count after it; the tokens in the opening line. */
@@ -691,7 +700,7 @@ function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, 
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 columnGap: 2,
-                children: [E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' })] }), text(E, barLine(n, of, value(n), width), { mono: true })],
+                children: [E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' })] }), barText(E, n, of, value(n), width)],
               }),
             )
           : [text(E, empty, { dimColor: true, wrap: 'wrap' })]),

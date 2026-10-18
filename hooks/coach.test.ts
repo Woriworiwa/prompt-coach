@@ -21,7 +21,7 @@ import {
   asLessons,
   tokenSummary,
 } from './lib.ts'
-import { BAR_CELLS, bar, barLine } from './ui.ts'
+import { BAR_CELLS, barCount, barRuns } from './ui.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -147,12 +147,15 @@ describe('lessons and live mode', () => {
     expect(tokenSummary(old)).toBeUndefined()
   })
 
-  test('bar is always BAR_CELLS long, filled in proportion and never past either end', () => {
-    expect(bar(1, 1)).toBe('█'.repeat(BAR_CELLS))
-    expect(bar(0, 4)).toBe('░'.repeat(BAR_CELLS))
-    expect(bar(2, 4)).toBe('█'.repeat(8) + '░'.repeat(7))
-    expect(bar(3, 0)).toBe('░'.repeat(BAR_CELLS))
-    expect(bar(9, 4)).toHaveLength(BAR_CELLS)
+  test('barRuns splits BAR_CELLS of █ into filled and empty, in proportion and never past either end', () => {
+    const cells = (n: number, of: number) => barRuns(n, of).map(r => r.length)
+    expect(cells(1, 1)).toEqual([BAR_CELLS, 0])
+    expect(cells(0, 4)).toEqual([0, BAR_CELLS])
+    expect(cells(2, 4)).toEqual([8, 7])
+    expect(cells(3, 0)).toEqual([0, BAR_CELLS])
+    expect(cells(9, 4)).toEqual([BAR_CELLS, 0])
+    // One character for both runs, so they're the same height; only the dim tells them apart.
+    expect(barRuns(2, 4).join('')).toBe('█'.repeat(BAR_CELLS))
   })
 
   test('recordLesson counts a rule once per analysis, however often its changes name it', () => {
@@ -162,9 +165,9 @@ describe('lessons and live mode', () => {
     expect(l.rules[a.changes[0]!.rule]).toBe(2)
   })
 
-  test('barLine pads the count to a fixed width with no-break spaces, so every line is as long', () => {
-    const a = barLine(5, 80, '5 of 80', 8)
-    const b = barLine(54, 80, '54 of 80', 8)
+  test('barCount pads the count to a fixed width with no-break spaces, so every line is as long', () => {
+    const a = barCount('5 of 80', 8)
+    const b = barCount('54 of 80', 8)
     expect(a).toHaveLength(b.length)
     expect(a.endsWith('\u00A0\u00A0\u00A05 of 80')).toBe(true)
     // Only the count keeps its own single spaces; the gap and the padding never fold.
@@ -223,6 +226,26 @@ describe('refresh helpers', () => {
 })
 
 // ---- The pane, with the engine stubbed beneath the mod ----
+
+/**
+ * Every bar line under a drawn node, as "filled+empty count": the mono Text's
+ * filled run, its dimmed empty run (`d` when dim), and the count trimmed.
+ */
+function barsIn(node: unknown): string[] {
+  const out: string[] = []
+  const walk = (n: unknown) => {
+    if (!n || typeof n !== 'object') return
+    const o = n as { props?: { mono?: boolean }; children?: unknown[]; kids?: unknown[] }
+    if (o.props?.mono) {
+      const [filled, empty, count] = (o.children ?? []) as [string, { props?: { dimColor?: boolean }; children?: string[] }, string]
+      out.push(`${filled.length}+${empty.children?.[0]?.length ?? 0}${empty.props?.dimColor ? 'd' : ''} ${count.replaceAll('\u00A0', ' ').trim()}`)
+      return
+    }
+    for (const c of [...(o.children ?? []), ...(o.kids ?? [])]) walk(c)
+  }
+  walk(node)
+  return out
+}
 
 /** The reader profile in the stubbed config's data folder: the installed copy's, though this folder is loaded directly. */
 const PROFILE = '/home/u/.claude/plugins/data/prompt-coach-prompt-coach/profile.yaml'
@@ -467,10 +490,9 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   const entries = [0, 1, 2, 3].map(i => boxNode(asNode(missing), `bars-missing-${i}`)!)
   const context = entries.find(r => textLook(asNode(r), 'Context').found)!
   expect(context.props.justifyContent).toBe('space-between')
-  expect(textLook(asNode(context), `${'█'.repeat(15)}\u00A0\u00A01 of 1`).found).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'bars-rules-0')), `${'█'.repeat(15)}\u00A0\u00A01 of 1`).found).toBe(true)
   // The bar and count are in the monospaced face, so every bar is as wide in Desktop.
-  expect(JSON.stringify(boxNode(await ui.drawn(), 'bars-rules-0'))).toContain('"mono":true')
+  expect(barsIn(context)).toEqual(['15+0d 1 of 1'])
+  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 1 of 1'])
   // Bars is the only layout: no tables and no Layout switch.
   expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
   expect(await ui.find({ key: 'stats-layout' })).toBeUndefined()
@@ -1607,10 +1629,8 @@ test('Statistics: bars show the tokens in the opening line and each item scaled 
   expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
   // "Done means" and "Be explicit" are 2 of 2; "Context" and "Say why" 1 of 2.
   for (const key of ['bars-missing', 'bars-rules']) {
-    const lines = boxNode(await ui.drawn(), key)!
-    const asNode = { type: 'Box', props: lines.props, children: lines.kids }
-    expect(textLook(asNode, `${'█'.repeat(15)}\u00A0\u00A02 of 2`).found).toBe(true)
-    expect(textLook(asNode, `${'█'.repeat(8)}${'░'.repeat(7)}\u00A0\u00A01 of 2`).found).toBe(true)
+    // 8 filled and 7 dimmed for 1 of 2, all of them █.
+    expect(barsIn(boxNode(await ui.drawn(), key))).toEqual(['15+0d 2 of 2', '8+7d 1 of 2'])
   }
   await ui.unmount()
 })
@@ -1633,7 +1653,7 @@ test('Statistics: a rule count saved before v0.9.5, higher than the analyses, sh
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-  expect(textLook(await ui.drawn(), `${'█'.repeat(15)}\u00A0\u00A02 of 2`).found).toBe(true)
+  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules'))).toEqual(['15+0d 2 of 2'])
   expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
   await ui.unmount()
 })
