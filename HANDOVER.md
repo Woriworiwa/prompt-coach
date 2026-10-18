@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.8.3 (2026-10-18)
+# Handover: prompt-coach v0.8.4 (2026-10-18)
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`. It's for Omar. It's a git repo on his personal GitHub, private: https://github.com/Woriworiwa/prompt-coach (branch `main`). The repo's own config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`, so pushes never use his work account (`omar-smartarena`, the global git identity and gh's active account). Keep it separate from his work repositories. `.claude-plugin/types/` is ignored: the installed Claude Code writes it. `README.md` describes it for him, TASKS.md has a one-line log per version, and this file is the brief for the next session.
 
@@ -7,7 +7,7 @@ prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `
 1. Read this file, then skim `hooks/ui.ts` (the pane) and `hooks/register.ts` (the hooks).
 2. Don't change code until Omar asks for something. He often starts a session with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
-4. The latest work (v0.4.4 to v0.8.3) is installed but mostly unchecked in Desktop; see "Left to do".
+4. The latest work (v0.4.4 to v0.8.4) is installed but mostly unchecked in Desktop; see "Left to do".
 
 ## What it does now
 
@@ -16,7 +16,7 @@ prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `
 - **Tabs: Coach (1), Tips (2), Settings (3) and Week (4),** the same on every surface. The terminal draws each tab as a plain button (`1: Coach`), the open one as `[Coach]` in clay. Desktop draws a native button even for `plain`, so there the open tab is clay semibold `Text` (no frame, not pressable) and the others are `dimColor` buttons. Omar confirmed the Desktop tabs look right.
   - **Coach:** Your draft, then the Rewrite right under it. If the rewrite has `[placeholders]`, Fill in the gaps follows: a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick. Enter in an empty field removes that gap's whole sentence, and an ⓘ beside the heading reveals the help on hover. Then the buttons: Analyze, Apply (fills the box) and Apply and send (fills, submits as Omar via `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove, which appends its sentence to the rewrite. A dim footer gives the rules' date and the path to `rules/omar.md`.
   - **Tips:** "Using \<model\> well", in three groups: for this draft (from the analysis), for the session's model, and Claude Code in general. Tips appear only here, never on Coach.
-  - **Settings:** four bordered groups (`borderStyle: 'round'`, `borderColor: 'subtle'`), each titled on a `backgroundColor: 'subtle'` band:
+  - **Settings:** four groups (`settingsGroup` in `ui.ts`), each a bold title in the normal text color above a bordered box (`borderStyle: 'round'`, `borderColor: 'subtle'`) that holds only the settings. Until v0.8.4 the title sat on a gray `backgroundColor: 'subtle'` band inside the box, which Omar found hard to read; he picked this from five options. The Week tab's sections still use `group` with the band:
     - **General:** Mode (Manual/Live, key `l`; live is capped at 30 analyses a session), Rewrite model, Refresh model and Week model (a `Select`, buttons on mobile, saved via `$.config.set`). A refused change makes the model controls read-only, with the reason.
     - **Statistics:** analyses so far, the checklist items most often missing, the rules applied most, and Clear statistics. It was the Lessons tab; recent drafts are no longer shown, though the store key is still `lessons` and `recordLesson` still keeps them.
     - **Refresh rules and tips:** what was the Refresh tab: check sources, Rewrite all, progress, per-file diffs, Accept/Reject.
@@ -103,7 +103,7 @@ Run the second line again with Desktop's bundled binary: `~/Library/Application 
 
 **Check in a new Desktop session; Omar has to click.** Not yet confirmed in the real app:
 - v0.8.1 Week tab: the tab draws (confirmed); Write shows its progress and an edition arrives within a few minutes, with links that open; how good the stories are from index pages alone; votes, reasons and takes survive closing and reopening the pane; Mark read updates the counts; Ask in side chat puts `/btw …` in the prompt box and Enter opens Desktop's side chat with the story's question; groups and buttons read well in light and dark.
-- v0.7.0 Settings groups: the borders and the subtle title band read well in light and dark, and each control sits on the right of its label.
+- v0.8.4 Settings groups: each bold title above its box reads well in light and dark, and each control sits on the right of its label.
 - v0.6.0 Tips tab shows the tips, and the Coach tab no longer does.
 - v0.5.0 Settings holds Statistics and Refresh rules and tips, and `/coach refresh` lands there.
 - Apply and send actually submits.

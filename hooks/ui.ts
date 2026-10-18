@@ -485,14 +485,30 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   }
 
   return [
-    group(E, 'general', 'General', general),
-    group(E, 'statistics', 'Statistics', statistics(E, v, a)),
-    group(E, 'refresh', 'Refresh rules and tips', refreshSection(E, v, a)),
-    group(E, 'sources', 'Sources', sources),
+    settingsGroup(E, 'general', 'General', general),
+    settingsGroup(E, 'statistics', 'Statistics', statistics(E, v, a)),
+    settingsGroup(E, 'refresh', 'Refresh rules and tips', refreshSection(E, v, a)),
+    settingsGroup(E, 'sources', 'Sources', sources),
   ]
 }
 
-/** A bordered group of settings, its title on a subtle band. Theme keys only, so it follows light and dark. */
+/**
+ * A group of settings: its bold title above the box, outside the border, and
+ * the bordered box holding only the settings. The title is in the normal text
+ * color, so it reads in light and dark alike.
+ */
+function settingsGroup(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
+  return E.Box({
+    key: `group-${key}`,
+    flexDirection: 'column',
+    children: [
+      heading(E, title),
+      E.Box({ key: `group-${key}-box`, flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1, children }),
+    ],
+  })
+}
+
+/** A bordered group, its title on a subtle band (the Week tab's sections). Theme keys only, so it follows light and dark. */
 function group(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
   return E.Box({
     key: `group-${key}`,

@@ -647,7 +647,7 @@ function boxNode(node: unknown, key: string): { props: Record<string, unknown>; 
   return undefined
 }
 
-test('Settings groups its parts in bordered boxes with a subtle title band, each control right of its label', async ($, on) => {
+test('Settings groups its parts in bordered boxes, each bold title above its box with no band, each control right of its label', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -656,12 +656,20 @@ test('Settings groups its parts in bordered boxes with a subtle title band, each
   const tree = await ui.drawn()
   for (const [key, title] of [['general', 'General'], ['statistics', 'Statistics'], ['refresh', 'Refresh rules and tips'], ['sources', 'Sources']] as const) {
     const g = boxNode(tree, `group-${key}`)
-    expect(g?.props.borderStyle).toBe('round')
-    expect(g?.props.borderColor).toBe('subtle')
-    const band = g?.kids[0] as { props?: Record<string, unknown> } | undefined
-    expect(band?.props?.backgroundColor).toBe('subtle')
-    expect(textLook(band, title).found).toBe(true)
+    // The title first, outside the border: semibold, in the normal text color, on no background.
+    const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
+    expect(label?.type).toBe('Text')
+    expect(textLook(label, title)).toEqual({ found: true, color: undefined, weight: 'semibold' })
+    expect(g?.props.borderStyle).toBeUndefined()
+    expect(g?.props.backgroundColor).toBeUndefined()
+    // Then the bordered box, holding only the settings.
+    expect((g?.kids[1] as { props?: { key?: string } })?.props?.key).toBe(`group-${key}-box`)
+    const box = boxNode(tree, `group-${key}-box`)
+    expect(box?.props.borderStyle).toBe('round')
+    expect(box?.props.borderColor).toBe('subtle')
+    expect(textLook(box, title).found).toBe(false)
   }
+  expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
   for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['refreshModel', 'set-refreshModel'], ['weekModel', 'set-weekModel'], ['sources', 'sources']] as const) {
     const r = boxNode(tree, `setting-${key}`)
     expect(r?.props.flexDirection).toBe('row')
