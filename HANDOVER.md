@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.8.1 (2026-10-18)
+# Handover: prompt-coach v0.8.2 (2026-10-18)
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`. It's for Omar. It's a git repo on his personal GitHub, private: https://github.com/Woriworiwa/prompt-coach (branch `main`). The repo's own config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`, so pushes never use his work account (`omar-smartarena`, the global git identity and gh's active account). Keep it separate from his work repositories. `.claude-plugin/types/` is ignored: the installed Claude Code writes it. `README.md` describes it for him, TASKS.md has a one-line log per version, and this file is the brief for the next session.
 
@@ -7,7 +7,7 @@ prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `
 1. Read this file, then skim `hooks/ui.ts` (the pane) and `hooks/register.ts` (the hooks).
 2. Don't change code until Omar asks for something. He often starts a session with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
-4. The latest work (v0.4.4 to v0.8.1) is installed but mostly unchecked in Desktop; see "Left to do".
+4. The latest work (v0.4.4 to v0.8.2) is installed but mostly unchecked in Desktop; see "Left to do".
 
 ## What it does now
 
@@ -31,10 +31,11 @@ prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `
 - **Writing:** "Write Claude Week NN" (only while this ISO week has no edition) calls `writeEdition`. It fetches every page in `week/sources.json` at once with `$.http.fetch`, each raced against a 20-second `$.clock.after`. `pageText` cuts HTML or a feed to text (links kept as `text <url>`, 20,000 characters a page); `releasesText` turns the GitHub releases API JSON into the last 14 days of notes (40,000 characters). Then one `$.model.complete` (model `weekModel`, system `week/edition-prompt.md`, `maxTokens` 16,000, a 9-minute timeout) with `buildWeekRequest`: today, the profile, the last 4 editions' feedback, the `<page>` blocks and an `<unread>` list. The job's `progress` text shows on the tab.
 - **Why not a subagent (v0.8.0):** in auto mode, the classifier refused the mod's `$.agent.spawn` because no request of Omar's asked for an Agent call. A `tool.check` hook allowing the mod's own spawn was blocked as an auto-mode bypass, so Omar chose this way instead. Its cost: no web search (Tier 4 is gone), and index pages give only titles and dates. `edition-prompt.md` has a "How you read sources here" section saying so.
 - **The answer:** `parseEdition` reads the JSON, forces the edition id, prefixes story ids with it, puts sections in order, adds Claude Desktop, and caps at 15 news stories while keeping the Top 3. A bad answer sets the job to failed, keeping the raw answer (20,000 characters at most) under `weekJob.raw`, and shows Try again.
+- **Ask in side chat (v0.8.2):** a story's or question's button calls `askAside`, which runs `$.command.run({ command: 'btw', args })`, Claude Code's own side question, as if Omar typed `/btw`. `asideAboutStory` and `asideAboutQuestion` in `week.ts` build the one-line question: the prompt, then the story or question it comes from, because `/btw` sees only the conversation. If `command.run` rejects, the text goes in the prompt box with a toast. There's no mods API for a side chat of the mod's own; `$.model.fork` is the same idea, but its answer would have to be drawn in the pane.
 - **A job** is stored only when it fails (with `raw`). A `running` job found at session start (from v0.8.0, or a session that ended mid-write) shows as failed.
 - **Store keys:** `weekEditions` (by id, never overwritten), `weekFeedback` (by story id, the spec's 3.2 shape, a record dropped once verdict, why and take are all empty), `weekRead` and `weekJob`. They're per config, so personal and business keep separate digests; Omar chose that over a shared folder.
 - **Text fields** follow the rule against redrawing on each keystroke: `onInput` schedules a quiet save after 800 ms with no redraw, and Enter saves and redraws, showing Saved or Not saved.
-- **Decisions Omar made:** fetch plus `model.complete` writes the edition (he first chose a subagent; see above); `$.store` per config; Put in prompt box (no clipboard copy); a tab in this mod, numbered 4 so the other tabs keep their keys.
+- **Decisions Omar made:** fetch plus `model.complete` writes the edition (he first chose a subagent; see above); `$.store` per config; a story's prompt opens a `/btw` side chat (it filled the prompt box until v0.8.2; never the clipboard); a tab in this mod, numbered 4 so the other tabs keep their keys.
 - **Choices made without his say on the detail:** the Top 3 lines are plain text, not buttons, since the pane can't scroll to a story; Reopen also unmarks read; a vote switch clears the reason; weekModel defaults to opus; tips aren't counted in the progress.
 
 ## Code
@@ -100,7 +101,7 @@ Run the second line again with Desktop's bundled binary: `~/Library/Application 
 ## Left to do
 
 **Check in a new Desktop session; Omar has to click.** Not yet confirmed in the real app:
-- v0.8.1 Week tab: the tab draws (confirmed); Write shows its progress and an edition arrives within a few minutes, with links that open; how good the stories are from index pages alone; votes, reasons and takes survive closing and reopening the pane; Mark read updates the counts; Put in prompt box fills the box; groups and buttons read well in light and dark.
+- v0.8.1 Week tab: the tab draws (confirmed); Write shows its progress and an edition arrives within a few minutes, with links that open; how good the stories are from index pages alone; votes, reasons and takes survive closing and reopening the pane; Mark read updates the counts; Ask in side chat opens Desktop's side chat with the story's question (and whether it works while Claude is busy, since `command.run` queues until the session is idle); groups and buttons read well in light and dark.
 - v0.7.0 Settings groups: the borders and the subtle title band read well in light and dark, and each control sits on the right of its label.
 - v0.6.0 Tips tab shows the tips, and the Coach tab no longer does.
 - v0.5.0 Settings holds Statistics and Refresh rules and tips, and `/coach refresh` lands there.

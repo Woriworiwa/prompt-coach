@@ -4,7 +4,7 @@ import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Addition, type Analysis, type CheckStatus, type Lessons, LIVE_CAP, NO_PICK, type Placeholder, top } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
-import { type Edition, type FeedbackStore, type ReadState, type Story, dateRange, readCounts } from './week.ts'
+import { type Edition, type FeedbackStore, type ReadState, type Story, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
 /** The elements every surface draws, so one tree fits the terminal, Desktop and mobile. */
 export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | 'Code' | 'Markdown'>
@@ -135,7 +135,8 @@ export type WeekActions = {
   submitTake: (storyId: string, text: string) => Promise<void>
   toggleRead: (storyId: string) => Promise<void>
   toggleDetail: (storyId: string) => void
-  usePrompt: (text: string) => Promise<void>
+  /** Opens a side chat (`/btw`) that asks `text`, beside the conversation and not in it. */
+  askAside: (text: string) => Promise<void>
 }
 
 /** The pane's pressable elements by key, kept between redraws. */
@@ -717,7 +718,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
           flexDirection: 'column',
           children: [
             text(E, q.text, { wrap: 'wrap' }),
-            ...(q.prompt ? [E.Button({ key: `week-q-prompt-${ed.edition_id}-${n}`, label: 'Put in prompt box', onPress: () => a.week.usePrompt(q.prompt!) })] : []),
+            ...(q.prompt ? [E.Button({ key: `week-q-aside-${ed.edition_id}-${n}`, label: 'Ask in side chat', onPress: () => a.week.askAside(asideAboutQuestion(q, ed.title)) })] : []),
           ],
         }),
       )
@@ -740,7 +741,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 /**
  * One story. Read, it folds to its title with a check and Reopen. Open: the
  * summary, the links, then Up, Down, Your take, Mark read, More detail and
- * Put in prompt box. A vote opens its reason field; Your take opens its own.
+ * Ask in side chat. A vote opens its reason field; Your take opens its own.
  * On mobile, which has no fields, saved reasons and takes show as text.
  */
 function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderElement {
@@ -772,7 +773,7 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
       ...(F ? [E.Button({ key: `take-${s.id}`, label: 'Your take', onPress: () => a.week.toggleTake(s.id) })] : []),
       E.Button({ key: `read-${s.id}`, label: 'Mark read', onPress: () => a.week.toggleRead(s.id) }),
       ...(s.detail ? [E.Button({ key: `detail-${s.id}`, label: w.details.includes(s.id) ? 'Less detail' : 'More detail', onPress: () => a.week.toggleDetail(s.id) })] : []),
-      ...(s.prompt ? [E.Button({ key: `prompt-${s.id}`, label: 'Put in prompt box', onPress: () => a.week.usePrompt(s.prompt!) })] : []),
+      ...(s.prompt ? [E.Button({ key: `aside-${s.id}`, label: 'Ask in side chat', onPress: () => a.week.askAside(asideAboutStory(s)) })] : []),
     ]),
   )
 

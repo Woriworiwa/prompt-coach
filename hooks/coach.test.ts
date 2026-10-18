@@ -208,7 +208,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; noBtw?: boolean } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -232,6 +232,7 @@ function world(
     toasts: [] as string[],
     transcript: [] as { role: 'user' | 'assistant'; text: string }[],
     weekRequests: [] as { prompt: string; system: string; model: string }[],
+    asides: [] as string[],
   }
   const rel = (path: string) => path.replace(/^.*?\/(rules|tips|week|sources\.json)/, (_m, dir: string) => dir)
 
@@ -309,6 +310,13 @@ function world(
   })
   on('ui.copy', async () => ({ value: { isCopied: true } }))
   on('turn.complete', async ($, e) => ({ text: e.answer, ...(e.usage ? { usage: e.usage } : {}) }))
+  // Claude Code's own /btw, beneath the mod: it records the side question.
+  if (!opts.noBtw) {
+    on('command.run', { command: 'btw' }, async ($, e) => {
+      s.asides.push(e.args)
+      return {}
+    })
+  }
   return { s, saved, clock }
 }
 
@@ -1287,16 +1295,23 @@ test('Week: a saved take opens its box when the edition loads', async ($, on) =>
   await ui.unmount()
 })
 
-test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detail and Put in prompt box work', async ($, on) => {
+test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detail and Ask in side chat work', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { saved: storedEdition() })
   expect(await ui.find({ text: 'Terminal only.' })).toBeUndefined()
   await ui.press({ key: 'detail-2026-W42-idle' })
   expect(await ui.find({ text: 'Terminal only.' })).toBeDefined()
 
-  await ui.press({ key: 'prompt-2026-W42-idle' })
-  expect(s.box).toBe('Explain idle compaction.')
-  await ui.press({ key: 'week-q-prompt-2026-W42-0' })
-  expect(s.box).toBe('Audit my hooks.')
+  // The prompt goes to a side chat (/btw) with the story it's about, and the prompt box is left alone.
+  expect(buttonProps(await ui.drawn(), 'aside-2026-W42-idle')?.label).toBe('Ask in side chat')
+  await ui.press({ key: 'aside-2026-W42-idle' })
+  expect(s.asides).toEqual([
+    'Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
+  ])
+  await ui.press({ key: 'week-q-aside-2026-W42-0' })
+  expect(s.asides[1]).toBe('Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
+  expect(s.filled).toEqual([])
+  // A story with no prompt has no side chat button.
+  expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')).toBeUndefined()
 
   await ui.press({ key: 'read-2026-W42-idle' })
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
@@ -1339,5 +1354,13 @@ test('Week: a redraw keeps the story buttons\' press handles', async ($, on) => 
   expect(before).toBeDefined()
   await ui.redraw({ ...pane('desktop').props, isFocused: true })
   expect(handleOf(await ui.drawn(), 'up-2026-W42-idle')).toBe(before)
+  await ui.unmount()
+})
+
+test('Week: when the session refuses /btw, the side question goes in the prompt box instead, and says so', async ($, on) => {
+  const { s, ui } = await weekPane($, on, { saved: storedEdition(), noBtw: true })
+  await ui.press({ key: 'aside-2026-W42-idle' })
+  expect(s.box).toContain('Explain idle compaction. (This is about the Claude Week story')
+  expect(s.toasts.at(-1)).toContain("Couldn't open a side chat")
   await ui.unmount()
 })

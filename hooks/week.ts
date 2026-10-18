@@ -376,6 +376,26 @@ function cut(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}\n[cut: the page goes on]` : s
 }
 
+/**
+ * What a side chat about a story asks: the story's prompt, then the story
+ * itself, since the side chat sees only the session's conversation. One line,
+ * as a typed `/btw` question is.
+ */
+export function asideAboutStory(s: Story): string {
+  const about = [s.summary, s.detail].filter(Boolean).join(' ')
+  const sources = s.links.length ? ` Sources: ${s.links.map(l => l.url).join(', ')}.` : ''
+  return oneLine(`${s.prompt ?? s.title} (This is about the Claude Week story "${s.title}": ${about}${sources})`)
+}
+
+/** What a side chat about one of an edition's questions asks: its prompt, with the question it comes from. */
+export function asideAboutQuestion(q: Question, editionTitle: string): string {
+  return oneLine(`${q.prompt ?? q.text} (From the questions in ${editionTitle}: "${q.text}")`)
+}
+
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, ' ').trim()
+}
+
 /** Read counts: the edition's news stories (tips aside) and each news section's. */
 export function readCounts(edition: Edition, read: ReadState): { read: number; total: number; sections: { id: string; title: string; read: number; total: number }[] } {
   const sections = edition.sections

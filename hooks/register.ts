@@ -419,7 +419,7 @@ export const register: Register = (on, options) => {
           weekDetails = weekDetails.includes(id) ? weekDetails.filter(x => x !== id) : [...weekDetails, id]
           $.ui.invalidate('ui.render')
         },
-        usePrompt: text => fillPrompt($, text, 'Prompt'),
+        askAside: text => askAside($, text),
       },
     }, F)
   })
@@ -966,6 +966,20 @@ async function toggleRead($: EngineInterface, id: string): Promise<void> {
   readState = was ? rest : { ...readState, [id]: true }
   await $.store.set(STORE.weekRead, readState)
   $.ui.invalidate('ui.render')
+}
+
+/**
+ * Asks `text` in a side chat, as typing `/btw <text>` would: Claude Code's own
+ * side question, which reads the conversation but stays out of it and runs no
+ * tools. If the session refuses the command, the text goes in the prompt box instead.
+ */
+async function askAside($: EngineInterface, text: string): Promise<void> {
+  try {
+    await $.command.run({ command: 'btw', args: text })
+  } catch (err) {
+    await fillPrompt($, text, 'Prompt')
+    $.ui.toast(`Couldn't open a side chat (${message(err)}), so the prompt is in the prompt box.`)
+  }
 }
 
 /** An ISO time to the second, as feedback records carry it. */
