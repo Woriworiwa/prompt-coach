@@ -421,3 +421,17 @@ export function archiveRows(editions: Editions, feedback: FeedbackStore, read: R
     return { id, title: e.title, range: e.date_from && e.date_to ? dateRange(e.date_from, e.date_to) : '', read: counts.read, total: counts.total, voted }
   })
 }
+
+/**
+ * Where the reader profile lives: the mod's own data folder in the Claude
+ * config (`plugins/data/<plugin>-<marketplace>`, the folder Claude Code keeps
+ * for a plugin across installs and updates), not the install itself, which an
+ * update replaces. An installed copy runs from `plugins/cache/<marketplace>/
+ * <plugin>/<version>`, so its folder follows from the root; a folder loaded
+ * directly gets Claude Code's `<plugin>-inline` folder in `configDir`.
+ */
+export function profilePath(root: string, name: string, configDir: string): string {
+  const installed = /^(.*)[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(root)
+  if (installed) return `${installed[1]}/plugins/data/${installed[3]}-${installed[2]}/profile.yaml`
+  return `${configDir.replace(/[\\/]$/, '')}/plugins/data/${name}-inline/profile.yaml`
+}

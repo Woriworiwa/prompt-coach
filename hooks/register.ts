@@ -55,6 +55,7 @@ import {
   pageText,
   parseEdition,
   parseWeekSources,
+  profilePath,
   releasesText,
   setTake,
   setWhy,
@@ -168,6 +169,9 @@ let weekSaves: Record<string, string> = {}
 let weekArchive = false
 /** The pages Write reads, for Settings; undefined when week/sources.json couldn't be read. */
 let weekSources: WeekSource[] | undefined
+/** The reader profile's path (see profilePath), and a line under it in Settings when it was just created or couldn't be. */
+let profileFile = ''
+let profileNote: string | undefined
 const weekTimers = new Map<string, Timer>()
 
 export const register: Register = (on, options) => {
@@ -814,6 +818,7 @@ async function loadWeek($: EngineInterface): Promise<void> {
   } catch {
     weekSources = undefined
   }
+  await ensureProfile($)
   // A take box with text in it opens with the edition.
   weekTakes = Object.values(feedback).filter(f => f.take).map(f => f.story_id)
   // Only a failure is kept; one still running when the session ended never came back.
@@ -823,6 +828,26 @@ async function loadWeek($: EngineInterface): Promise<void> {
     weekJob = { state: 'failed', title: job.title ?? 'Claude Week', editionId: job.editionId, reason: 'the session ended before the edition was ready.' }
     await $.store.set(STORE.weekJob, weekJob)
   } else weekJob = { state: 'idle' }
+}
+
+/**
+ * Finds the reader profile in the mod's data folder and, only when there is
+ * no file there, starts one from week/profile.example.yaml. An existing
+ * profile is never written.
+ */
+async function ensureProfile($: EngineInterface): Promise<void> {
+  try {
+    const configDir = (await $.env.get('CLAUDE_CONFIG_DIR')) || `${(await $.env.get('HOME')) ?? '~'}/.claude`
+    profileFile = profilePath($.plugin.root, $.plugin.name, configDir)
+    if (await $.fs.exists(profileFile)) {
+      profileNote = undefined
+      return
+    }
+    await $.fs.write(profileFile, await $.fs.read(`${$.plugin.root}/week/profile.example.yaml`))
+    profileNote = 'A blank profile was created here. Fill it in before the next Write.'
+  } catch (err) {
+    profileNote = `Couldn't create it: ${err instanceof Error ? err.message : String(err)}`
+  }
 }
 
 function weekView($: EngineInterface, now: number): View['week'] {
@@ -840,7 +865,8 @@ function weekView($: EngineInterface, now: number): View['week'] {
     saves: weekSaves,
     job: weekJob,
     weekModel,
-    profilePath: `${$.plugin.root}/week/profile.yaml`,
+    profilePath: profileFile,
+    profileNote,
     sources: weekSources,
     archive: weekArchive,
     archiveRows: archiveRows(editions, feedback, readState),
@@ -869,7 +895,10 @@ async function writeEdition($: EngineInterface): Promise<void> {
   try {
     progress('Reading the source pages…')
     const system = await $.fs.read(`${root}/week/edition-prompt.md`)
-    const profile = await $.fs.read(`${root}/week/profile.yaml`)
+    if (!profileFile) await ensureProfile($)
+    const profile = await $.fs.read(profileFile).catch(() => {
+      throw new Error(`couldn't read your reader profile at ${profileFile}`)
+    })
     const sources = parseWeekSources(await $.fs.read(`${root}/week/sources.json`))
     let done = 0
     const pages = await Promise.all(

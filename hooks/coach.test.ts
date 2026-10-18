@@ -181,6 +181,9 @@ describe('refresh helpers', () => {
 
 // ---- The pane, with the engine stubbed beneath the mod ----
 
+/** The reader profile in the stubbed config's data folder (this folder is loaded directly, so `-inline`). */
+const PROFILE = '/home/u/.claude/plugins/data/prompt-coach-inline/profile.yaml'
+
 const FILES: Record<string, string> = {
   'rules/general.md': '# General\n\nSource: x\nAs of: 2026-10\n\n- Be explicit.\n',
   'rules/opus-5-5.md': '# Opus\n\nSources: x\nAs of: 2026-09\n\n- Name the finish line.\n',
@@ -189,7 +192,8 @@ const FILES: Record<string, string> = {
   'tips/opus-5-5.md': '# Opus tips\n\nSource: x\n\n- Use /effort, not "think hard".\n',
   'tips/sonnet-5-5.md': '# Sonnet tips\n\nSource: x\n\n- Sonnet is the everyday model.\n',
   'tips/claude-code.md': '# Claude Code\n\nSource: x\n\n- Run /clear between tasks.\n',
-  'week/profile.yaml': 'name: Omar\nuses_claude_code: daily, in the desktop app\n',
+  [PROFILE]: 'name: Omar\nuses_claude_code: daily, in the desktop app\n',
+  'week/profile.example.yaml': '# Claude Week reader profile.\nname:\n',
   'week/edition-prompt.md': 'You are writing this week\'s edition of Claude Week.\n',
   'week/sources.json': JSON.stringify({
     pages: [
@@ -208,7 +212,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -252,9 +256,12 @@ function world(
   on('session.surfaces', async () => ({ value: (opts.surfaces ?? ['desktop']) as never }))
   on('fs.read', async ($, e) => {
     const file = rel(String(e.path))
-    const text = s.written.get(file) ?? FILES[file]
+    const text = fileAt(file)
     return text === undefined ? { deny: `no such file: ${file}` } : { value: text }
   })
+  const fileAt = (file: string) => s.written.get(file) ?? (opts.noProfile && file === PROFILE ? undefined : FILES[file])
+  on('fs.exists', async ($, e) => ({ value: fileAt(rel(String(e.path))) !== undefined }))
+  on('env.get', async ($, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? '/home/u/.claude' : undefined }))
   on('fs.write', async ($, e) => {
     s.written.set(rel(String(e.path)), String(e.text))
     return { value: undefined }
@@ -1386,12 +1393,38 @@ test('Settings: Claude Week holds the Week model, the reader profile and the pag
   expect(week).toContain('"set-weekModel"')
   expect(JSON.stringify(boxNode(tree, 'group-general'))).not.toContain('set-weekModel')
   expect(week).toContain('Reader profile')
-  expect(week).toContain('/week/profile.yaml')
+  expect(week).toContain(PROFILE)
   expect(await ui.find({ type: 'Link', text: 'Tier 1 · Newsroom' })).toBeDefined()
   expect(await ui.find({ type: 'Link', text: 'Tier 2 · Tracker' })).toBeDefined()
   await ui.press({ key: 'tab-week' })
   expect(await ui.find({ text: /Written by/ })).toBeUndefined()
   expect(await ui.find({ text: /Settings → Claude Week/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Week: an existing reader profile in the data folder is used and never written', async ($, on) => {
+  const { s } = world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-week' })
+  await ui.press({ key: 'week-write' })
+  expect(s.weekRequests[0]!.prompt).toContain('uses_claude_code: daily, in the desktop app')
+  expect(s.written.has(PROFILE)).toBe(false)
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: /blank profile was created/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('Week: with no reader profile yet, a blank one is created from the template and Settings says so', async ($, on) => {
+  const { s } = world(on, { noProfile: true })
+  await $.session.start(START)
+  expect(s.written.get(PROFILE)).toBe('# Claude Week reader profile.\nname:\n')
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: /blank profile was created here/ })).toBeDefined()
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'group-week'))).toContain(PROFILE)
   await ui.unmount()
 })
 

@@ -1,0 +1,11 @@
+# Claude Week reader profile. The edition writer reads this every edition.
+# It is yours: fill it in and edit it by hand. Nothing in prompt-coach rewrites it,
+# and installing or updating the mod leaves this file alone.
+name:
+role:                 # e.g. backend developer
+uses_claude_code:     # e.g. daily, in the desktop app
+interests: Claude Code releases and features, tips for Claude Code, usage limits, models
+follows: []           # people whose posts you want flagged
+prefers:
+  - plain, factual wording that leads with the version or date
+dislikes: []

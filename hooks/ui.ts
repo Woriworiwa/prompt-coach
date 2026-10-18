@@ -77,7 +77,10 @@ export type WeekView = {
   saves: Record<string, string>
   job: WeekJob
   weekModel: string
+  /** The reader profile, in the mod's data folder; see profilePath in week.ts. */
   profilePath: string
+  /** Shown under the path when the profile was just created, or couldn't be. */
+  profileNote?: string
   /** The pages Write reads (week/sources.json), listed under Settings; undefined when the file couldn't be read. */
   sources?: WeekSource[]
   /** True while the tab shows the archive instead of an edition. */
@@ -522,7 +525,11 @@ function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     : [text(E, "Couldn't read week/sources.json.", { color: 'warning', wrap: 'wrap' })]
   return [
     modelSetting(E, a, 'weekModel', 'Week model', 'Writes each Claude Week edition from the fetched pages.', w.weekModel, st.weekChoices, st.readOnlyReason, F),
-    block(E, 'week-profile', [labelled('Reader profile', 'What the writer knows about you. Edit this file to steer future editions.'), code(E, w.profilePath)]),
+    block(E, 'week-profile', [
+      labelled('Reader profile', 'What the writer knows about you. Edit this file to steer future editions; installing or updating the mod leaves it alone.'),
+      code(E, w.profilePath),
+      ...(w.profileNote ? [text(E, w.profileNote, { color: w.profileNote.startsWith("Couldn't") ? 'warning' : 'suggestion', wrap: 'wrap' })] : []),
+    ]),
     block(E, 'week-sources', [labelled('Sources', 'The pages Write reads each week (week/sources.json).'), ...pages]),
   ]
 }
