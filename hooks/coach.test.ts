@@ -4,7 +4,6 @@ import type { On, PromptEditInput, PromptEditResult } from 'claude-code'
 import {
   ANALYSIS_SYSTEM,
   LIVE_CAP,
-  NO_LESSONS,
   NO_PICK,
   answersFor,
   fillPlaceholders,
@@ -16,12 +15,9 @@ import {
   liveSkipReason,
   parseAnalysis,
   parseTips,
-  recordLesson,
-  addUsage,
-  asLessons,
-  tokenSummary,
 } from './lib.ts'
 import { BAR_CELLS, barCount, barRuns } from './ui.ts'
+import { type Analytics, NO_ANALYTICS, recordDraft } from './analytics.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -121,32 +117,7 @@ describe('suggestions', () => {
   })
 })
 
-describe('lessons and live mode', () => {
-  test('recordLesson counts gaps and rules and keeps five recent drafts', () => {
-    const a = parseAnalysis(ANALYSIS)!
-    let l = NO_LESSONS
-    for (let i = 0; i < 6; i++) l = recordLesson(l, a, `draft ${i}`, i)
-    expect(l.analyses).toBe(6)
-    expect(l.gaps).toEqual({ Goal: 6, Context: 6, 'Done means': 6, 'Stop rule': 6 })
-    expect(l.rules['Name the finish line']).toBe(6)
-    expect(l.recent.map(r => r.draft)).toEqual(['draft 5', 'draft 4', 'draft 3', 'draft 2', 'draft 1'])
-  })
-
-  test('addUsage sums each answered call; tokenSummary totals them; recordLesson keeps them; old statistics start at zero', () => {
-    const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 200, cache_creation_input_tokens: 100 }
-    let l = addUsage(addUsage(NO_LESSONS, usage), usage)
-    expect(l.tokens).toEqual({ calls: 2, input: 2000, output: 1000, cacheRead: 400, cacheWrite: 200 })
-    expect(tokenSummary(l)).toEqual({ total: 3600, input: 2000, output: 1000, cache: 600, perCall: 1800 })
-    l = recordLesson(l, parseAnalysis(ANALYSIS)!, 'draft', 0)
-    expect(l.tokens.calls).toBe(2)
-    expect(tokenSummary(NO_LESSONS)).toBeUndefined()
-    // Saved before v0.9.4: no tokens field, and the rest is kept.
-    const old = asLessons({ analyses: 3, gaps: { Goal: 2 }, rules: {}, recent: [] })
-    expect(old.analyses).toBe(3)
-    expect(old.tokens).toEqual({ calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
-    expect(tokenSummary(old)).toBeUndefined()
-  })
-
+describe('bars and live mode', () => {
   test('barRuns splits BAR_CELLS of █ into filled and empty, in proportion and never past either end', () => {
     const cells = (n: number, of: number) => barRuns(n, of).map(r => r.length)
     expect(cells(1, 1)).toEqual([BAR_CELLS, 0])
@@ -156,13 +127,6 @@ describe('lessons and live mode', () => {
     expect(cells(9, 4)).toEqual([BAR_CELLS, 0])
     // One character for both runs, so they're the same height; only the dim tells them apart.
     expect(barRuns(2, 4).join('')).toBe('█'.repeat(BAR_CELLS))
-  })
-
-  test('recordLesson counts a rule once per analysis, however often its changes name it', () => {
-    const a = parseAnalysis(ANALYSIS)!
-    const twice = { ...a, changes: [...a.changes, { ...a.changes[0]!, what: 'another change' }] }
-    const l = recordLesson(recordLesson(NO_LESSONS, twice, 'one', 0), twice, 'two', 1)
-    expect(l.rules[a.changes[0]!.rule]).toBe(2)
   })
 
   test('barCount pads the count to a fixed width with no-break spaces, so every line is as long', () => {
@@ -476,30 +440,27 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.filled).toEqual([rewrite, ''])
   expect(s.submitted).toEqual([{ text: rewrite, origin: { kind: 'plugin', name: 'prompt-coach', asUser: true } }])
   expect(s.box).toBe('')
-  expect((saved.get('lessons') as { analyses: number }).analyses).toBe(1)
+  // The analysis is recorded for Analytics, and Apply and send marks it applied.
+  const stored = saved.get('analytics') as Analytics
+  expect(stored.drafts).toHaveLength(1)
+  expect(stored.drafts[0]).toMatchObject({ model: 'Opus 5.5', applied: true, added: 0, rules: ['Name the finish line', 'Remove "think step by step"'] })
+  expect(stored.drafts[0]!.status).toEqual({ Goal: 'partial', Context: 'missing', Constraints: 'n/a', 'Done means': 'missing', 'Stop rule': 'missing', Output: 'present' })
 
-  // Lessons now live on the Analytics tab, under Statistics, without the recent drafts.
+  // Statistics live on the Analytics tab.
   expect(buttonProps(await ui.drawn(), 'tab-lessons')).toBeUndefined()
   await ui.press({ key: 'tab-analytics' })
   expect(textLook(await ui.drawn(), 'Statistics')).toEqual({ found: true, color: undefined, weight: 'semibold' })
-  // Statistics as bars: a title per list, then one line per item with its bar and count on the right.
-  const asNode = (b: ReturnType<typeof boxNode>) => b && { type: 'Box', props: b.props, children: b.kids }
-  const missing = boxNode(await ui.drawn(), 'bars-missing')!
-  expect(textLook(asNode(missing), 'Most often missing').weight).toBe('semibold')
-  // Each of the four missed items is a line: its name on the left, a full bar and "1 of 1" on the right.
-  const entries = [0, 1, 2, 3].map(i => boxNode(asNode(missing), `bars-missing-${i}`)!)
-  const context = entries.find(r => textLook(asNode(r), 'Context').found)!
+  const missing = boxNode(await ui.drawn(), 'stats-missing')!
+  expect(textLook({ type: 'Box', props: missing.props, children: missing.kids }, 'Missing or vague').weight).toBe('semibold')
+  // Each item missing or vague is a line: its name and a dim note on the left, a full bar and "1 of 1" on the right.
+  const context = boxNode(await ui.drawn(), 'bars-missing-Context')!
   expect(context.props.justifyContent).toBe('space-between')
-  // The bar and count are in the monospaced face, so every bar is as wide in Desktop.
   expect(barsIn(context)).toEqual(['15+0d 1 of 1'])
+  expect(await ui.find({ text: '1 left out · 0 vague · last 1: 1' })).toBeDefined()
   expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 1 of 1'])
-  // Bars is the only layout: no tables and no Layout switch.
-  expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
-  expect(await ui.find({ key: 'stats-layout' })).toBeUndefined()
-  expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
-  expect(await ui.find({ text: 'Rules applied most' })).toBeUndefined()
+  expect(await ui.find({ text: 'What the coach changed most · Opus 5.5' })).toBeDefined()
+  expect(await ui.find({ text: 'Added 0 of 0 suggestions · applied 1 of 1 rewrite' })).toBeDefined()
   expect(await ui.find({ text: 'Recent drafts' })).toBeUndefined()
-  expect(await ui.find({ text: 'Lessons' })).toBeUndefined()
   expect(await ui.find({ key: 'clear-lessons', text: 'Clear statistics' })).toBeDefined()
   await ui.unmount()
 })
@@ -1578,13 +1539,67 @@ test('Week: when the prompt box can\'t take the side question, it goes on the cl
 
 // ---- Statistics: tokens and the layout trial (v0.9.4) ----
 
-const STATS = {
-  analyses: 2,
-  gaps: { 'Done means': 2, Context: 1 },
-  rules: { 'Be explicit': 2, 'Say why': 1 },
-  recent: [],
-  tokens: { calls: 2, input: 1000, output: 500, cacheRead: 200, cacheWrite: 0 },
+/** Two drafts of ANALYSIS written for Opus 5.5, with some tokens counted. */
+function stats(model = 'Opus 5.5'): Analytics {
+  const a = parseAnalysis(ANALYSIS)!
+  const two = recordDraft(recordDraft(NO_ANALYTICS, a, 'Opus 5.5', 1), a, model, 2)
+  return { ...two, tokens: { calls: 2, input: 1000, output: 500, cacheRead: 200, cacheWrite: 0 } }
 }
+const STATS = stats()
+
+test('Statistics: the eight parts, in order: score, work on next, missing or vague, strengths, changes, advice, tokens, clear', async ($, on) => {
+  world(on, { saved: { analytics: STATS } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-analytics' })
+  // ANALYSIS scores 2.5: Output and Constraints (n/a) a point each, Goal (vague) half.
+  expect(await ui.find({ text: '2 analyses · your last 2 drafts score 2.5 of 6 on average.' })).toBeDefined()
+  // Goal, Context, Done means and Stop rule are all missing or vague in both; Goal comes first on the checklist.
+  expect(await ui.find({ text: 'Work on next: Goal' })).toBeDefined()
+  expect(await ui.find({ text: 'Missing or vague in 2 of your last 2 drafts.' })).toBeDefined()
+  expect(barsIn(boxNode(await ui.drawn(), 'bars-missing-Goal'))).toEqual(['15+0d 2 of 2'])
+  expect(await ui.find({ text: '0 left out · 2 vague · last 2: 2' })).toBeDefined()
+  // Constraints was n/a and Output present, so neither is missing or vague.
+  expect(boxNode(await ui.drawn(), 'bars-missing-Output')).toBeUndefined()
+  expect(await ui.find({ text: 'Output: in 2 of 2 drafts' })).toBeDefined()
+  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 2 of 2'])
+  expect(await ui.find({ text: 'Added 0 of 0 suggestions · applied 0 of 2 rewrites' })).toBeDefined()
+  expect(await ui.find({ text: '1,700 tokens used by analyses (\u2248850 each).' })).toBeDefined()
+
+  const keys = boxNode(await ui.drawn(), 'block-statistics')!.kids.map(k => (k as { props?: { key?: string } }).props?.key ?? (k as { type?: string }).type)
+  expect(keys).toEqual(['stats-score', 'stats-focus', 'stats-missing', 'stats-strengths', 'stats-rules', 'stats-advice', 'Text', 'clear-lessons'])
+  await ui.unmount()
+})
+
+test('Statistics: what the coach changed most counts only drafts for the session\'s model', async ($, on) => {
+  world(on, { saved: { analytics: stats('Sonnet 5.5') } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-analytics' })
+  // One of the two drafts was for Opus 5.5, the session's model.
+  expect(await ui.find({ text: 'What the coach changed most · Opus 5.5' })).toBeDefined()
+  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 1 of 1'])
+  await ui.unmount()
+})
+
+test('Statistics: Add and Apply are counted as advice taken, with the suggestion offered as the example to work on', async ($, on) => {
+  const { s, saved } = world(on, { analysis: MERGED })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  await ui.press({ key: 'add-1-0' })
+  await ui.press({ key: 'fill' })
+  const d = (saved.get('analytics') as Analytics).drafts[0]!
+  expect(d).toMatchObject({ applied: true, added: 1 })
+  expect(d.offered).toHaveLength(3)
+  await ui.press({ key: 'tab-analytics' })
+  expect(await ui.find({ text: 'Added 1 of 3 suggestions · applied 1 of 1 rewrite' })).toBeDefined()
+  await ui.unmount()
+})
 
 test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Clear statistics resets them', async ($, on) => {
   const { s, saved } = world(on)
@@ -1595,85 +1610,46 @@ test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Cl
   await ui.press({ key: 'analyze' })
   await ui.press({ key: 'tab-analytics' })
   // The stub's usage is 1 input and 1 output token.
-  expect(await ui.find({ text: '1 analysis · 2 tokens (≈2 each)' })).toBeDefined()
+  expect(await ui.find({ text: '2 tokens used by analyses (\u22482 each).' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
   expect(await ui.find({ text: /tokens/ })).toBeUndefined()
   expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
-  expect(saved.has('lessons')).toBe(false)
+  expect(saved.has('analytics')).toBe(false)
   await ui.unmount()
 })
 
-test('Statistics: an answer that is not an analysis still counts its tokens', async ($, on) => {
+test('Statistics: an answer that is not an analysis still counts its tokens, but adds no draft', async ($, on) => {
   const { s, saved } = world(on, { analysis: 'no tags here' })
   s.box = 'fix the login thing so it works'
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
-  const l = saved.get('lessons') as { analyses: number; tokens: { calls: number } }
-  expect(l.analyses).toBe(0)
-  expect(l.tokens.calls).toBe(1)
+  const a = saved.get('analytics') as Analytics
+  expect(a.drafts).toHaveLength(0)
+  expect(a.tokens.calls).toBe(1)
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: '0 analyses · 2 tokens (≈2 each)' })).toBeDefined()
+  expect(await ui.find({ text: '2 tokens used by analyses (\u22482 each).' })).toBeDefined()
   await ui.unmount()
 })
 
-test('Statistics: statistics saved before v0.9.4 show as before, with a note that tokens count from now on', async ($, on) => {
-  const { tokens: _, ...old } = STATS
-  world(on, { saved: { lessons: old } })
+test('Statistics: the statistics kept before v0.11.0 are deleted when a session starts', async ($, on) => {
+  const { saved } = world(on, { saved: { lessons: { analyses: 80, gaps: { Goal: 3 }, rules: {}, recent: [] }, statsLayout: 'side' } })
   await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: '2 analyses' })).toBeDefined()
-  expect(await ui.find({ text: 'Tokens are counted from v0.9.4 on.' })).toBeDefined()
-  await ui.unmount()
+  expect(saved.has('lessons')).toBe(false)
+  expect(saved.has('statsLayout')).toBe(false)
 })
 
-test('Statistics: bars show the tokens in the opening line and each item scaled to the analyses', async ($, on) => {
-  world(on, { saved: { lessons: STATS } })
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
-  expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
-  // "Done means" and "Be explicit" are 2 of 2; "Context" and "Say why" 1 of 2.
-  for (const key of ['bars-missing', 'bars-rules']) {
-    // 8 filled and 7 dimmed for 1 of 2, all of them █.
-    expect(barsIn(boxNode(await ui.drawn(), key))).toEqual(['15+0d 2 of 2', '8+7d 1 of 2'])
-  }
-  await ui.unmount()
-})
-
-test('Statistics: on mobile the bars show too, and Clear statistics empties them', async ($, on) => {
-  world(on, { saved: { lessons: STATS }, surfaces: ['mobile'] })
+test('Statistics: on mobile the statistics show too, and Clear statistics empties them', async ($, on) => {
+  world(on, { saved: { analytics: STATS }, surfaces: ['mobile'] })
   await $.session.start({ ...START, surface: 'mobile' })
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
+  expect(await ui.find({ text: 'Work on next: Goal' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
   expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
   await ui.unmount()
-})
-
-test('Statistics: a rule count saved before v0.9.5, higher than the analyses, shows capped at them', async ($, on) => {
-  world(on, { saved: { lessons: { ...STATS, rules: { 'Be explicit': 5 } } } })
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules'))).toEqual(['15+0d 2 of 2'])
-  expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
-  await ui.unmount()
-})
-
-test('Statistics: the layout trial\'s saved choice is deleted from the store when a session starts', async ($, on) => {
-  const { saved } = world(on, { saved: { lessons: STATS, statsLayout: 'side' } })
-  await $.session.start(START)
-  expect(saved.has('statsLayout')).toBe(false)
-  expect((saved.get('lessons') as { analyses: number }).analyses).toBe(2)
 })
 
 test('Analytics: the statistics first, then a thin line and the tips', async ($, on) => {
@@ -1686,7 +1662,7 @@ test('Analytics: the statistics first, then a thin line and the tips', async ($,
   const text = JSON.stringify(tree)
   expect(boxNode(tree, 'group-statistics')).toBeDefined()
   expect(boxNode(tree, 'line-analytics')).toBeDefined()
-  expect(text.indexOf('2 analyses')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
+  expect(text.indexOf('Work on next')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
   expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
   expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
   await ui.unmount()

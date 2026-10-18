@@ -4,11 +4,7 @@ import {
   ANALYSIS_SYSTEM,
   type Analysis,
   LIVE_DEBOUNCE_MS,
-  type Lessons,
-  NO_LESSONS,
   SYSTEM,
-  addUsage,
-  asLessons,
   answersFor,
   asOfDate,
   buildAnalysisRequest,
@@ -23,7 +19,6 @@ import {
   parseAnalysis,
   parseReply,
   parseTips,
-  recordLesson,
   rulesFor,
 } from './lib.ts'
 import {
@@ -41,6 +36,7 @@ import {
   stampAsOf,
   toFetchUrl,
 } from './refresh.ts'
+import { type Analytics, NO_ANALYTICS, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
 import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
@@ -70,7 +66,7 @@ import {
 //
 // /coach: a pane that reads the draft in the prompt box, checks it against a
 // checklist, rewrites it with the reason for each change, shows tips for the
-// session's model, and keeps the person's recurring gaps under Lessons.
+// session's model, and keeps the person's statistics for the Analytics tab.
 // /coach refresh: re-reads the pages in sources.json and proposes updated
 // rules and tips, which change only when the person accepts them.
 // The Week tab: Claude Week, a weekly digest the Week model writes from the
@@ -79,7 +75,7 @@ import {
 const PANE = 'prompt-coach'
 const STORE = {
   mode: 'mode',
-  lessons: 'lessons',
+  analytics: 'analytics',
   pending: 'pendingRefresh',
   seen: 'sourceFingerprints',
   weekEditions: 'weekEditions',
@@ -106,7 +102,7 @@ let refreshModel = 'opus'
 let weekModel = 'opus'
 
 // The pane's state, shared by the hooks below. A reload starts it afresh;
-// mode and lessons come back from $.store.
+// mode and analytics come back from $.store.
 let isPaneOpen = false
 let tab: Tab = 'coach'
 let detail: Detail = 'checklist'
@@ -127,7 +123,9 @@ let analyzedReply: { chars: number; isCut: boolean } | undefined
 let isRunning = false
 let status = ''
 let liveCalls = 0
-let lessons: Lessons = NO_LESSONS
+let analytics: Analytics = NO_ANALYTICS
+/** When the analysis on screen was recorded, so an Apply marks that draft. */
+let analyzedAt = 0
 let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
 const buttons = new Map<string, ElementCache>()
@@ -194,7 +192,9 @@ export const register: Register = (on, options) => {
       immediate: true,
     })
     mode = (await $.store.get(STORE.mode)) === 'live' ? 'live' : 'manual'
-    lessons = asLessons(await $.store.get(STORE.lessons))
+    analytics = asAnalytics(await $.store.get(STORE.analytics))
+    // The statistics kept before v0.11.0: Omar chose to start fresh, so they're deleted.
+    if ((await $.store.get('lessons')) !== undefined) await $.store.delete('lessons')
     // The v0.9.4 layout trial's choice; Bars is the only layout since v0.9.6.
     if ((await $.store.get('statsLayout')) !== undefined) await $.store.delete('statsLayout')
     const pending = (await $.store.get(STORE.pending)) as { results?: unknown; seen?: unknown } | undefined
@@ -352,7 +352,7 @@ export const register: Register = (on, options) => {
       liveCalls,
       rulesAsOf,
       sources,
-      lessons,
+      analytics,
       refresh,
       refreshModel,
       settings: {
@@ -400,7 +400,7 @@ export const register: Register = (on, options) => {
         $.ui.invalidate('ui.render')
       },
       setModel: (field, value) => setModelSetting($, field, value),
-      clearLessons: () => clearLessons($),
+      clearAnalytics: () => clearAnalytics($),
       refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
       rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
       accept: () => acceptRefresh($),
@@ -517,8 +517,8 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
       return
     }
     // Counted before parsing: an answer that can't be read still cost its tokens.
-    lessons = addUsage(lessons, reply.usage)
-    await $.store.set(STORE.lessons, lessons)
+    analytics = addUsage(analytics, reply.usage)
+    await $.store.set(STORE.analytics, analytics)
     const parsed = parseAnalysis(reply.text)
     if (!parsed) {
       status = 'The analysis came back in an unexpected format. Try again.'
@@ -533,8 +533,9 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     formGen += 1
     analyzedReply = previous.text ? { chars: previous.text.length, isCut: previous.isCut } : undefined
     status = ''
-    lessons = recordLesson(lessons, parsed, text, await $.clock.now())
-    await $.store.set(STORE.lessons, lessons)
+    analyzedAt = await $.clock.now()
+    analytics = recordDraft(analytics, parsed, modelLabel, analyzedAt)
+    await $.store.set(STORE.analytics, analytics)
   } catch (err) {
     status = `Analysis failed: ${err instanceof Error ? err.message : String(err)}`
   } finally {
@@ -562,8 +563,16 @@ function droppedGaps(): string[] {
   return removed.filter(t => !answers[t])
 }
 
+/** Records for Analytics that the analysis on screen was applied, with the suggestions added to it. */
+async function noteApplied($: EngineInterface): Promise<void> {
+  if (!analysis || !analyzedAt) return
+  analytics = recordUse(analytics, analyzedAt, added.length)
+  await $.store.set(STORE.analytics, analytics)
+}
+
 /** Puts the rewrite in the prompt box and sends nothing. */
 async function fillRewrite($: EngineInterface, rewrite: string): Promise<void> {
+  await noteApplied($)
   analyzedText = rewrite
   draft = rewrite
   await fillPrompt($, rewrite)
@@ -572,6 +581,7 @@ async function fillRewrite($: EngineInterface, rewrite: string): Promise<void> {
 
 /** Puts the rewrite in the prompt box, then sends it as Omar's own prompt, as Enter would. */
 async function applyRewrite($: EngineInterface, rewrite: string): Promise<void> {
+  await noteApplied($)
   analyzedText = rewrite
   draft = rewrite
   const filled = await $.prompt.fill({ text: rewrite, mode: 'replace' })
@@ -627,9 +637,9 @@ async function setModelSetting($: EngineInterface, field: ModelSetting, value: s
   $.ui.invalidate('ui.render')
 }
 
-async function clearLessons($: EngineInterface): Promise<void> {
-  lessons = NO_LESSONS
-  await $.store.delete(STORE.lessons)
+async function clearAnalytics($: EngineInterface): Promise<void> {
+  analytics = NO_ANALYTICS
+  await $.store.delete(STORE.analytics)
   $.ui.invalidate('ui.render')
 }
 

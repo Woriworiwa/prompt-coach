@@ -37,7 +37,16 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left,
 
 **Analytics tab** (`2`): first **Statistics** (below), then a thin line and **Using \<model\> well**, in three groups: tips for the draft you analyzed, tips for the model your session runs, and general Claude Code tips. They switch when you change model with `/model`.
 
-**Statistics** (on the Analytics tab since v0.10.0): how many drafts you've analyzed, the checklist items you most often miss, **What the coach changed most** (the rules behind its rewrites, each counted once per analysis and shown as "x of y analyses", like the missing items), and the tokens the analyses used. Tokens are counted from v0.9.4 on, for Analyze and live mode, and an answer that couldn't be read counts too. /improve isn't counted. Each list is drawn as bars: one line per item, a bar showing its share of your analyses (filled, then dimmed for the rest), then "x of y". The opening line gives the analyses, the tokens and about how many each analysis takes. It's all kept between sessions on this Mac. **Clear statistics** resets it.
+**Statistics** (rebuilt in v0.11.0 to help you write better prompts; the older statistics were cleared): from your last 200 analyzed drafts, in this order:
+- **Score:** your last 10 drafts' average out of 6 (a point for each checklist item covered or not needed, half for a vague one), and whether it went up or down from the 10 before.
+- **Work on next:** the item most often missing or vague in your last 10 drafts, with a sentence the coach suggested for it in one of your own drafts.
+- **Missing or vague:** each item with a bar and "x of y", and under it how often it was left out against vague, and your last 10 drafts against the 10 before.
+- **What you do well:** up to three items present in most of your drafts.
+- **What the coach changed most:** the rules behind its changes, for your session's model only, each counted once per draft.
+- **Advice you took:** suggestions you added of those offered, and rewrites you applied.
+- **Tokens:** what the analyses used, last and dim. Analyze and live mode count; /improve doesn't.
+
+It's all kept between sessions on this Mac, with no draft text, and no extra model calls. **Clear statistics** resets it.
 
 **Settings tab** (`4`), laid out like the Desktop app's own settings: three sections (General, Rules and tips, Claude Week), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.

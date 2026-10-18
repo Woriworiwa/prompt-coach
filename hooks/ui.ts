@@ -2,7 +2,8 @@
 // element tree. No `$`; the hooks module hands in the elements and actions.
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
-import { type Addition, type Analysis, type CheckStatus, type Lessons, LIVE_CAP, NO_PICK, type Placeholder, tokenSummary, top } from './lib.ts'
+import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, scoreTrend, strengths, tokenSummary } from './analytics.ts'
+import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, NO_PICK, type Placeholder } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
 
@@ -51,7 +52,7 @@ export type View = {
   /** Where this copy of the mod reads Omar's own rules from. */
   ownRulesPath: string
   sources: string[]
-  lessons: Lessons
+  analytics: Analytics
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
   /** The model that rewrites files on refresh (the refreshModel setting). */
   refreshModel: string
@@ -120,7 +121,7 @@ export type Actions = {
   type: (token: string, value: string) => void
   submitAnswer: (token: string, value: string) => void
   setModel: (field: ModelSetting, value: string) => void
-  clearLessons: () => Promise<void>
+  clearAnalytics: () => Promise<void>
   refresh: () => Promise<void> | undefined
   rewriteAll: () => Promise<void> | undefined
   accept: () => Promise<void>
@@ -646,24 +647,31 @@ function modelSetting(
 }
 
 /**
- * What the analyses so far add up to: the checklist items drafts most often
- * miss, what the coach changed most, and the tokens the analyses used, as
- * bars (Omar's pick from the v0.9.4 layout trial). Then a reset.
+ * What the analyses add up to, in the order that helps most (v0.11.0): the
+ * score and its trend, the one item to work on next with an example from the
+ * person's own drafts, each item missing or vague (left out against vague,
+ * the last drafts against the ones before), what the drafts do well, what the
+ * coach changed most for this model, how much advice was taken, then tokens.
  */
 function statistics(E: UI, v: View, a: Actions): RenderElement[] {
-  const l = v.lessons
-  if (l.analyses === 0 && !tokenSummary(l)) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
-
-  const gaps = top(l.gaps, 4)
-  // Counted once per analysis since v0.9.5; an older count may be higher, so it's capped at the analyses.
-  const rules = top(l.rules, 4).map(([rule, n]): [string, number] => [rule, Math.min(n, l.analyses)])
-  return [...statsBars(E, l, gaps, rules), E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearLessons })]
+  const an = v.analytics
+  if (!an.drafts.length && !tokenSummary(an)) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
+  return [
+    ...(an.drafts.length
+      ? [scoreLine(E, an), ...focusBlock(E, an), gapBars(E, an), strengthsBlock(E, an), changedBars(E, an, v.modelLabel), adviceLine(E, an)]
+      : []),
+    ...tokensLine(E, an),
+    E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearAnalytics }),
+  ]
 }
 
-const MISSING_EMPTY = 'Nothing yet. Your drafts have covered the checklist.'
-const RULES_TITLE = 'What the coach changed most'
-const NO_TOKENS_YET = 'Tokens are counted from v0.9.4 on.'
 const fmt = (n: number) => n.toLocaleString('en-US')
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** A semibold section title with lines under it, keyed `key`. */
+function statBlock(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
+  return E.Box({ key: `stats-${key}`, flexDirection: 'column', children: [text(E, title, { weight: 'semibold' }), ...children] })
+}
 
 /** How many cells a bar has. */
 export const BAR_CELLS = 15
@@ -696,37 +704,93 @@ function barText(E: UI, n: number, of: number, count: string, width: number): Re
   return E.Text({ mono: true, children: [filled, E.Text({ dimColor: true, children: [empty] }), barCount(count, width)] })
 }
 
-/** Bars: one line per item, its share of the analyses as a text bar, the count after it; the tokens in the opening line. */
-function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
-  const t = tokenSummary(l)
-  const head = `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'}${t ? ` · ${fmt(t.total)} tokens (≈${fmt(t.perCall)} each)` : ''}`
-  // Every count is padded to the widest one possible, "N of N", so both lists line up.
-  const width = `${l.analyses} of ${l.analyses}`.length
-  const lines = (key: string, title: string, items: [string, number][], of: number, value: (n: number) => string, empty: string) =>
-    E.Box({
-      key: `bars-${key}`,
-      flexDirection: 'column',
-      children: [
-        text(E, title, { weight: 'semibold' }),
-        ...(items.length
-          ? items.map(([name, n], i) =>
-              E.Box({
-                key: `bars-${key}-${i}`,
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                columnGap: 2,
-                children: [E.Box({ flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' })] }), barText(E, n, of, value(n), width)],
-              }),
-            )
-          : [text(E, empty, { dimColor: true, wrap: 'wrap' })]),
-      ],
-    })
+/** The count of drafts and the average score of the last ones, up or down from the ones before. */
+function scoreLine(E: UI, an: Analytics): RenderElement {
+  const t = scoreTrend(an)!
+  const n = Math.min(an.drafts.length, RECENT)
+  const trend = t.before === undefined ? '' : t.recent > t.before ? `, up from ${t.before}` : t.recent < t.before ? `, down from ${t.before}` : ', the same as before'
+  return E.Box({
+    key: 'stats-score',
+    flexDirection: 'column',
+    children: [
+      text(E, `${plural(an.drafts.length, 'analysis', 'analyses')} · your last ${plural(n, 'draft scores', 'drafts score')} ${t.recent} of 6 on average${trend}.`, { wrap: 'wrap' }),
+      text(E, 'A point for each checklist item a draft covers (or doesn\'t need), half for a vague one.', { dimColor: true, wrap: 'wrap' }),
+    ],
+  })
+}
+
+/** The one item to work on next, with the newest sentence the coach suggested for it. */
+function focusBlock(E: UI, an: Analytics): RenderElement[] {
+  const f = focus(an)
+  if (!f) return []
   return [
-    text(E, head),
-    ...(t ? [] : [text(E, NO_TOKENS_YET, { dimColor: true })]),
-    lines('missing', 'Most often missing', gaps, l.analyses, n => `${n} of ${l.analyses}`, MISSING_EMPTY),
-    lines('rules', RULES_TITLE, rules, l.analyses, n => `${n} of ${l.analyses}`, 'None yet.'),
+    statBlock(E, 'focus', `Work on next: ${f.item}`, [
+      text(E, `Missing or vague in ${f.gaps} of your last ${plural(f.of, 'draft', 'drafts')}.`, { wrap: 'wrap' }),
+      ...(f.example ? [text(E, `For example: “${f.example}”`, { dimColor: true, wrap: 'wrap' })] : []),
+    ]),
   ]
+}
+
+/** One bar line: the name with a dim note under it on the left, the bar and its count on the right. */
+function barRow(E: UI, key: string, name: string, note: string, n: number, of: number, width: number): RenderElement {
+  return E.Box({
+    key,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    columnGap: 2,
+    children: [
+      E.Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' }), ...(note ? [text(E, note, { dimColor: true, wrap: 'wrap' })] : [])] }),
+      barText(E, n, of, `${n} of ${of}`, width),
+    ],
+  })
+}
+
+/** Each item missing or vague, worst first: how often it was left out against vague, and the last drafts against the ones before. */
+function gapBars(E: UI, an: Analytics): RenderElement {
+  const stats = itemStats(an).filter(s => s.missing + s.vague > 0)
+  const width = Math.max(0, ...stats.map(s => `${s.missing + s.vague} of ${s.applicable}`.length))
+  const rows = stats.map(s => {
+    const last = `last ${s.recent.of}: ${s.recent.gaps}${s.before ? `, the ${s.before.of} before: ${s.before.gaps}` : ''}`
+    return barRow(E, `bars-missing-${s.item}`, s.item, `${s.missing} left out · ${s.vague} vague · ${last}`, s.missing + s.vague, s.applicable, width)
+  })
+  return statBlock(E, 'missing', 'Missing or vague', rows.length ? rows : [text(E, 'Nothing yet. Your drafts have covered the checklist.', { dimColor: true, wrap: 'wrap' })])
+}
+
+/** What the drafts do well: items present in most of them. */
+function strengthsBlock(E: UI, an: Analytics): RenderElement {
+  const good = strengths(an)
+  return statBlock(
+    E,
+    'strengths',
+    'What you do well',
+    good.length
+      ? good.map(g => text(E, `${g.item}: in ${g.present} of ${plural(g.of, 'draft', 'drafts')}`, { wrap: 'wrap' }))
+      : [text(E, 'Nothing stands out yet. Items your drafts cover most of the time show here.', { dimColor: true, wrap: 'wrap' })],
+  )
+}
+
+/** The rules behind the most changes, for the session's model when it's known. */
+function changedBars(E: UI, an: Analytics, model: string): RenderElement {
+  const { rules, of } = rulesFor(an, model)
+  const width = `${of} of ${of}`.length
+  const title = model ? `What the coach changed most · ${model}` : 'What the coach changed most'
+  const rows = rules.map(([rule, n], i) => barRow(E, `bars-rules-${i}`, rule, '', Math.min(n, of), of, width))
+  const empty = of ? 'None yet.' : `No analyses with ${model} yet.`
+  return statBlock(E, 'rules', title, rows.length ? rows : [text(E, empty, { dimColor: true, wrap: 'wrap' })])
+}
+
+/** How much of the coach's advice was taken. */
+function adviceLine(E: UI, an: Analytics): RenderElement {
+  const t = advice(an)
+  return statBlock(E, 'advice', 'Advice you took', [
+    text(E, `Added ${t.added} of ${plural(t.offered, 'suggestion', 'suggestions')} · applied ${t.applied} of ${plural(t.drafts, 'rewrite', 'rewrites')}`, { wrap: 'wrap' }),
+  ])
+}
+
+/** The tokens the analyses used, last and dim: they say what the coaching costs, not how to prompt. */
+function tokensLine(E: UI, an: Analytics): RenderElement[] {
+  const t = tokenSummary(an)
+  return t ? [text(E, `${fmt(t.total)} tokens used by analyses (≈${fmt(t.perCall)} each).`, { dimColor: true, wrap: 'wrap' })] : []
 }
 
 /** /coach refresh: the check, its progress, and each changed file's diff to accept or reject. */
