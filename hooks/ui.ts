@@ -434,7 +434,7 @@ function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: R
     const m = MARK[c.status]
     const fixes = changes.filter(x => fills(x.c.rule, c.item))
     const mine = indexed.filter(x => x.s.item === c.item)
-    // Each item a row of its own: the mark and name on one line, the note under them, then what fills it, indented.
+    // Each item a row of its own: the mark, name and note on one line (v0.24.0, Omar's call), then what fills it, indented.
     rows.push(
       E.Box({
         key: `check-${c.item}`,
@@ -442,12 +442,10 @@ function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: R
         gap: 1,
         children: [
           E.Box({
-            key: `check-${c.item}-head`,
-            flexDirection: 'column',
-            children: [
-              E.Box({ key: `check-${c.item}-row`, flexDirection: 'row', columnGap: 1, children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' })] }),
-              text(E, c.note, { dimColor: true, wrap: 'wrap' }),
-            ],
+            key: `check-${c.item}-row`,
+            flexDirection: 'row',
+            columnGap: 1,
+            children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' }), text(E, c.note, { dimColor: true, wrap: 'wrap' })],
           }),
           ...fixes.map(x => fix(E, x.i, 'Rewrite', x.c.why)),
           ...mine.map(x => suggestion(E, v, a, x.s, x.i)),

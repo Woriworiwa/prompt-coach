@@ -1269,7 +1269,7 @@ const FIXED = MERGED.replace(
   '<changes>\nDone means | Naming the finish line tells it when the work is complete.\nclarity | "Remove completely" spells out what remove means.',
 )
 
-test('the checklist sits in one box like a Settings section: an item per row, a line between rows, the note under the name', async ($, on) => {
+test('the checklist sits in one box like a Settings section: an item per row, a line between rows, the note beside the name', async ($, on) => {
   const { s } = world(on, { analysis: FIXED })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -1284,12 +1284,12 @@ test('the checklist sits in one box like a Settings section: an item per row, a 
     'check-Done means', 'line-checklist-4', 'check-Stop rule', 'line-checklist-5', 'check-Output', 'line-checklist-6',
     'other-changes', 'line-checklist-7', 'other-suggestions',
   ])
-  // The mark and name on one line, the note on its own line under them.
-  const head = boxNode(tree, 'check-Context-head')!
-  expect(head.props.flexDirection).toBe('column')
-  expect(JSON.stringify(boxNode(tree, 'check-Context-row'))).toContain('"Context"')
-  expect(JSON.stringify(boxNode(tree, 'check-Context-row'))).not.toContain('no file or error named')
-  expect(JSON.stringify(head)).toContain('no file or error named')
+  // The mark, name and note on one row (v0.24.0).
+  const itemRow = boxNode(tree, 'check-Context-row')!
+  expect(itemRow.props.flexDirection).toBe('row')
+  expect(JSON.stringify(itemRow)).toContain('"Context"')
+  expect(JSON.stringify(itemRow)).toContain('no file or error named')
+  expect(boxNode(tree, 'check-Context-head')).toBeUndefined()
   // Suggestions say so, apart from the rewrite's own changes.
   expect(await ui.find({ text: 'Suggestion: Say when to stop' })).toBeDefined()
   await ui.unmount()
