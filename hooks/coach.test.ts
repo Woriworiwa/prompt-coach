@@ -155,6 +155,13 @@ describe('lessons and live mode', () => {
     expect(bar(9, 4)).toHaveLength(BAR_CELLS)
   })
 
+  test('recordLesson counts a rule once per analysis, however often its changes name it', () => {
+    const a = parseAnalysis(ANALYSIS)!
+    const twice = { ...a, changes: [...a.changes, { ...a.changes[0]!, what: 'another change' }] }
+    const l = recordLesson(recordLesson(NO_LESSONS, twice, 'one', 0), twice, 'two', 1)
+    expect(l.rules[a.changes[0]!.rule]).toBe(2)
+  })
+
   test('liveSkipReason waits for enough text, a new draft, no running analysis, and the cap', () => {
     const base = { text: 'fix the login bug please', lastAnalyzed: '', isRunning: false, liveCalls: 0 }
     expect(liveSkipReason(base)).toBeUndefined()
@@ -457,7 +464,10 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   // A thin line between rows, as in the rest of Settings.
   expect(missing.kids.some(k => (k as { props?: { key?: string } }).props?.key === 'line-table-missing-0')).toBe(true)
   expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-0')), 'Rule').found).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-1')), '1').found).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-0')), 'Changed in').found).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-1')), '1 of 1').found).toBe(true)
+  expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
+  expect(await ui.find({ text: 'Rules applied most' })).toBeUndefined()
   expect(await ui.find({ text: 'Recent drafts' })).toBeUndefined()
   expect(await ui.find({ text: 'Lessons' })).toBeUndefined()
   expect(await ui.find({ key: 'clear-lessons', text: 'Clear statistics' })).toBeDefined()
@@ -1530,7 +1540,7 @@ test('Week: when the prompt box can\'t take the side question, it goes on the cl
 const STATS = {
   analyses: 2,
   gaps: { 'Done means': 2, Context: 1 },
-  rules: { 'Be explicit': 3, 'Say why': 1 },
+  rules: { 'Be explicit': 2, 'Say why': 1 },
   recent: [],
   tokens: { calls: 2, input: 1000, output: 500, cacheRead: 200, cacheWrite: 0 },
 }
@@ -1597,7 +1607,8 @@ test('Statistics: the Layout switch draws the same figures four ways and is save
   await ui.select({ key: 'stats-layout', value: 'grid' })
   expect(saved.get('statsLayout')).toBe('grid')
   expect(await ui.find({ text: 'Done means: 2 of 2' })).toBeDefined()
-  expect(await ui.find({ text: 'Be explicit: 3' })).toBeDefined()
+  expect(await ui.find({ text: 'Be explicit: 2 of 2' })).toBeDefined()
+  expect(await ui.find({ text: 'Say why: 1 of 2' })).toBeDefined()
   expect(await ui.find({ text: 'Total: 1,700' })).toBeDefined()
   expect(await ui.find({ text: 'Cache: 200' })).toBeDefined()
   expect(boxNode(await ui.drawn(), 'grid-missing-0')?.props.width).toBe('50%')
@@ -1617,8 +1628,9 @@ test('Statistics: the Layout switch draws the same figures four ways and is save
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
   expect(await ui.find({ text: `${'█'.repeat(15)}  2 of 2` })).toBeDefined()
   expect(await ui.find({ text: `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2` })).toBeDefined()
-  expect(await ui.find({ text: `${'█'.repeat(15)}  3` })).toBeDefined()
-  expect(await ui.find({ text: `${'█'.repeat(5)}${'░'.repeat(10)}  1` })).toBeDefined()
+  // Rules are scaled to the analyses too, like the gaps.
+  expect(await ui.find({ text: `${'█'.repeat(15)}  2 of 2` })).toBeDefined()
+  expect(await ui.find({ text: `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2` })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1634,5 +1646,16 @@ test('Statistics: the saved layout comes back next session; on mobile the switch
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
   expect(buttonProps(await ui.drawn(), 'stats-layout-bars')).toBeUndefined()
+  await ui.unmount()
+})
+
+test('Statistics: a rule count saved before v0.9.5, higher than the analyses, shows capped at them', async ($, on) => {
+  world(on, { saved: { lessons: { ...STATS, rules: { 'Be explicit': 5 } } } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  expect(textLook(await ui.drawn(), '2 of 2').found).toBe(true)
+  expect(await ui.find({ text: '5 of 2' })).toBeUndefined()
   await ui.unmount()
 })

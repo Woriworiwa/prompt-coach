@@ -674,7 +674,8 @@ function statistics(E: UI, v: View, a: Actions): RenderElement[] {
   if (l.analyses === 0 && !tokenSummary(l)) return [text(E, 'No analyses yet. Each Analyze adds to these statistics.', { dimColor: true })]
 
   const gaps = top(l.gaps, 4)
-  const rules = top(l.rules, 4)
+  // Counted once per analysis since v0.9.5; an older count may be higher, so it's capped at the analyses.
+  const rules = top(l.rules, 4).map(([rule, n]): [string, number] => [rule, Math.min(n, l.analyses)])
   const body =
     v.statsLayout === 'grid' ? statsGrid(E, v, l, gaps, rules)
     : v.statsLayout === 'side' ? statsSide(E, v, l, gaps, rules)
@@ -684,6 +685,7 @@ function statistics(E: UI, v: View, a: Actions): RenderElement[] {
 }
 
 const MISSING_EMPTY = 'Nothing yet. Your drafts have covered the checklist.'
+const RULES_TITLE = 'What the coach changed most'
 const NO_TOKENS_YET = 'Tokens are counted from v0.9.4 on.'
 const fmt = (n: number) => n.toLocaleString('en-US')
 const analysesLine = (E: UI, l: Lessons) => text(E, `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'} so far.`)
@@ -720,7 +722,7 @@ function statsTables(E: UI, v: View, l: Lessons, gaps: [string, number][], rules
     analysesLine(E, l),
     ...tokens,
     statTable(E, v, 'missing', 'Most often missing', ['Checklist item', 'Missing or vague in'], gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY),
-    statTable(E, v, 'rules', 'Rules applied most', ['Rule', 'Times'], rules.map(([rule, n]) => [rule, String(n)]), 'None yet.'),
+    statTable(E, v, 'rules', RULES_TITLE, ['Rule', 'Changed in'], rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.'),
   ]
 }
 
@@ -750,7 +752,7 @@ function statsGrid(E: UI, v: View, l: Lessons, gaps: [string, number][], rules: 
     analysesLine(E, l),
     grid('missing', 'Most often missing', gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY),
     ...hairline(E, v, 'grid-1'),
-    grid('rules', 'Rules applied most', rules.map(([rule, n]) => [rule, String(n)]), 'None yet.'),
+    grid('rules', RULES_TITLE, rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.'),
     ...hairline(E, v, 'grid-2'),
     grid('tokens', 'Tokens used by analyses', tokenRows(l), NO_TOKENS_YET),
   ]
@@ -766,7 +768,7 @@ function statsSide(E: UI, v: View, l: Lessons, gaps: [string, number][], rules: 
       flexDirection: 'row',
       children: [
         half('missing', statTable(E, v, 'missing', 'Most often missing', ['Item', 'Missing in'], gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY)),
-        half('rules', statTable(E, v, 'rules', 'Rules applied most', ['Rule', 'Times'], rules.map(([rule, n]) => [rule, String(n)]), 'None yet.')),
+        half('rules', statTable(E, v, 'rules', RULES_TITLE, ['Rule', 'Changed in'], rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.')),
       ],
     }),
     statTable(E, v, 'tokens', 'Tokens used by analyses', ['Kind', 'Tokens'], tokenRows(l), NO_TOKENS_YET),
@@ -782,7 +784,7 @@ export function bar(n: number, of: number): string {
   return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled)
 }
 
-/** Bars: one line per item, its share as a text bar, the count after it; the tokens in the opening line. */
+/** Bars: one line per item, its share of the analyses as a text bar, the count after it; the tokens in the opening line. */
 function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
   const t = tokenSummary(l)
   const head = `${l.analyses} ${l.analyses === 1 ? 'analysis' : 'analyses'}${t ? ` · ${fmt(t.total)} tokens (≈${fmt(t.perCall)} each)` : ''}`
@@ -809,7 +811,7 @@ function statsBars(E: UI, l: Lessons, gaps: [string, number][], rules: [string, 
     text(E, head),
     ...(t ? [] : [text(E, NO_TOKENS_YET, { dimColor: true })]),
     lines('missing', 'Most often missing', gaps, l.analyses, n => `${n} of ${l.analyses}`, MISSING_EMPTY),
-    lines('rules', 'Rules applied most', rules, rules[0]?.[1] ?? 0, n => String(n), 'None yet.'),
+    lines('rules', RULES_TITLE, rules, l.analyses, n => `${n} of ${l.analyses}`, 'None yet.'),
   ]
 }
 

@@ -364,7 +364,7 @@ export type Lessons = {
   tokens: TokenCounts
   /** How often each checklist item was missing or partial. */
   gaps: Record<string, number>
-  /** How often each rule was applied in a rewrite. */
+  /** In how many analyses each rule changed the draft: once per analysis, however often it was named (since v0.9.5). */
   rules: Record<string, number>
   /** The newest analyses first, at most five. */
   recent: { at: number; draft: string; gaps: string[] }[]
@@ -418,7 +418,8 @@ export function recordLesson(lessons: Lessons, analysis: Analysis, draft: string
   for (const item of missed) gaps[item] = (gaps[item] ?? 0) + 1
 
   const rules = { ...lessons.rules }
-  for (const { rule } of analysis.changes) rules[rule] = (rules[rule] ?? 0) + 1
+  // Once per analysis, so a rule reads as "x of y analyses", as the gaps do.
+  for (const rule of new Set(analysis.changes.map(c => c.rule))) rules[rule] = (rules[rule] ?? 0) + 1
 
   const short = draft.length > 160 ? `${draft.slice(0, 157)}...` : draft
   return {
