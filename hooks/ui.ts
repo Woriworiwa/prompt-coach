@@ -368,7 +368,7 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
       r.borrowed ? [text(E, r.borrowed, { color: 'warning', wrap: 'wrap' })] : [],
     ),
     ruleGroup(E, v, a, 'own', 'Your rules', own, 'No rules yet.', [E.Button({ key: 'rules-edit-own', label: 'Edit in Settings', onPress: () => a.tab('settings') })]),
-  ])
+  ], { indent: true })
 }
 
 /**
@@ -741,14 +741,15 @@ function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 /**
  * A settings section: its bold title (normal text color, no band), then its
  * rows with a thin line between each two. `after` follows the last row with
- * no line, as a note under the section. With `boxed` (the Settings tab, since
- * v0.20.0) it sits in the same bordered box as the Analytics tab's Rules,
- * without the title's band; without it (Statistics), in no box.
+ * no line, as a note under the section. The rows sit a cell in from the
+ * title (v0.20.1). With `boxed` (the Settings tab, since v0.20.0) it sits in
+ * the same bordered box as the Analytics tab's Rules, its title with no band
+ * and no padding; without it (Statistics), in no box.
  */
 function settingsGroup(E: UI, v: View, key: string, title: string, rows: RenderElement[], after: RenderElement[] = [], boxed = false): RenderElement {
   const lined = rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `${key}-${i}`), r]))
-  const body = E.Box({ key: `group-${key}-box`, flexDirection: 'column', gap: 1, children: [...lined, ...after] })
-  if (boxed) return group(E, key, title, [body], false)
+  const body = E.Box({ key: `group-${key}-box`, flexDirection: 'column', gap: 1, paddingLeft: 1, children: [...lined, ...after] })
+  if (boxed) return group(E, key, title, [body], { band: false })
   return E.Box({ key: `group-${key}`, flexDirection: 'column', gap: 1, children: [heading(E, title), body] })
 }
 
@@ -773,10 +774,13 @@ function block(E: UI, key: string, children: RenderElement[]): RenderElement {
 
 /**
  * A bordered group, its title on a subtle band (the Week tab's sections), or
- * on no band with `band` false (the Settings tab's). Theme keys only, so it
- * follows light and dark.
+ * with `band` false on no band and with no padding (the Settings tab's). With
+ * `indent`, its items sit a cell in from the title (the Analytics tab's Rules).
+ * Theme keys only, so it follows light and dark.
  */
-function group(E: UI, key: string, title: string, children: RenderElement[], band = true): RenderElement {
+function group(E: UI, key: string, title: string, children: RenderElement[], { band = true, indent = false } = {}): RenderElement {
+  const head = band ? E.Box({ backgroundColor: 'subtle', paddingX: 1, children: [heading(E, title)] }) : E.Box({ children: [heading(E, title)] })
+  const items = indent ? [E.Box({ key: `group-${key}-items`, flexDirection: 'column', gap: 1, paddingLeft: 1, children })] : children
   return E.Box({
     key: `group-${key}`,
     flexDirection: 'column',
@@ -784,7 +788,7 @@ function group(E: UI, key: string, title: string, children: RenderElement[], ban
     borderColor: 'subtle',
     paddingX: 1,
     gap: 1,
-    children: [E.Box({ ...(band ? { backgroundColor: 'subtle' as const } : {}), paddingX: 1, children: [heading(E, title)] }), ...children],
+    children: [head, ...items],
   })
 }
 

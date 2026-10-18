@@ -777,8 +777,7 @@ test('Settings: each section in the Analytics group\'s bordered box with its tit
   await ui.press({ key: 'tab-analytics' })
   const model = boxNode(await ui.drawn(), 'group-rule-list')!
   const { key: _k, children: _c, ...boxLook } = model.props
-  const { children: _h, backgroundColor, ...headLook } = (model.kids[0] as { props: Record<string, unknown> }).props
-  expect(backgroundColor).toBe('subtle')
+  expect((model.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBe('subtle')
   expect(boxLook.borderStyle).toBe('round')
 
   await ui.press({ key: 'tab-settings' })
@@ -787,15 +786,15 @@ test('Settings: each section in the Analytics group\'s bordered box with its tit
     const g = boxNode(tree, `group-${key}`)!
     const { key: _gk, children: _gc, ...look } = g.props
     expect(look).toEqual(boxLook)
-    // The title first, in a box like the Analytics title's but on no background: semibold, in the normal text color.
+    // The title first, with no background and no padding (v0.20.1): semibold, in the normal text color.
     const head = g.kids[0] as { type?: string; props: Record<string, unknown> }
     expect(head.type).toBe('Box')
-    const { children: headKids, ...headProps } = head.props
-    expect(headProps).toEqual(headLook)
+    const { children: _hk, ...headProps } = head.props ?? {}
+    expect(headProps).toEqual({})
     expect(textLook(head, title)).toEqual({ found: true, color: undefined, weight: 'semibold' })
-    // Then the rows, with no border of their own.
+    // Then the rows, a cell in from the title, with no border of their own.
+    expect(boxNode(tree, `group-${key}-box`)?.props).toMatchObject({ paddingLeft: 1 })
     expect(boxNode(tree, `group-${key}-box`)?.props.borderStyle).toBeUndefined()
-    void headKids
   }
   expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
   // More space between sections (the xl step) than between rows (1).
@@ -1898,7 +1897,10 @@ test('Rules on the Analytics tab: General, then the model with its name a dropdo
   expect(box.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
   expect(textLook(box.kids[0], 'Rules').found).toBe(true)
   expect((box.kids[0] as { props?: { backgroundColor?: string } }).props?.backgroundColor).toBe('subtle')
-  const groups = box.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
+  // Its items sit a cell in from the title (v0.20.1).
+  const items = boxNode(await ui.drawn(), 'group-rule-list-items')!
+  expect(items.props.paddingLeft).toBe(1)
+  const groups = items.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
   expect(groups.filter(k => k!.startsWith('block-rules-'))).toEqual(['block-rules-general', 'block-rules-model', 'block-rules-own'])
   expect(await ui.find({ key: 'rules-toggle-checklist' })).toBeUndefined()
   expect(await ui.find({ text: /^Checklist$/ })).toBeUndefined()
