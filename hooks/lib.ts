@@ -353,8 +353,15 @@ export function asOfDate(markdown: string): string | undefined {
 
 // ---- Lessons: the person's recurring weak spots, kept between sessions ----
 
+/** What the analyses' model calls cost, summed: `calls` answered calls and their tokens by kind. */
+export type TokenCounts = { calls: number; input: number; output: number; cacheRead: number; cacheWrite: number }
+
+export const NO_TOKENS: TokenCounts = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+
 export type Lessons = {
   analyses: number
+  /** Tokens the analyses used, since v0.9.4; an answer that couldn't be read counts too. */
+  tokens: TokenCounts
   /** How often each checklist item was missing or partial. */
   gaps: Record<string, number>
   /** How often each rule was applied in a rewrite. */
@@ -363,7 +370,7 @@ export type Lessons = {
   recent: { at: number; draft: string; gaps: string[] }[]
 }
 
-export const NO_LESSONS: Lessons = { analyses: 0, gaps: {}, rules: {}, recent: [] }
+export const NO_LESSONS: Lessons = { analyses: 0, tokens: NO_TOKENS, gaps: {}, rules: {}, recent: [] }
 
 /** Reads a stored value as Lessons, falling back to none when it is not one. */
 export function asLessons(value: unknown): Lessons {
@@ -371,7 +378,37 @@ export function asLessons(value: unknown): Lessons {
   if (!v || typeof v.analyses !== 'number' || typeof v.gaps !== 'object' || typeof v.rules !== 'object' || !Array.isArray(v.recent)) {
     return NO_LESSONS
   }
-  return v as Lessons
+  // Statistics saved before v0.9.4 have no token counts: they start at zero.
+  const t = (v.tokens ?? {}) as Partial<TokenCounts>
+  const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0)
+  return { ...(v as Lessons), tokens: { calls: n(t.calls), input: n(t.input), output: n(t.output), cacheRead: n(t.cacheRead), cacheWrite: n(t.cacheWrite) } }
+}
+
+/** Adds one answered analysis call's usage to the lessons, returning a new value. */
+export function addUsage(
+  lessons: Lessons,
+  usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number },
+): Lessons {
+  const t = lessons.tokens
+  return {
+    ...lessons,
+    tokens: {
+      calls: t.calls + 1,
+      input: t.input + usage.input_tokens,
+      output: t.output + usage.output_tokens,
+      cacheRead: t.cacheRead + usage.cache_read_input_tokens,
+      cacheWrite: t.cacheWrite + usage.cache_creation_input_tokens,
+    },
+  }
+}
+
+/** The token totals Statistics shows, or undefined before any were counted. Cache is read plus written. */
+export function tokenSummary(lessons: Lessons): { total: number; input: number; output: number; cache: number; perCall: number } | undefined {
+  const t = lessons.tokens
+  const cache = t.cacheRead + t.cacheWrite
+  const total = t.input + t.output + cache
+  if (!t.calls || !total) return undefined
+  return { total, input: t.input, output: t.output, cache, perCall: Math.round(total / t.calls) }
 }
 
 /** Adds one analysis to the lessons, returning a new value. */
@@ -386,6 +423,7 @@ export function recordLesson(lessons: Lessons, analysis: Analysis, draft: string
   const short = draft.length > 160 ? `${draft.slice(0, 157)}...` : draft
   return {
     analyses: lessons.analyses + 1,
+    tokens: lessons.tokens,
     gaps,
     rules,
     recent: [{ at, draft: short, gaps: missed }, ...lessons.recent].slice(0, 5),

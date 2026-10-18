@@ -17,7 +17,11 @@ import {
   parseAnalysis,
   parseTips,
   recordLesson,
+  addUsage,
+  asLessons,
+  tokenSummary,
 } from './lib.ts'
+import { BAR_CELLS, bar } from './ui.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -126,6 +130,29 @@ describe('lessons and live mode', () => {
     expect(l.gaps).toEqual({ Goal: 6, Context: 6, 'Done means': 6, 'Stop rule': 6 })
     expect(l.rules['Name the finish line']).toBe(6)
     expect(l.recent.map(r => r.draft)).toEqual(['draft 5', 'draft 4', 'draft 3', 'draft 2', 'draft 1'])
+  })
+
+  test('addUsage sums each answered call; tokenSummary totals them; recordLesson keeps them; old statistics start at zero', () => {
+    const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 200, cache_creation_input_tokens: 100 }
+    let l = addUsage(addUsage(NO_LESSONS, usage), usage)
+    expect(l.tokens).toEqual({ calls: 2, input: 2000, output: 1000, cacheRead: 400, cacheWrite: 200 })
+    expect(tokenSummary(l)).toEqual({ total: 3600, input: 2000, output: 1000, cache: 600, perCall: 1800 })
+    l = recordLesson(l, parseAnalysis(ANALYSIS)!, 'draft', 0)
+    expect(l.tokens.calls).toBe(2)
+    expect(tokenSummary(NO_LESSONS)).toBeUndefined()
+    // Saved before v0.9.4: no tokens field, and the rest is kept.
+    const old = asLessons({ analyses: 3, gaps: { Goal: 2 }, rules: {}, recent: [] })
+    expect(old.analyses).toBe(3)
+    expect(old.tokens).toEqual({ calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+    expect(tokenSummary(old)).toBeUndefined()
+  })
+
+  test('bar is always BAR_CELLS long, filled in proportion and never past either end', () => {
+    expect(bar(1, 1)).toBe('█'.repeat(BAR_CELLS))
+    expect(bar(0, 4)).toBe('░'.repeat(BAR_CELLS))
+    expect(bar(2, 4)).toBe('█'.repeat(8) + '░'.repeat(7))
+    expect(bar(3, 0)).toBe('░'.repeat(BAR_CELLS))
+    expect(bar(9, 4)).toHaveLength(BAR_CELLS)
   })
 
   test('liveSkipReason waits for enough text, a new draft, no running analysis, and the cap', () => {
@@ -1495,5 +1522,117 @@ test('Week: when the prompt box can\'t take the side question, it goes on the cl
   await ui.press({ key: 'aside-2026-W42-idle' })
   expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\. \(This is about the Claude Week story/)
   expect(s.toasts.at(-1)).toContain("Couldn't put the side question in the prompt box, so it's on the clipboard")
+  await ui.unmount()
+})
+
+// ---- Statistics: tokens and the layout trial (v0.9.4) ----
+
+const STATS = {
+  analyses: 2,
+  gaps: { 'Done means': 2, Context: 1 },
+  rules: { 'Be explicit': 3, 'Say why': 1 },
+  recent: [],
+  tokens: { calls: 2, input: 1000, output: 500, cacheRead: 200, cacheWrite: 0 },
+}
+
+test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Clear statistics resets them', async ($, on) => {
+  const { s, saved } = world(on)
+  s.box = 'fix the login thing so it works'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  await ui.press({ key: 'tab-settings' })
+  // The stub's usage is 1 input and 1 output token.
+  expect(await ui.find({ text: '2 tokens used by analyses.' })).toBeDefined()
+  expect(await ui.find({ text: 'input 1 · output 1 · about 2 per analysis' })).toBeDefined()
+  await ui.press({ key: 'clear-lessons' })
+  expect(await ui.find({ text: /tokens used by analyses/ })).toBeUndefined()
+  expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
+  expect(saved.has('lessons')).toBe(false)
+  await ui.unmount()
+})
+
+test('Statistics: an answer that is not an analysis still counts its tokens', async ($, on) => {
+  const { s, saved } = world(on, { analysis: 'no tags here' })
+  s.box = 'fix the login thing so it works'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const l = saved.get('lessons') as { analyses: number; tokens: { calls: number } }
+  expect(l.analyses).toBe(0)
+  expect(l.tokens.calls).toBe(1)
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: '2 tokens used by analyses.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Statistics: statistics saved before v0.9.4 show as before, with a note that tokens count from now on', async ($, on) => {
+  const { tokens: _, ...old } = STATS
+  world(on, { saved: { lessons: old } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: '2 analyses so far.' })).toBeDefined()
+  expect(await ui.find({ text: 'Tokens are counted from v0.9.4 on.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Statistics: the Layout switch draws the same figures four ways and is saved', async ($, on) => {
+  const { saved } = world(on, { saved: { lessons: STATS } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+
+  // Tables, the default: today's tables, the tokens under the count.
+  expect(await ui.find({ type: 'Select', key: 'stats-layout' })).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'table-missing')).toBeDefined()
+  expect(await ui.find({ text: '1,700 tokens used by analyses.' })).toBeDefined()
+  expect(await ui.find({ text: 'input 1,000 · output 500 · cache 200 · about 850 per analysis' })).toBeDefined()
+
+  // Two-column grid: "name: count" cells, half the width each.
+  await ui.select({ key: 'stats-layout', value: 'grid' })
+  expect(saved.get('statsLayout')).toBe('grid')
+  expect(await ui.find({ text: 'Done means: 2 of 2' })).toBeDefined()
+  expect(await ui.find({ text: 'Be explicit: 3' })).toBeDefined()
+  expect(await ui.find({ text: 'Total: 1,700' })).toBeDefined()
+  expect(await ui.find({ text: 'Cache: 200' })).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'grid-missing-0')?.props.width).toBe('50%')
+  expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
+
+  // Side by side: both tables in one row, then the tokens as a table.
+  await ui.select({ key: 'stats-layout', value: 'side' })
+  const side = boxNode(await ui.drawn(), 'side-tables')!
+  expect(side.props.flexDirection).toBe('row')
+  expect(boxNode(await ui.drawn(), 'table-missing')).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'table-rules')).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'table-tokens')).toBeDefined()
+  expect(await ui.find({ text: 'Per analysis' })).toBeDefined()
+
+  // Bars: the tokens in the opening line, a bar per item scaled to the analyses or the top rule.
+  await ui.select({ key: 'stats-layout', value: 'bars' })
+  expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
+  expect(await ui.find({ text: `${'█'.repeat(15)}  2 of 2` })).toBeDefined()
+  expect(await ui.find({ text: `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2` })).toBeDefined()
+  expect(await ui.find({ text: `${'█'.repeat(15)}  3` })).toBeDefined()
+  expect(await ui.find({ text: `${'█'.repeat(5)}${'░'.repeat(10)}  1` })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Statistics: the saved layout comes back next session; on mobile the switch is buttons; with no analyses there is no switch', async ($, on) => {
+  world(on, { saved: { lessons: STATS, statsLayout: 'grid' }, surfaces: ['mobile'] })
+  await $.session.start({ ...START, surface: 'mobile' })
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('mobile'))
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: 'Done means: 2 of 2' })).toBeDefined()
+  expect(buttonProps(await ui.drawn(), 'stats-layout-grid')?.label).toBe('[Two-column grid]')
+  await ui.press({ key: 'stats-layout-bars' })
+  expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
+  await ui.press({ key: 'clear-lessons' })
+  expect(buttonProps(await ui.drawn(), 'stats-layout-bars')).toBeUndefined()
   await ui.unmount()
 })
