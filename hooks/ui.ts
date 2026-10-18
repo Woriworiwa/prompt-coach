@@ -659,10 +659,10 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       flexDirection: 'column',
       gap: 'xl',
       children: [
-        settingsGroup(E, v, 'general', 'General', general, generalNote),
-        settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F)),
-        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
-        settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
+        settingsGroup(E, v, 'general', 'General', general, generalNote, true),
+        settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
+        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))], [], true),
+        settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
       ],
     }),
   ]
@@ -739,18 +739,17 @@ function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 }
 
 /**
- * A settings section as Desktop draws one: its bold title (normal text
- * color, no box, no band), then its rows with a thin line between each two.
- * `after` follows the last row with no line, as a note under the section.
+ * A settings section: its bold title (normal text color, no band), then its
+ * rows with a thin line between each two. `after` follows the last row with
+ * no line, as a note under the section. With `boxed` (the Settings tab, since
+ * v0.20.0) it sits in the same bordered box as the Analytics tab's Rules,
+ * without the title's band; without it (Statistics), in no box.
  */
-function settingsGroup(E: UI, v: View, key: string, title: string, rows: RenderElement[], after: RenderElement[] = []): RenderElement {
-  const children = rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `${key}-${i}`), r]))
-  return E.Box({
-    key: `group-${key}`,
-    flexDirection: 'column',
-    gap: 1,
-    children: [heading(E, title), E.Box({ key: `group-${key}-box`, flexDirection: 'column', gap: 1, children: [...children, ...after] })],
-  })
+function settingsGroup(E: UI, v: View, key: string, title: string, rows: RenderElement[], after: RenderElement[] = [], boxed = false): RenderElement {
+  const lined = rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `${key}-${i}`), r]))
+  const body = E.Box({ key: `group-${key}-box`, flexDirection: 'column', gap: 1, children: [...lined, ...after] })
+  if (boxed) return group(E, key, title, [body], false)
+  return E.Box({ key: `group-${key}`, flexDirection: 'column', gap: 1, children: [heading(E, title), body] })
 }
 
 /**
@@ -772,8 +771,12 @@ function block(E: UI, key: string, children: RenderElement[]): RenderElement {
   return E.Box({ key: `block-${key}`, flexDirection: 'column', gap: 1, children })
 }
 
-/** A bordered group, its title on a subtle band (the Week tab's sections). Theme keys only, so it follows light and dark. */
-function group(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
+/**
+ * A bordered group, its title on a subtle band (the Week tab's sections), or
+ * on no band with `band` false (the Settings tab's). Theme keys only, so it
+ * follows light and dark.
+ */
+function group(E: UI, key: string, title: string, children: RenderElement[], band = true): RenderElement {
   return E.Box({
     key: `group-${key}`,
     flexDirection: 'column',
@@ -781,7 +784,7 @@ function group(E: UI, key: string, title: string, children: RenderElement[]): Re
     borderColor: 'subtle',
     paddingX: 1,
     gap: 1,
-    children: [E.Box({ backgroundColor: 'subtle', paddingX: 1, children: [heading(E, title)] }), ...children],
+    children: [E.Box({ ...(band ? { backgroundColor: 'subtle' as const } : {}), paddingX: 1, children: [heading(E, title)] }), ...children],
   })
 }
 

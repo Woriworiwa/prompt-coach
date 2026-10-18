@@ -768,26 +768,36 @@ function boxNode(node: unknown, key: string): { props: Record<string, unknown>; 
   return undefined
 }
 
-test('Settings is laid out like Desktop\'s own: a bold title per section with no box, plain labels, a thin line between rows', async ($, on) => {
+test('Settings: each section in the Analytics group\'s bordered box with its title on no band, plain labels, a thin line between rows', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
+  // The Analytics tab's Rules group is the model: its box, and its title's box but for the band.
+  await ui.press({ key: 'tab-analytics' })
+  const model = boxNode(await ui.drawn(), 'group-rule-list')!
+  const { key: _k, children: _c, ...boxLook } = model.props
+  const { children: _h, backgroundColor, ...headLook } = (model.kids[0] as { props: Record<string, unknown> }).props
+  expect(backgroundColor).toBe('subtle')
+  expect(boxLook.borderStyle).toBe('round')
+
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
   for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules'], ['week', 'Claude Week']] as const) {
-    const g = boxNode(tree, `group-${key}`)
-    // The title first: semibold, in the normal text color, on no background.
-    const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
-    expect(label?.type).toBe('Text')
-    expect(textLook(label, title)).toEqual({ found: true, color: undefined, weight: 'semibold' })
-    // Then the rows, in no box: no border and no band anywhere.
-    const box = boxNode(tree, `group-${key}-box`)
-    expect(box?.props.borderStyle).toBeUndefined()
-    expect(g?.props.borderStyle).toBeUndefined()
+    const g = boxNode(tree, `group-${key}`)!
+    const { key: _gk, children: _gc, ...look } = g.props
+    expect(look).toEqual(boxLook)
+    // The title first, in a box like the Analytics title's but on no background: semibold, in the normal text color.
+    const head = g.kids[0] as { type?: string; props: Record<string, unknown> }
+    expect(head.type).toBe('Box')
+    const { children: headKids, ...headProps } = head.props
+    expect(headProps).toEqual(headLook)
+    expect(textLook(head, title)).toEqual({ found: true, color: undefined, weight: 'semibold' })
+    // Then the rows, with no border of their own.
+    expect(boxNode(tree, `group-${key}-box`)?.props.borderStyle).toBeUndefined()
+    void headKids
   }
   expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
-  expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
   expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
