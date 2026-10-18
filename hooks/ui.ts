@@ -49,8 +49,7 @@ export type View = {
   codeTips: string[]
   liveCalls: number
   rulesAsOf: string
-  /** Where this copy of the mod reads Omar's own rules from. */
-  ownRulesPath: string
+  ownRules: OwnRules
   sources: string[]
   analytics: Analytics
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
@@ -58,6 +57,17 @@ export type View = {
   refreshModel: string
   settings: Settings
   week: WeekView
+}
+
+/** Omar's own rules, kept in rules.md in the mod's data folder. */
+export type OwnRules = {
+  /** The file's path; '' when the data folder wasn't found. */
+  path: string
+  rules: string[]
+  /** What the last add or remove did. */
+  note?: string
+  /** Changes with each add, so the Add field starts empty again. */
+  gen: number
 }
 
 /** What the Week tab shows: one stored edition, its feedback and read state, and the writer's job. */
@@ -121,6 +131,8 @@ export type Actions = {
   type: (token: string, value: string) => void
   submitAnswer: (token: string, value: string) => void
   setModel: (field: ModelSetting, value: string) => void
+  addRule: (typed: string) => Promise<void>
+  removeRule: (rule: string) => Promise<void>
   clearAnalytics: () => Promise<void>
   refresh: () => Promise<void> | undefined
   rewriteAll: () => Promise<void> | undefined
@@ -474,7 +486,7 @@ function footer(E: UI, v: View): RenderElement {
   return E.Box({
     key: 'footer',
     flexDirection: 'column',
-    children: [text(E, `Rules as of ${v.rulesAsOf || 'unknown'} · your own rules: ${v.ownRulesPath}`, { dimColor: true, wrap: 'wrap' })],
+    children: [text(E, `Rules as of ${v.rulesAsOf || 'unknown'} · your own rules: ${v.ownRules.path || 'not found'}`, { dimColor: true, wrap: 'wrap' })],
   })
 }
 
@@ -523,10 +535,61 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       gap: 'xl',
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote),
+        settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F)),
         settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
       ],
     }),
+  ]
+}
+
+/**
+ * Omar's own rules: where they're kept, each rule with Remove, and a field to
+ * add one. The mobile app has no fields, so there the list is read-only.
+ */
+function ownRulesSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
+  const o = v.ownRules
+  const rules = o.rules.length
+    ? o.rules.map(rule =>
+        E.Box({
+          key: `own-rule-${rule}`,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          columnGap: 2,
+          flexWrap: 'wrap',
+          children: [
+            E.Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [text(E, rule, { wrap: 'wrap' })] }),
+            E.Button({ key: `remove-rule-${rule}`, label: 'Remove', onPress: () => a.removeRule(rule) }),
+          ],
+        }),
+      )
+    : [text(E, 'No rules yet.', { dimColor: true })]
+  const add = F
+    ? [
+        F.Input({
+          key: `add-rule-${o.gen}`,
+          label: 'Add a rule',
+          placeholder: "One rule, such as: Keep the draft's language.",
+          value: '',
+          submitLabel: 'add',
+          onSubmit: value => void a.addRule(value),
+        }),
+      ]
+    : [text(E, 'Add rules in Desktop or the terminal.', { dimColor: true, wrap: 'wrap' })]
+  const note = o.note ? [text(E, o.note, { ...(o.note.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' })] : []
+  return [
+    block(E, 'own-rules-file', [
+      E.Box({
+        flexDirection: 'column',
+        children: [
+          text(E, 'Rules file'),
+          text(E, 'Sent with every analysis and /improve, after the general and model rules; yours win when they conflict. Updates never touch this file, and you can edit it by hand.', { dimColor: true, wrap: 'wrap' }),
+        ],
+      }),
+      o.path ? code(E, o.path) : text(E, "The mod's data folder wasn't found.", { color: 'warning', wrap: 'wrap' }),
+    ]),
+    block(E, 'own-rules-list', [...rules, ...add, ...note]),
   ]
 }
 
@@ -799,7 +862,7 @@ function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
   const out: RenderElement[] = [
     text(
       E,
-      `Checks the pages in sources.json for changes since your last refresh. Only files whose pages changed are rewritten, by ${v.refreshModel}. Nothing changes until you accept, and rules/omar.md is never touched.`,
+      `Checks the pages in sources.json for changes since your last refresh. Only files whose pages changed are rewritten, by ${v.refreshModel}. Nothing changes until you accept, and your own rules are never touched.`,
       { wrap: 'wrap', dimColor: true },
     ),
   ]

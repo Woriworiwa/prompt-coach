@@ -10,12 +10,12 @@ export type RefreshResult =
   | { target: string; state: 'same' }
   | { target: string; state: 'failed'; reason: string }
 
-/** Reads sources.json, keeping only targets under rules/ or tips/ and never rules/omar.md. */
+/** Reads sources.json, keeping only targets under rules/ or tips/. */
 export function parseSources(json: string): Sources {
   const raw = JSON.parse(json) as { targets?: Record<string, unknown> }
   const targets: Record<string, string[]> = {}
   for (const [target, urls] of Object.entries(raw.targets ?? {})) {
-    if (!/^(rules|tips)\/[a-z0-9-]+\.md$/.test(target) || target === 'rules/omar.md') continue
+    if (!/^(rules|tips)\/[a-z0-9-]+\.md$/.test(target)) continue
     if (!Array.isArray(urls)) continue
     const https = urls.filter((u): u is string => typeof u === 'string' && u.startsWith('https://'))
     if (https.length) targets[target] = https

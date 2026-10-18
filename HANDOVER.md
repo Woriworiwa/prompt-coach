@@ -1,15 +1,15 @@
-# Handover: prompt-coach v0.11.0
+# Handover: prompt-coach v0.12.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
-This file is the only brief and describes the current state. `CLAUDE.md` imports it into every session and says to keep it current as you go. Version history lives in `TASKS.md` (one line per version) and in the commits. `README.md` describes the mod for Omar.
+This file is the only brief and describes the current state. `.claude/CLAUDE.md` imports it into every session and says to keep it current as you go. Version history lives in `TASKS.md` (one line per version) and in the commits. `README.md` describes the mod for Omar.
 
 ## Start here
 
 1. In your first reply, give the current version and what's open (see "Left to do").
 2. Don't change code until Omar asks for something. He often starts with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
-4. Open sessions in `~/projects/claude-mods/prompt-coach` so `CLAUDE.md` loads at launch. A session there loads the mod straight from this folder, not from the installed copy.
+4. Open sessions in `~/projects/claude-mods/prompt-coach` so `.claude/CLAUDE.md` loads at launch. It sits in `.claude/` because a `CLAUDE.md` at the plugin root fails `validate --strict`. A session there loads the mod straight from this folder, not from the installed copy.
 
 ## What it does now
 
@@ -17,13 +17,23 @@ This file is the only brief and describes the current state. `CLAUDE.md` imports
 - **`/coach`** opens a pane that Desktop docks beside the transcript. Running it again closes it. `/coach live` and `/coach manual` set the mode and open it. `/coach refresh` (and `refresh all`) opens Settings and proposes rules and tips updates for files whose source pages changed. Nothing is written until Omar accepts.
 - **Inside a conversation,** each analysis also sends Claude's last reply (capped at 6,000 characters), and the draft is read as a reply to it.
 - **Tabs:** Coach (1), Analytics (2) and News (3) on the left, Settings (4) alone at the right end, the same on every surface. `tabs()` puts them in one `tabs` Box with `justifyContent: 'space-between'`. The terminal draws each tab as a plain button, with the open one in clay brackets. Desktop always draws a native button, so there the open tab is clay semibold `Text` and the others are `dimColor` buttons. News is the Week tab's label: its key is `tab-week`, the code calls it the Week tab, and the digest is still "Claude Week".
-  - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove. A dim footer gives the rules' date and the path to `rules/omar.md`.
+  - **Coach:** your draft, then the rewrite under it. If the rewrite has `[placeholders]`, "Fill in the gaps" follows, with a question, a dropdown of likely answers and a text field per gap. A typed answer wins over a pick, and Enter in an empty field removes that gap's sentence. An ⓘ beside the heading reveals help on hover. Then Analyze, Apply (fills the box) and Apply and send (fills it, submits as Omar with `$.prompt.submit({ asUser: true })`, then empties the box). Below them, the Checklist and Why each change sub-tabs. The Checklist shows each missing item with the suggestions that fill it, each with Add/Remove. A dim footer gives the rules' date and the path to Omar's rules file.
   - **Analytics** (`analyticsTab`): first Statistics (below), then a hairline, then the tips (`tips()`): "Using \<model\> well", in three groups: this draft, the session's model, and Claude Code in general. Tips appear only here.
-  - **Settings** is laid out like Desktop's own settings page, with three sections (`settingsGroup`): General, Rules and tips, and Claude Week. Each section is a bold title with no box, then rows (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
+  - **Settings** is laid out like Desktop's own settings page, with four sections (`settingsGroup`): General, Your rules, Rules and tips, and Claude Week. Each section is a bold title with no box, then rows (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
     - **General:** Mode (Manual or Live; live is capped at 30 analyses a session), Rewrite model and Refresh model. Model changes are saved with `$.config.set`. A refused change makes them read-only, with the reason.
+    - **Your rules** (`ownRulesSettings`): the rules file's path, each rule with Remove (`remove-rule-<rule>`), and an Add a rule field (`add-rule-<gen>`, emptied after each add; none on mobile). A note says Added, Removed, already there, or Not saved.
     - **Rules and tips:** the source pages, always listed, then the refresh (check sources, Rewrite all, progress, per-file diffs, Accept/Reject). Omar chose the title and the order.
     - **Claude Week:** Week model, Reader profile (its path, plus a note when the mod just created it or couldn't), and Sources (the pages in `week/sources.json` as links, `Tier N · label`).
   - **News:** Claude Week (below).
+
+## Your rules
+
+Omar's own rules for the coach, chosen on 2026-10-18 so he can change them from the app and so they aren't tied to the repo. They live in `<config>/plugins/data/prompt-coach-prompt-coach/rules.md`, next to the reader profile (`dataDir` in `lib.ts`, which `profilePath` also uses). The repo ships no rules file and no example; `rules/omar.md` was deleted in v0.12.0.
+
+- A missing file means no rules. The mod writes it only when the first rule is added, starting with `OWN_RULES_HEADER` (a string in `lib.ts`).
+- A rule is a line starting with "- " (`ownRuleLines`). Add appends one (`withOwnRule`, after `cleanRule`), and Remove drops that line only (`withoutOwnRule`), so headings and notes typed by hand stay.
+- `loadRules` re-reads the file on every analysis and `/improve`, and opening Settings re-reads it, so hand edits apply at once. It's sent last and wins on conflict.
+- Omar's rule ("Keep the draft's language…") was moved into both configs' files by hand on 2026-10-18. The data folder isn't in git, and uninstalling may delete it.
 
 ## Statistics (Analytics tab)
 
@@ -52,7 +62,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 - **Archive:** shows once two or more editions are stored. It lists each edition with its counts, and Open shows it as it was, still editable (`weekArchive`, `archiveRows`). There's no delete and no pruning yet; about 150–200 weeks fit in the store.
 - **Store keys:** `weekEditions` (never overwritten), `weekFeedback`, `weekRead` and `weekJob`, kept per config, so personal and business have separate digests (Omar's choice). The business config holds W40–W42; W40 and W41 were written by hand on 2026-10-18 (backup in `~/projects/claude-mods/prompt-coach-backups/2026-10-18/`). The personal config has none.
 - **Text fields:** `onInput` saves quietly after 800 ms with no redraw. Enter saves and redraws, showing Saved or Not saved.
-- **Reader profile:** each user's own file, outside the install, so updates never touch it: `<config>/plugins/data/<plugin>-<marketplace>/profile.yaml` (`profilePath` in `week.ts`). For a folder loaded directly, it's the installed copy's folder, `<plugin>-<plugin>`. Mods have no data-folder API, so this follows Claude Code's own layout. `ensureProfile` writes `week/profile.example.yaml` there only when no file exists. Uninstalling a plugin may delete its data folder. Omar's profile is in both configs' `prompt-coach-prompt-coach` folders.
+- **Reader profile:** each user's own file, outside the install, so updates never touch it: `<config>/plugins/data/<plugin>-<marketplace>/profile.yaml` (`profilePath` in `week.ts`, on `dataDir`). For a folder loaded directly, it's the installed copy's folder, `<plugin>-<plugin>`. Mods have no data-folder API, so this follows Claude Code's own layout. `ensureProfile` writes `week/profile.example.yaml` there only when no file exists. Uninstalling a plugin may delete its data folder. Omar's profile is in both configs' `prompt-coach-prompt-coach` folders.
 - **Choices made without Omar's say on the detail:** the Top 3 are plain text, not buttons; Reopen also unmarks read; switching a vote clears its reason; tips aren't counted in the progress.
 
 ## Code
@@ -60,13 +70,13 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | File | What it holds |
 | --- | --- |
 | `hooks/register.ts` | Every hook and every `$` call, plus the pane state |
-| `hooks/lib.ts` | Pure: prompts, `parseAnalysis`, placeholders, `parseAdditions`, `withAdditions`, `lastReply`, `CHECKLIST` |
+| `hooks/lib.ts` | Pure: prompts, `parseAnalysis`, placeholders, `parseAdditions`, `withAdditions`, `lastReply`, `CHECKLIST`, `dataDir` and the own-rules helpers |
 | `hooks/analytics.ts` | Pure: the statistics (`recordDraft`, `recordUse`, `addUsage`, `itemStats`, `scoreTrend`, `strengths`, `focus`, `rulesFor`, `advice`) |
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `analyticsTab`, `statistics`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 120 tests. `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
-| `rules/*.md`, `tips/*.md`, `sources.json` | Content. `rules/omar.md` is Omar's and is never refreshed |
+| `hooks/*.test.ts` | 124 tests. `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
+| `rules/*.md`, `tips/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
 ## How every change ships (Omar expects all of it)
@@ -121,6 +131,7 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.12.0 Your rules: Settings shows the section after General with the language rule and the data-folder path; Add a rule adds one and empties the field; Remove takes it out; the footer shows the new path; an Analyze follows the rules.
 - v0.11.0 Analytics: after 5 analyses and an Apply, the score, Work on next, Missing or vague, What you do well, What the coach changed most for this model, Advice you took and tokens add up and read well.
 - v0.10.1: the third tab reads News.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.

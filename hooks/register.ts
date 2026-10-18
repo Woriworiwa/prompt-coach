@@ -10,6 +10,11 @@ import {
   buildAnalysisRequest,
   buildRequest,
   NO_PICK,
+  cleanRule,
+  dataDir,
+  ownRuleLines,
+  withOwnRule,
+  withoutOwnRule,
   fillPlaceholders,
   removeSentences,
   withAdditions,
@@ -171,6 +176,12 @@ let weekSources: WeekSource[] | undefined
 /** The reader profile's path (see profilePath), and a line under it in Settings when it was just created or couldn't be. */
 let profileFile = ''
 let profileNote: string | undefined
+/** The mod's data folder in this config (see dataDir), found once. */
+let dataFolder = ''
+/** Omar's own rules, in rules.md in the data folder: the rules as last read, what the last change did, and a counter that empties the Add field. */
+let ownRules: string[] = []
+let ownRulesNote: string | undefined
+let ruleGen = 0
 const weekTimers = new Map<string, Timer>()
 
 export const register: Register = (on, options) => {
@@ -203,6 +214,7 @@ export const register: Register = (on, options) => {
       pendingSeen = asFingerprints(pending.seen) ?? {}
     }
     await loadWeek($)
+    await loadOwnRules($)
     return next(e)
   })
 
@@ -346,7 +358,7 @@ export const register: Register = (on, options) => {
       analyzedReply,
       // An empty box after sending is not a changed draft.
       isStale: !!analysis && !!draft.trim() && draft.trim() !== analyzedText.trim(),
-      ownRulesPath: `${$.plugin.root}/rules/omar.md`,
+      ownRules: { path: ownRulesPath(), rules: ownRules, note: ownRulesNote, gen: ruleGen },
       modelTips,
       codeTips,
       liveCalls,
@@ -369,6 +381,8 @@ export const register: Register = (on, options) => {
       tab: t => {
         tab = t
         $.ui.invalidate('ui.render')
+        // The file may have been edited by hand since it was last read.
+        if (t === 'settings') void loadOwnRules($).then(() => $.ui.invalidate('ui.render'))
       },
       mode: m => setMode($, m),
       analyze: () => analyzeNow($),
@@ -400,6 +414,8 @@ export const register: Register = (on, options) => {
         $.ui.invalidate('ui.render')
       },
       setModel: (field, value) => setModelSetting($, field, value),
+      addRule: typed => addOwnRule($, typed),
+      removeRule: rule => removeOwnRule($, rule),
       clearAnalytics: () => clearAnalytics($),
       refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
       rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
@@ -853,8 +869,7 @@ async function loadWeek($: EngineInterface): Promise<void> {
  */
 async function ensureProfile($: EngineInterface): Promise<void> {
   try {
-    const configDir = (await $.env.get('CLAUDE_CONFIG_DIR')) || `${(await $.env.get('HOME')) ?? '~'}/.claude`
-    profileFile = profilePath($.plugin.root, $.plugin.name, configDir)
+    profileFile = profilePath($.plugin.root, $.plugin.name, await configDir($))
     if (await $.fs.exists(profileFile)) {
       profileNote = undefined
       return
@@ -863,6 +878,62 @@ async function ensureProfile($: EngineInterface): Promise<void> {
     profileNote = 'A blank profile was created here. Fill it in before the next Write.'
   } catch (err) {
     profileNote = `Couldn't create it: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+/** The Claude config this session runs in: CLAUDE_CONFIG_DIR, or ~/.claude. */
+async function configDir($: EngineInterface): Promise<string> {
+  return (await $.env.get('CLAUDE_CONFIG_DIR')) || `${(await $.env.get('HOME')) ?? '~'}/.claude`
+}
+
+// ---- Your own rules ----
+
+/** rules.md in the mod's data folder; '' until the folder is found. */
+function ownRulesPath(): string {
+  return dataFolder ? `${dataFolder}/rules.md` : ''
+}
+
+/**
+ * Reads Omar's own rules from the data folder, for the analysis and for
+ * Settings. No file means no rules: it's written only when a first rule is
+ * added, so the mod ships no rules of anyone's.
+ */
+async function loadOwnRules($: EngineInterface): Promise<string> {
+  if (!dataFolder) {
+    try {
+      dataFolder = dataDir($.plugin.root, $.plugin.name, await configDir($))
+    } catch {
+      return ''
+    }
+  }
+  const md = await readOr($, ownRulesPath())
+  ownRules = ownRuleLines(md)
+  return md
+}
+
+async function addOwnRule($: EngineInterface, typed: string): Promise<void> {
+  const rule = cleanRule(typed)
+  if (!rule) return
+  const md = await loadOwnRules($)
+  if (ownRules.includes(rule)) ownRulesNote = 'That rule is already in your rules.'
+  else await saveOwnRules($, withOwnRule(md, rule), 'Added. It applies from the next analysis.')
+  ruleGen += 1
+  $.ui.invalidate('ui.render')
+}
+
+async function removeOwnRule($: EngineInterface, rule: string): Promise<void> {
+  await saveOwnRules($, withoutOwnRule(await loadOwnRules($), rule), 'Removed.')
+  $.ui.invalidate('ui.render')
+}
+
+async function saveOwnRules($: EngineInterface, md: string, done: string): Promise<void> {
+  try {
+    if (!ownRulesPath()) throw new Error("the mod's data folder wasn't found")
+    await $.fs.write(ownRulesPath(), md)
+    ownRules = ownRuleLines(md)
+    ownRulesNote = done
+  } catch (err) {
+    ownRulesNote = `Not saved: ${message(err)}`
   }
 }
 
@@ -1093,12 +1164,12 @@ function lastPersonPrompt(messages: SessionMessage[]): { text: string; index: nu
   return undefined
 }
 
-/** The general rules, the session model's own rules when there is a file for it, then Omar's own. */
+/** The general rules, the session model's own rules when there is a file for it, then Omar's own from the data folder. */
 async function loadRules($: EngineInterface, file: string | undefined): Promise<string> {
   const dir = `${$.plugin.root}/rules`
   const parts = [await $.fs.read(`${dir}/general.md`)]
   if (file) parts.push(await readOr($, `${dir}/${file}`))
-  parts.push(await readOr($, `${dir}/omar.md`))
+  parts.push(await loadOwnRules($))
   return parts.filter(Boolean).join('\n\n')
 }
 

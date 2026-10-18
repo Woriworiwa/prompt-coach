@@ -3,6 +3,8 @@
 // feedback and read state in $.store.
 // The edition and feedback shapes follow Omar's Claude Week spec (part 3).
 
+import { dataDir } from './lib.ts'
+
 export type Link = { label: string; url: string }
 export type Story = {
   id: string
@@ -422,18 +424,7 @@ export function archiveRows(editions: Editions, feedback: FeedbackStore, read: R
   })
 }
 
-/**
- * Where the reader profile lives: the mod's own data folder in the Claude
- * config (`plugins/data/<plugin>-<marketplace>`, the folder Claude Code keeps
- * for a plugin across installs and updates), not the install itself, which an
- * update replaces. An installed copy runs from `plugins/cache/<marketplace>/
- * <plugin>/<version>`, so its folder follows from the root. A folder loaded
- * directly (a session opened in the repo) uses the installed copy's folder in
- * `configDir`, `<plugin>-<plugin>` (the repo's marketplace shares its name),
- * so both read the same profile.
- */
+/** Where the reader profile lives: the mod's own data folder (see dataDir in lib.ts), so updates never touch it. */
 export function profilePath(root: string, name: string, configDir: string): string {
-  const installed = /^(.*)[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(root)
-  if (installed) return `${installed[1]}/plugins/data/${installed[3]}-${installed[2]}/profile.yaml`
-  return `${configDir.replace(/[\\/]$/, '')}/plugins/data/${name}-${name}/profile.yaml`
+  return `${dataDir(root, name, configDir)}/profile.yaml`
 }

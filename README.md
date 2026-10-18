@@ -48,9 +48,10 @@ The pane has four tabs: Coach (`1`), Analytics (`2`) and News (`3`) on the left,
 
 It's all kept between sessions on this Mac, with no draft text, and no extra model calls. **Clear statistics** resets it.
 
-**Settings tab** (`4`), laid out like the Desktop app's own settings: three sections (General, Rules and tips, Claude Week), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
+**Settings tab** (`4`), laid out like the Desktop app's own settings: four sections (General, Your rules, Rules and tips, Claude Week), each a bold title with rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual analyzes only when you press Analyze. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model** and **Refresh model:** two of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
+- **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
 - **Rules and tips:** the source pages the rules and tips come from, always listed, then the refresh (see "Keeping the rules current" below).
 - **Claude Week:** the **Week model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
 
@@ -67,7 +68,7 @@ It's all kept between sessions on this Mac, with no draft text, and no extra mod
 | What | Where |
 | --- | --- |
 | Prompting rules | `rules/general.md`, plus the session model's file (`opus-5-5.md`, `sonnet-5-5.md`, `haiku-5-5.md`, `fable-5-1.md`, which also covers Mythos 5.1) |
-| Your own rules | `rules/omar.md`. It is loaded last and wins on conflict. Refresh never touches it. |
+| Your own rules | `rules.md` in the mod's data folder, `plugins/data/prompt-coach-prompt-coach/` in your Claude config. Edited under Settings → Your rules or by hand. Loaded last, wins on conflict; neither refresh nor an update touches it. |
 | Model tips | `tips/<model>.md` and `tips/claude-code.md` |
 | Which model you're on | The live session |
 | Checklist, rewrite and reasons | One call to the rewrite model (default `sonnet`), given your draft and the rules above. It can be wrong, so treat it as a second opinion. |
@@ -97,9 +98,9 @@ claude plugin install prompt-coach@prompt-coach
 Then start a new session in the Desktop app's Code tab, or run `/reload-plugins`. Type `/coach`.
 
 **An installed copy runs from Claude Code's plugin cache** (`~/.claude-personal/plugins/cache/prompt-coach/…`), not from this folder. Three things follow:
-- Your edits to `rules/omar.md` here don't reach it until you raise `version` in `.claude-plugin/plugin.json` and run `claude plugin update prompt-coach@prompt-coach`.
+- Your edits to the rules and tips here don't reach it until you raise `version` in `.claude-plugin/plugin.json` and run `claude plugin update prompt-coach@prompt-coach`. Your own rules and reader profile aren't part of the install, so they apply at once.
 - A refresh you accept writes into the cached copy.
-- The pane's footer shows the path of the `omar.md` it is actually reading.
+- The pane's footer shows the path of the rules file it is actually reading.
 
 The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLAUDE_CODE_PLUGIN_DIRS`, so there it always runs the cached copy. To run straight from this folder, with edits picked up as you save, use a terminal session: `claude --plugin-dir ~/projects/claude-mods/prompt-coach`.
 

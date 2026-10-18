@@ -1,5 +1,5 @@
 {
-  "note": "Where /coach refresh reads from. Each target file is rebuilt from its sources. rules/omar.md is never listed here, so refresh never touches it. Pages are fetched as their Markdown copy (the same URL plus .md).",
+  "note": "Where /coach refresh reads from. Each target file is rebuilt from its sources. Your own rules live in the mod's data folder, so refresh never touches them. Pages are fetched as their Markdown copy (the same URL plus .md).",
   "targets": {
     "rules/general.md": [
       "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices"

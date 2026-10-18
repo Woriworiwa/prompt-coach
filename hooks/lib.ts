@@ -392,3 +392,50 @@ function bullets(block: string): string[] {
     .map(line => line.replace(/^[-*]\s*/, '').trim())
     .filter(Boolean)
 }
+
+// ---- Your own rules ----
+
+/**
+ * The mod's own data folder in the Claude config (`plugins/data/<plugin>-
+ * <marketplace>`, which Claude Code keeps for a plugin across installs and
+ * updates), not the install itself, which an update replaces. An installed
+ * copy runs from `plugins/cache/<marketplace>/<plugin>/<version>`, so its
+ * folder follows from the root. A folder loaded directly (a session opened in
+ * the repo) uses the installed copy's folder in `configDir`, `<plugin>-
+ * <plugin>` (the repo's marketplace shares its name), so both read the same files.
+ */
+export function dataDir(root: string, name: string, configDir: string): string {
+  const installed = /^(.*)[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(root)
+  if (installed) return `${installed[1]}/plugins/data/${installed[3]}-${installed[2]}`
+  return `${configDir.replace(/[\\/]$/, '')}/plugins/data/${name}-${name}`
+}
+
+/** The top of a new rules file; the mod writes it with the first rule added under Settings. */
+export const OWN_RULES_HEADER =
+  '# Your own rules\n\nSent with every analysis and /improve, after the general and model rules; these win when they conflict.\nOne rule per line, each starting with "- ". Add and remove them under Settings in the coach pane, or edit this file.\nInstalling or updating prompt-coach never touches it.\n\n'
+
+/** The rules in a rules file: each line starting with "- ", in order. */
+export function ownRuleLines(md: string): string[] {
+  return md
+    .split('\n')
+    .map(l => /^\s*-\s+(.+?)\s*$/.exec(l)?.[1])
+    .filter((r): r is string => !!r)
+}
+
+/** A rule as typed, made one line: whitespace collapsed and any leading "- " dropped. */
+export function cleanRule(typed: string): string {
+  return typed.replace(/\s+/g, ' ').trim().replace(/^-\s*/, '')
+}
+
+/** The rules file with `rule` added at the end; an empty file starts with the header. */
+export function withOwnRule(md: string, rule: string): string {
+  const base = md.trim() ? (md.endsWith('\n') ? md : `${md}\n`) : OWN_RULES_HEADER
+  return `${base}- ${rule}\n`
+}
+
+/** The rules file without the first line holding `rule`; everything else is kept as written. */
+export function withoutOwnRule(md: string, rule: string): string {
+  const lines = md.split('\n')
+  const at = lines.findIndex(l => /^\s*-\s+(.+?)\s*$/.exec(l)?.[1] === rule)
+  return at < 0 ? md : [...lines.slice(0, at), ...lines.slice(at + 1)].join('\n')
+}

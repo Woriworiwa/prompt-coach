@@ -1,4 +1,4 @@
-@HANDOVER.md
+@../HANDOVER.md
 
 In your first reply each session, start with the current version and what's open.
 

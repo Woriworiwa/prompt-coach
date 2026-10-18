@@ -12,7 +12,13 @@ import {
   removeSentences,
   withAdditions,
   asOfDate,
+  cleanRule,
+  dataDir,
   liveSkipReason,
+  ownRuleLines,
+  withOwnRule,
+  withoutOwnRule,
+  OWN_RULES_HEADER,
   parseAnalysis,
   parseTips,
 } from './lib.ts'
@@ -152,15 +158,28 @@ describe('bars and live mode', () => {
     expect(parseTips(md)).toEqual(['First tip.', 'Second `tip`.'])
     expect(asOfDate(md)).toBe('2026-10-17')
   })
+
+  test('own rules: read from "- " lines, added under a header to a new file, removed one line at a time', () => {
+    expect(dataDir('/c/plugins/cache/mkt/prompt-coach/0.12.0', 'prompt-coach', '/x')).toBe('/c/plugins/data/prompt-coach-mkt')
+    expect(dataDir('/repo/prompt-coach', 'prompt-coach', '/home/u/.claude/')).toBe('/home/u/.claude/plugins/data/prompt-coach-prompt-coach')
+    expect(cleanRule('  - Keep the\n draft\'s   language. ')).toBe("Keep the draft's language.")
+    const first = withOwnRule('', 'Keep the language.')
+    expect(first).toBe(`${OWN_RULES_HEADER}- Keep the language.\n`)
+    const md = withOwnRule('# Mine\n\nA note.\n- One', 'Two')
+    expect(md).toBe('# Mine\n\nA note.\n- One\n- Two\n')
+    expect(ownRuleLines(md)).toEqual(['One', 'Two'])
+    expect(ownRuleLines(OWN_RULES_HEADER)).toEqual([])
+    expect(withoutOwnRule(md, 'One')).toBe('# Mine\n\nA note.\n- Two\n')
+    expect(withoutOwnRule(md, 'Three')).toBe(md)
+  })
 })
 
 describe('refresh helpers', () => {
-  test('parseSources keeps rules and tips targets and never rules/omar.md', () => {
+  test('parseSources keeps only https rules and tips targets', () => {
     const s = parseSources(
       JSON.stringify({
         targets: {
           'rules/general.md': ['https://a.example/x'],
-          'rules/omar.md': ['https://a.example/y'],
           'hooks/register.ts': ['https://a.example/z'],
           'tips/opus-5-5.md': ['http://insecure.example', 'https://b.example/'],
         },
@@ -213,12 +232,14 @@ function barsIn(node: unknown): string[] {
 
 /** The reader profile in the stubbed config's data folder: the installed copy's, though this folder is loaded directly. */
 const PROFILE = '/home/u/.claude/plugins/data/prompt-coach-prompt-coach/profile.yaml'
+/** Omar's own rules, in the same data folder. */
+const OWN_RULES = '/home/u/.claude/plugins/data/prompt-coach-prompt-coach/rules.md'
 
 const FILES: Record<string, string> = {
   'rules/general.md': '# General\n\nSource: x\nAs of: 2026-10\n\n- Be explicit.\n',
   'rules/opus-5-5.md': '# Opus\n\nSources: x\nAs of: 2026-09\n\n- Name the finish line.\n',
   'rules/sonnet-5-5.md': '# Sonnet\n\nSource: x\nAs of: 2026-10\n\n- Ask for a real check.\n',
-  'rules/omar.md': '# Omar\n\n- End with a recap.\n',
+  [OWN_RULES]: '# Your own rules\n\n- End with a recap.\n',
   'tips/opus-5-5.md': '# Opus tips\n\nSource: x\n\n- Use /effort, not "think hard".\n',
   'tips/sonnet-5-5.md': '# Sonnet tips\n\nSource: x\n\n- Sonnet is the everyday model.\n',
   'tips/claude-code.md': '# Claude Code\n\nSource: x\n\n- Run /clear between tasks.\n',
@@ -242,7 +263,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -268,7 +289,8 @@ function world(
     weekRequests: [] as { prompt: string; system: string; model: string }[],
     copied: [] as string[],
   }
-  const rel = (path: string) => path.replace(/^.*?\/(rules|tips|week|sources\.json)/, (_m, dir: string) => dir)
+  // The data folder's files keep their full path; the mod's own are named from its root.
+  const rel = (path: string) => (path.includes('/plugins/data/') ? path : path.replace(/^.*?\/(rules|tips|week|sources\.json)/, (_m, dir: string) => dir))
 
   on('store.get', async ($, e) => ({ value: saved.get(e.key) }))
   on('store.set', async ($, e) => {
@@ -289,7 +311,7 @@ function world(
     const text = fileAt(file)
     return text === undefined ? { deny: `no such file: ${file}` } : { value: text }
   })
-  const fileAt = (file: string) => s.written.get(file) ?? (opts.noProfile && file === PROFILE ? undefined : FILES[file])
+  const fileAt = (file: string) => s.written.get(file) ?? ((opts.noProfile && file === PROFILE) || (opts.noOwnRules && file === OWN_RULES) ? undefined : FILES[file])
   on('fs.exists', async ($, e) => ({ value: fileAt(rel(String(e.path))) !== undefined }))
   on('env.get', async ($, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? '/home/u/.claude' : undefined }))
   on('fs.write', async ($, e) => {
@@ -403,7 +425,7 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   await ui.press({ key: 'analyze' })
   expect(s.analyses).toHaveLength(1)
   expect(s.analyses[0]).toContain('Name the finish line.') // the Opus rules file
-  expect(s.analyses[0]).toContain('End with a recap.') // rules/omar.md is sent too
+  expect(s.analyses[0]).toContain('End with a recap.') // your own rules, from the data folder, are sent too
   expect(s.analyses[0]).toContain('think step by step and fix the login thing')
   expect(await ui.find({ type: 'Code', text: '[which file?]' })).toBeDefined()
   // Checklist and Why each change are tabs: the checklist shows first, the reasons one press away, and back.
@@ -712,7 +734,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
-  for (const [key, title] of [['general', 'General'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
+  for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules and tips'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)
     // The title first: semibold, in the normal text color, on no background.
     const label = g?.kids[0] as { type?: string; props?: Record<string, unknown> } | undefined
@@ -727,7 +749,7 @@ test('Settings is laid out like Desktop\'s own: a bold title per section with no
   expect(JSON.stringify(tree)).not.toContain('"borderStyle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
-  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-rules', 'group-week'])
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
   // Statistics moved to the Analytics tab in v0.10.0.
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
   // Rules and tips: the sources first, always listed (no Show sources button), a thin line, then the refresh.
@@ -1169,7 +1191,7 @@ test('/coach refresh writes only the changed rules and tips files on Accept, wit
 
   expect([...s.written.keys()]).toEqual(['rules/general.md', 'tips/sonnet-5-5.md'])
   expect(s.written.get('rules/general.md')).toContain('As of: 2026-10-17')
-  expect(s.written.has('rules/omar.md')).toBe(false)
+  expect(s.written.has(OWN_RULES)).toBe(false)
   expect(saved.has('pendingRefresh')).toBe(false)
   await ui.unmount()
 })
@@ -1665,5 +1687,62 @@ test('Analytics: the statistics first, then a thin line and the tips', async ($,
   expect(text.indexOf('Work on next')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
   expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('Using Opus 5.5 well'))
   expect(await ui.find({ type: 'Markdown', text: 'Run /clear between tasks.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Your rules: Settings lists the rules file in the data folder, and Remove takes a rule out of it and out of the analysis', async ($, on) => {
+  const { s } = world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  expect(await ui.find({ text: new RegExp(`your own rules: ${OWN_RULES}`) })).toBeDefined()
+  await ui.press({ key: 'tab-settings' })
+  const group = JSON.stringify(boxNode(await ui.drawn(), 'group-own-rules'))
+  expect(group).toContain(OWN_RULES)
+  expect(group).toContain('End with a recap.')
+  await ui.press({ key: 'remove-rule-End with a recap.' })
+  expect(s.written.get(OWN_RULES)).toBe('# Your own rules\n\n')
+  expect(await ui.find({ text: 'No rules yet.' })).toBeDefined()
+  expect(await ui.find({ text: 'Removed.' })).toBeDefined()
+  s.box = 'fix the login bug in auth.ts please'
+  await ui.press({ key: 'tab-coach' })
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses[0]).not.toContain('End with a recap.')
+  await ui.unmount()
+})
+
+test('Your rules: with no file yet, the first rule added creates it with a header, and the next analysis sends it', async ($, on) => {
+  const { s } = world(on, { noOwnRules: true })
+  await $.session.start(START)
+  // Nothing is written until a rule is added.
+  expect(s.written.has(OWN_RULES)).toBe(false)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: 'No rules yet.' })).toBeDefined()
+  await ui.input({ key: 'add-rule-0', text: "  Keep the draft's language. " })
+  expect(s.written.get(OWN_RULES)).toBe(`${OWN_RULES_HEADER}- Keep the draft's language.\n`)
+  expect(await ui.find({ text: "Keep the draft's language." })).toBeDefined()
+  expect(await ui.find({ text: /^Added/ })).toBeDefined()
+  // The field starts empty again, and the same rule twice is refused.
+  expect(await ui.find({ type: 'Input', key: 'add-rule-0' })).toBeUndefined()
+  await ui.input({ key: 'add-rule-1', text: "Keep the draft's language." })
+  expect(ownRuleLines(s.written.get(OWN_RULES)!)).toEqual(["Keep the draft's language."])
+  expect(await ui.find({ text: /already in your rules/ })).toBeDefined()
+  s.box = 'fix the login bug in auth.ts please'
+  await ui.press({ key: 'tab-coach' })
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses[0]).toContain("Keep the draft's language.")
+  await ui.unmount()
+})
+
+test('Your rules: the mobile app lists the rules with no field to add one', async ($, on) => {
+  world(on, { surfaces: ['mobile'] })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('mobile'))
+  await ui.press({ key: 'tab-settings' })
+  expect(await ui.find({ text: 'End with a recap.' })).toBeDefined()
+  expect(await ui.find({ text: /Add rules in Desktop/ })).toBeDefined()
   await ui.unmount()
 })
