@@ -181,8 +181,8 @@ describe('refresh helpers', () => {
 
 // ---- The pane, with the engine stubbed beneath the mod ----
 
-/** The reader profile in the stubbed config's data folder (this folder is loaded directly, so `-inline`). */
-const PROFILE = '/home/u/.claude/plugins/data/prompt-coach-inline/profile.yaml'
+/** The reader profile in the stubbed config's data folder: the installed copy's, though this folder is loaded directly. */
+const PROFILE = '/home/u/.claude/plugins/data/prompt-coach-prompt-coach/profile.yaml'
 
 const FILES: Record<string, string> = {
   'rules/general.md': '# General\n\nSource: x\nAs of: 2026-10\n\n- Be explicit.\n',

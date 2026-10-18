@@ -166,10 +166,10 @@ describe('reading', () => {
     expect(editionIds({ '2026-W40': r.edition, '2026-W42': r.edition, '2026-W41': r.edition })).toEqual(['2026-W42', '2026-W41', '2026-W40'])
   })
 
-  test('profilePath is the mod\'s data folder in its config: from the install\'s cache path, or -inline for a folder loaded directly', () => {
+  test('profilePath is the mod\'s data folder in its config: from the install\'s cache path, the same folder for the repo loaded directly', () => {
     expect(profilePath('/Users/o/.claude/plugins/cache/prompt-coach/prompt-coach/0.9.0', 'prompt-coach', '/x')).toBe('/Users/o/.claude/plugins/data/prompt-coach-prompt-coach/profile.yaml')
     expect(profilePath('/Users/o/.claude-personal/plugins/cache/market/coach/1.0.0/', 'coach', '/x')).toBe('/Users/o/.claude-personal/plugins/data/coach-market/profile.yaml')
-    expect(profilePath('/Users/o/projects/prompt-coach', 'prompt-coach', '/Users/o/.claude/')).toBe('/Users/o/.claude/plugins/data/prompt-coach-inline/profile.yaml')
+    expect(profilePath('/Users/o/projects/prompt-coach', 'prompt-coach', '/Users/o/.claude/')).toBe('/Users/o/.claude/plugins/data/prompt-coach-prompt-coach/profile.yaml')
   })
 
   test('archiveRows lists editions newest first, with stories read and voted per edition', () => {

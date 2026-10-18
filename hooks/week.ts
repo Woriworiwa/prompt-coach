@@ -427,11 +427,13 @@ export function archiveRows(editions: Editions, feedback: FeedbackStore, read: R
  * config (`plugins/data/<plugin>-<marketplace>`, the folder Claude Code keeps
  * for a plugin across installs and updates), not the install itself, which an
  * update replaces. An installed copy runs from `plugins/cache/<marketplace>/
- * <plugin>/<version>`, so its folder follows from the root; a folder loaded
- * directly gets Claude Code's `<plugin>-inline` folder in `configDir`.
+ * <plugin>/<version>`, so its folder follows from the root. A folder loaded
+ * directly (a session opened in the repo) uses the installed copy's folder in
+ * `configDir`, `<plugin>-<plugin>` (the repo's marketplace shares its name),
+ * so both read the same profile.
  */
 export function profilePath(root: string, name: string, configDir: string): string {
   const installed = /^(.*)[\\/]plugins[\\/]cache[\\/]([^\\/]+)[\\/]([^\\/]+)[\\/][^\\/]+[\\/]?$/.exec(root)
   if (installed) return `${installed[1]}/plugins/data/${installed[3]}-${installed[2]}/profile.yaml`
-  return `${configDir.replace(/[\\/]$/, '')}/plugins/data/${name}-inline/profile.yaml`
+  return `${configDir.replace(/[\\/]$/, '')}/plugins/data/${name}-${name}/profile.yaml`
 }
