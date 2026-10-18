@@ -450,22 +450,19 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(buttonProps(await ui.drawn(), 'tab-lessons')).toBeUndefined()
   await ui.press({ key: 'tab-settings' })
   expect(textLook(await ui.drawn(), 'Statistics')).toEqual({ found: true, color: undefined, weight: 'semibold' })
-  // Statistics as tables: a header row, then each item with its count on the right.
+  // Statistics as bars: a title per list, then one line per item with its bar and count on the right.
   const asNode = (b: ReturnType<typeof boxNode>) => b && { type: 'Box', props: b.props, children: b.kids }
-  const missing = boxNode(await ui.drawn(), 'table-missing')!
+  const missing = boxNode(await ui.drawn(), 'bars-missing')!
   expect(textLook(asNode(missing), 'Most often missing').weight).toBe('semibold')
-  expect(textLook(asNode(boxNode(asNode(missing), 'table-missing-0')), 'Checklist item')).toEqual({ found: true, color: undefined, weight: 'semibold' })
-  expect(textLook(asNode(boxNode(asNode(missing), 'table-missing-0')), 'Missing or vague in').found).toBe(true)
-  // Each of the four missed items is a row: its name on the left, "1 of 1" on the right.
-  const entries = [1, 2, 3, 4].map(i => boxNode(asNode(missing), `table-missing-${i}`)!)
+  // Each of the four missed items is a line: its name on the left, a full bar and "1 of 1" on the right.
+  const entries = [0, 1, 2, 3].map(i => boxNode(asNode(missing), `bars-missing-${i}`)!)
   const context = entries.find(r => textLook(asNode(r), 'Context').found)!
   expect(context.props.justifyContent).toBe('space-between')
-  expect(textLook(asNode(context), '1 of 1').found).toBe(true)
-  // A thin line between rows, as in the rest of Settings.
-  expect(missing.kids.some(k => (k as { props?: { key?: string } }).props?.key === 'line-table-missing-0')).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-0')), 'Rule').found).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-0')), 'Changed in').found).toBe(true)
-  expect(textLook(asNode(boxNode(await ui.drawn(), 'table-rules-1')), '1 of 1').found).toBe(true)
+  expect(textLook(asNode(context), `${'█'.repeat(15)}  1 of 1`).found).toBe(true)
+  expect(textLook(asNode(boxNode(await ui.drawn(), 'bars-rules-0')), `${'█'.repeat(15)}  1 of 1`).found).toBe(true)
+  // Bars is the only layout: no tables and no Layout switch.
+  expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
+  expect(await ui.find({ key: 'stats-layout' })).toBeUndefined()
   expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
   expect(await ui.find({ text: 'Rules applied most' })).toBeUndefined()
   expect(await ui.find({ text: 'Recent drafts' })).toBeUndefined()
@@ -1554,10 +1551,9 @@ test('Statistics: each Analyze adds its tokens, an unreadable answer too, and Cl
   await ui.press({ key: 'analyze' })
   await ui.press({ key: 'tab-settings' })
   // The stub's usage is 1 input and 1 output token.
-  expect(await ui.find({ text: '2 tokens used by analyses.' })).toBeDefined()
-  expect(await ui.find({ text: 'input 1 · output 1 · about 2 per analysis' })).toBeDefined()
+  expect(await ui.find({ text: '1 analysis · 2 tokens (≈2 each)' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
-  expect(await ui.find({ text: /tokens used by analyses/ })).toBeUndefined()
+  expect(await ui.find({ text: /tokens/ })).toBeUndefined()
   expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
   expect(saved.has('lessons')).toBe(false)
   await ui.unmount()
@@ -1574,7 +1570,7 @@ test('Statistics: an answer that is not an analysis still counts its tokens', as
   expect(l.analyses).toBe(0)
   expect(l.tokens.calls).toBe(1)
   await ui.press({ key: 'tab-settings' })
-  expect(await ui.find({ text: '2 tokens used by analyses.' })).toBeDefined()
+  expect(await ui.find({ text: '0 analyses · 2 tokens (≈2 each)' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1585,67 +1581,38 @@ test('Statistics: statistics saved before v0.9.4 show as before, with a note tha
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-  expect(await ui.find({ text: '2 analyses so far.' })).toBeDefined()
+  expect(await ui.find({ text: '2 analyses' })).toBeDefined()
   expect(await ui.find({ text: 'Tokens are counted from v0.9.4 on.' })).toBeDefined()
   await ui.unmount()
 })
 
-test('Statistics: the Layout switch draws the same figures four ways and is saved', async ($, on) => {
-  const { saved } = world(on, { saved: { lessons: STATS } })
+test('Statistics: bars show the tokens in the opening line and each item scaled to the analyses', async ($, on) => {
+  world(on, { saved: { lessons: STATS } })
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-
-  // Tables, the default: today's tables, the tokens under the count.
-  expect(await ui.find({ type: 'Select', key: 'stats-layout' })).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'table-missing')).toBeDefined()
-  expect(await ui.find({ text: '1,700 tokens used by analyses.' })).toBeDefined()
-  expect(await ui.find({ text: 'input 1,000 · output 500 · cache 200 · about 850 per analysis' })).toBeDefined()
-
-  // Two-column grid: "name: count" cells, half the width each.
-  await ui.select({ key: 'stats-layout', value: 'grid' })
-  expect(saved.get('statsLayout')).toBe('grid')
-  expect(await ui.find({ text: 'Done means: 2 of 2' })).toBeDefined()
-  expect(await ui.find({ text: 'Be explicit: 2 of 2' })).toBeDefined()
-  expect(await ui.find({ text: 'Say why: 1 of 2' })).toBeDefined()
-  expect(await ui.find({ text: 'Total: 1,700' })).toBeDefined()
-  expect(await ui.find({ text: 'Cache: 200' })).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'grid-missing-0')?.props.width).toBe('50%')
-  expect(boxNode(await ui.drawn(), 'table-missing')).toBeUndefined()
-
-  // Side by side: both tables in one row, then the tokens as a table.
-  await ui.select({ key: 'stats-layout', value: 'side' })
-  const side = boxNode(await ui.drawn(), 'side-tables')!
-  expect(side.props.flexDirection).toBe('row')
-  expect(boxNode(await ui.drawn(), 'table-missing')).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'table-rules')).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'table-tokens')).toBeDefined()
-  expect(await ui.find({ text: 'Per analysis' })).toBeDefined()
-
-  // Bars: the tokens in the opening line, a bar per item scaled to the analyses or the top rule.
-  await ui.select({ key: 'stats-layout', value: 'bars' })
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
-  expect(await ui.find({ text: `${'█'.repeat(15)}  2 of 2` })).toBeDefined()
-  expect(await ui.find({ text: `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2` })).toBeDefined()
-  // Rules are scaled to the analyses too, like the gaps.
-  expect(await ui.find({ text: `${'█'.repeat(15)}  2 of 2` })).toBeDefined()
-  expect(await ui.find({ text: `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2` })).toBeDefined()
+  expect(await ui.find({ text: 'What the coach changed most' })).toBeDefined()
+  // "Done means" and "Be explicit" are 2 of 2; "Context" and "Say why" 1 of 2.
+  for (const key of ['bars-missing', 'bars-rules']) {
+    const lines = boxNode(await ui.drawn(), key)!
+    const asNode = { type: 'Box', props: lines.props, children: lines.kids }
+    expect(textLook(asNode, `${'█'.repeat(15)}  2 of 2`).found).toBe(true)
+    expect(textLook(asNode, `${'█'.repeat(8)}${'░'.repeat(7)}  1 of 2`).found).toBe(true)
+  }
   await ui.unmount()
 })
 
-test('Statistics: the saved layout comes back next session; on mobile the switch is buttons; with no analyses there is no switch', async ($, on) => {
-  world(on, { saved: { lessons: STATS, statsLayout: 'grid' }, surfaces: ['mobile'] })
+test('Statistics: on mobile the bars show too, and Clear statistics empties them', async ($, on) => {
+  world(on, { saved: { lessons: STATS }, surfaces: ['mobile'] })
   await $.session.start({ ...START, surface: 'mobile' })
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'tab-settings' })
-  expect(await ui.find({ text: 'Done means: 2 of 2' })).toBeDefined()
-  expect(buttonProps(await ui.drawn(), 'stats-layout-grid')?.label).toBe('[Two-column grid]')
-  await ui.press({ key: 'stats-layout-bars' })
   expect(await ui.find({ text: '2 analyses · 1,700 tokens (≈850 each)' })).toBeDefined()
   await ui.press({ key: 'clear-lessons' })
-  expect(buttonProps(await ui.drawn(), 'stats-layout-bars')).toBeUndefined()
+  expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1655,7 +1622,7 @@ test('Statistics: a rule count saved before v0.9.5, higher than the analyses, sh
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-  expect(textLook(await ui.drawn(), '2 of 2').found).toBe(true)
-  expect(await ui.find({ text: '5 of 2' })).toBeUndefined()
+  expect(textLook(await ui.drawn(), `${'█'.repeat(15)}  2 of 2`).found).toBe(true)
+  expect(await ui.find({ text: /5 of 2/ })).toBeUndefined()
   await ui.unmount()
 })

@@ -13,17 +13,6 @@ export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 
 export type Tab = 'coach' | 'tips' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
-/**
- * How Statistics is drawn. A trial (v0.9.4): Omar compares the four in
- * Desktop and picks one; the others and the switch then go.
- */
-export type StatsLayout = 'tables' | 'grid' | 'side' | 'bars'
-export const STATS_LAYOUTS: readonly { id: StatsLayout; label: string }[] = [
-  { id: 'tables', label: 'Tables' },
-  { id: 'grid', label: 'Two-column grid' },
-  { id: 'side', label: 'Side by side' },
-  { id: 'bars', label: 'Bars' },
-]
 /** Which part of the analysis shows below the buttons. */
 export type Detail = 'checklist' | 'why'
 
@@ -63,7 +52,6 @@ export type View = {
   ownRulesPath: string
   sources: string[]
   lessons: Lessons
-  statsLayout: StatsLayout
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
   /** The model that rewrites files on refresh (the refreshModel setting). */
   refreshModel: string
@@ -133,7 +121,6 @@ export type Actions = {
   submitAnswer: (token: string, value: string) => void
   setModel: (field: ModelSetting, value: string) => void
   clearLessons: () => Promise<void>
-  setStatsLayout: (layout: StatsLayout) => Promise<void>
   refresh: () => Promise<void> | undefined
   rewriteAll: () => Promise<void> | undefined
   accept: () => Promise<void>
@@ -519,10 +506,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       gap: 'xl',
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote),
-        settingsGroup(E, v, 'statistics', 'Statistics', [
-          ...(v.lessons.analyses || tokenSummary(v.lessons) ? [statsLayoutSetting(E, v, a, F)] : []),
-          block(E, 'statistics', statistics(E, v, a)),
-        ]),
+        settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
         settingsGroup(E, v, 'rules', 'Rules and tips', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))]),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F)),
       ],
@@ -646,28 +630,10 @@ function modelSetting(
   return settingRow(E, field, label, help, control)
 }
 
-/** The Layout switch at the top of Statistics (the v0.9.4 trial): a dropdown, or buttons on mobile. */
-function statsLayoutSetting(E: UI, v: View, a: Actions, F?: Form): RenderElement {
-  const control = F
-    ? F.Select({
-        key: 'stats-layout',
-        options: STATS_LAYOUTS.map(l => ({ value: l.id, label: l.label })),
-        value: v.statsLayout,
-        onSelect: id => void a.setStatsLayout(STATS_LAYOUTS.find(l => l.id === id)?.id ?? 'tables'),
-      })
-    : row(
-        E,
-        STATS_LAYOUTS.map(l =>
-          E.Button({ key: `stats-layout-${l.id}`, label: l.id === v.statsLayout ? `[${l.label}]` : l.label, plain: true, onPress: () => a.setStatsLayout(l.id) }),
-        ),
-      )
-  return settingRow(E, 'stats-layout', 'Layout', 'Four ways to show these statistics, to compare. Pick one, and the rest go.', control)
-}
-
 /**
  * What the analyses so far add up to: the checklist items drafts most often
- * miss, the rules applied most, and the tokens the analyses used, in the
- * chosen layout. Then a reset.
+ * miss, what the coach changed most, and the tokens the analyses used, as
+ * bars (Omar's pick from the v0.9.4 layout trial). Then a reset.
  */
 function statistics(E: UI, v: View, a: Actions): RenderElement[] {
   const l = v.lessons
@@ -676,12 +642,7 @@ function statistics(E: UI, v: View, a: Actions): RenderElement[] {
   const gaps = top(l.gaps, 4)
   // Counted once per analysis since v0.9.5; an older count may be higher, so it's capped at the analyses.
   const rules = top(l.rules, 4).map(([rule, n]): [string, number] => [rule, Math.min(n, l.analyses)])
-  const body =
-    v.statsLayout === 'grid' ? statsGrid(E, v, l, gaps, rules)
-    : v.statsLayout === 'side' ? statsSide(E, v, l, gaps, rules)
-    : v.statsLayout === 'bars' ? statsBars(E, l, gaps, rules)
-    : statsTables(E, v, l, gaps, rules)
-  return [...body, E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearLessons })]
+  return [...statsBars(E, l, gaps, rules), E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearLessons })]
 }
 
 const MISSING_EMPTY = 'Nothing yet. Your drafts have covered the checklist.'
@@ -700,78 +661,6 @@ function tokenRows(l: Lessons): [string, string][] {
     ['Input', fmt(t.input)],
     ['Output', fmt(t.output)],
     ...(t.cache ? [['Cache', fmt(t.cache)] as [string, string]] : []),
-  ]
-}
-
-/** Tables: the two stacked tables as before, with the tokens as a line and a dim breakdown under the count. */
-function statsTables(E: UI, v: View, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
-  const t = tokenSummary(l)
-  const tokens = t
-    ? [
-        E.Box({
-          key: 'stats-tokens',
-          flexDirection: 'column',
-          children: [
-            text(E, `${fmt(t.total)} tokens used by analyses.`),
-            text(E, `input ${fmt(t.input)} · output ${fmt(t.output)}${t.cache ? ` · cache ${fmt(t.cache)}` : ''} · about ${fmt(t.perCall)} per analysis`, { dimColor: true, wrap: 'wrap' }),
-          ],
-        }),
-      ]
-    : [text(E, NO_TOKENS_YET, { dimColor: true })]
-  return [
-    analysesLine(E, l),
-    ...tokens,
-    statTable(E, v, 'missing', 'Most often missing', ['Checklist item', 'Missing or vague in'], gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY),
-    statTable(E, v, 'rules', RULES_TITLE, ['Rule', 'Changed in'], rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.'),
-  ]
-}
-
-/** Two-column grid: each group a title, then "name: count" cells two to a line; tokens are a group too. */
-function statsGrid(E: UI, v: View, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
-  const grid = (key: string, title: string, cells: [string, string][], empty: string) =>
-    E.Box({
-      key: `grid-${key}`,
-      flexDirection: 'column',
-      gap: 1,
-      children: [
-        text(E, title, { weight: 'semibold' }),
-        cells.length
-          ? E.Box({
-              key: `grid-${key}-cells`,
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              rowGap: 1,
-              children: cells.map(([name, value], i) =>
-                E.Box({ key: `grid-${key}-${i}`, width: '50%', paddingRight: 2, children: [text(E, `${name}: ${value}`, { wrap: 'wrap' })] }),
-              ),
-            })
-          : text(E, empty, { dimColor: true, wrap: 'wrap' }),
-      ],
-    })
-  return [
-    analysesLine(E, l),
-    grid('missing', 'Most often missing', gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY),
-    ...hairline(E, v, 'grid-1'),
-    grid('rules', RULES_TITLE, rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.'),
-    ...hairline(E, v, 'grid-2'),
-    grid('tokens', 'Tokens used by analyses', tokenRows(l), NO_TOKENS_YET),
-  ]
-}
-
-/** Side by side: the two tables next to each other, half the width each, then the tokens as a small table. */
-function statsSide(E: UI, v: View, l: Lessons, gaps: [string, number][], rules: [string, number][]): RenderElement[] {
-  const half = (key: string, table: RenderElement) => E.Box({ key: `side-${key}`, width: '50%', paddingRight: 2, children: [table] })
-  return [
-    analysesLine(E, l),
-    E.Box({
-      key: 'side-tables',
-      flexDirection: 'row',
-      children: [
-        half('missing', statTable(E, v, 'missing', 'Most often missing', ['Item', 'Missing in'], gaps.map(([item, n]) => [item, `${n} of ${l.analyses}`]), MISSING_EMPTY)),
-        half('rules', statTable(E, v, 'rules', RULES_TITLE, ['Rule', 'Changed in'], rules.map(([rule, n]) => [rule, `${n} of ${l.analyses}`]), 'None yet.')),
-      ],
-    }),
-    statTable(E, v, 'tokens', 'Tokens used by analyses', ['Kind', 'Tokens'], tokenRows(l), NO_TOKENS_YET),
   ]
 }
 

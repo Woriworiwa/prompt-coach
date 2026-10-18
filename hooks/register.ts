@@ -41,7 +41,7 @@ import {
   stampAsOf,
   toFetchUrl,
 } from './refresh.ts'
-import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, STATS_LAYOUTS, type StatsLayout, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
+import { type Detail, type ElementCache, type Form, type Mode, type ModelSetting, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
   type FeedbackStore,
@@ -86,7 +86,6 @@ const STORE = {
   weekFeedback: 'weekFeedback',
   weekRead: 'weekRead',
   weekJob: 'weekJob',
-  statsLayout: 'statsLayout',
 } as const
 /** How long the draft preview waits after typing stops, outside live mode. */
 const PREVIEW_DEBOUNCE_MS = 400
@@ -129,8 +128,6 @@ let isRunning = false
 let status = ''
 let liveCalls = 0
 let lessons: Lessons = NO_LESSONS
-/** How Statistics is drawn (the v0.9.4 layout trial). */
-let statsLayout: StatsLayout = 'tables'
 let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
 const buttons = new Map<string, ElementCache>()
@@ -198,8 +195,6 @@ export const register: Register = (on, options) => {
     })
     mode = (await $.store.get(STORE.mode)) === 'live' ? 'live' : 'manual'
     lessons = asLessons(await $.store.get(STORE.lessons))
-    const layout = await $.store.get(STORE.statsLayout)
-    statsLayout = STATS_LAYOUTS.find(l => l.id === layout)?.id ?? 'tables'
     const pending = (await $.store.get(STORE.pending)) as { results?: unknown; seen?: unknown } | undefined
     if (pending && Array.isArray(pending.results)) {
       refresh = { isRunning: false, progress: 'Proposed updates from your last refresh, not yet accepted.', results: pending.results as RefreshResult[] }
@@ -356,7 +351,6 @@ export const register: Register = (on, options) => {
       rulesAsOf,
       sources,
       lessons,
-      statsLayout,
       refresh,
       refreshModel,
       settings: {
@@ -405,11 +399,6 @@ export const register: Register = (on, options) => {
       },
       setModel: (field, value) => setModelSetting($, field, value),
       clearLessons: () => clearLessons($),
-      setStatsLayout: async layout => {
-        statsLayout = layout
-        $.ui.invalidate('ui.render')
-        await $.store.set(STORE.statsLayout, layout)
-      },
       refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
       rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
       accept: () => acceptRefresh($),
