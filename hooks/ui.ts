@@ -45,7 +45,6 @@ export type View = {
   /** Changes with each analysis, so its fields start empty. */
   formGen: number
   /** Claude's last reply as the analysis read it; undefined at the start of a conversation. */
-  analyzedReply?: { chars: number; isCut: boolean }
   /** True when the prompt box no longer holds the draft that was analyzed. */
   isStale: boolean
   liveCalls: number
@@ -317,10 +316,6 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   if (v.analysis) {
     const an = v.analysis
     if (v.isStale) out.push(text(E, 'Your draft changed since this rewrite. Press Rewrite to update it.', { dimColor: true }))
-    if (v.analyzedReply) {
-      const cut = v.analyzedReply.isCut ? ' It was long, so only its start and end were read.' : ''
-      out.push(text(E, `Read as a reply to Claude's last message.${cut}`, { dimColor: true, wrap: 'wrap' }))
-    }
 
     const { rows, after } = checklistWithFixes(E, v, a, an)
     out.push(settingsGroup(E, v, 'checklist', 'Checklist', rows, after, true))
@@ -535,7 +530,7 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
   // No "Fill in the gaps" heading since v0.26.0: each question stands on its own.
   const out: RenderElement[] = []
   if (!F) {
-    out.push(text(E, `Fill these in after Copy to prompt: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' }))
+    out.push(E.Box({ key: 'gaps-later', paddingLeft: 2, children: [text(E, `Fill these in after Copy to prompt: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' })] }))
     return out
   }
   for (const [i, p] of placeholders.entries()) {
@@ -569,7 +564,8 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
     if (v.removed.includes(p.token)) {
       fields.push(text(E, 'Removed from the rewrite, with its sentence. Type or pick an answer to bring it back.', { color: 'warning', wrap: 'wrap' }))
     }
-    out.push(E.Box({ key: id, flexDirection: 'column', children: fields }))
+    // Indented like the suggestions under it (v0.26.1).
+    out.push(E.Box({ key: id, flexDirection: 'column', paddingLeft: 2, children: fields }))
   }
   return out
 }

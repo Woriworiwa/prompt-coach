@@ -534,7 +534,7 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   await ui.unmount()
 })
 
-test('inside a conversation, Analyze sends Claude\'s last reply and the pane says so', async ($, on) => {
+test('inside a conversation, Rewrite sends Claude\'s last reply, and the pane shows no note about it (v0.26.1)', async ($, on) => {
   const { s } = world(on)
   s.transcript = [
     { role: 'user', text: 'the login test fails' },
@@ -547,7 +547,7 @@ test('inside a conversation, Analyze sends Claude\'s last reply and the pane say
   expect(await ui.find({ text: /Read as a reply/ })).toBeUndefined()
   await ui.press({ key: 'analyze' })
   expect(s.analyses[0]).toContain('<previous_reply>\nTwo fixes: 1. reset the session, 2. widen the timeout. Which one?\n</previous_reply>')
-  expect(await ui.find({ text: /Read as a reply to Claude's last message/ })).toBeDefined()
+  expect(await ui.find({ text: /Read as a reply/ })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -1035,6 +1035,8 @@ test('Fill in the gaps: the dropdown and the text field share one line', async (
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
+  // Indented like the suggestions (v0.26.1).
+  expect(boxNode(await ui.drawn(), 'gap-1-0')?.props.paddingLeft).toBe(2)
   const line = boxNode(await ui.drawn(), 'gap-1-0-fields')!
   expect(line.props.flexDirection).toBe('row')
   expect(line.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['gap-1-0-pick', 'gap-1-0-type'])

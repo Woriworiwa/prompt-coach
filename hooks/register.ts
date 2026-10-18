@@ -134,7 +134,6 @@ let edited: string | undefined
 let rewriteShown = ''
 let rewriteGen = 0
 /** Claude's last reply as the last analysis read it: its length, and whether it was cut. Undefined at the start of a conversation. */
-let analyzedReply: { chars: number; isCut: boolean } | undefined
 let isRunning = false
 let status = ''
 let liveCalls = 0
@@ -373,7 +372,6 @@ export const register: Register = (on, options) => {
       added,
       removed: droppedGaps(),
       formGen,
-      analyzedReply,
       // An empty box after sending is not a changed draft.
       isStale: !!analysis && !!draft.trim() && draft.trim() !== analyzedText.trim(),
       ownRules: { path: ownRulesPath(), rules: ownRules, note: ownRulesNote, gen: ruleGen },
@@ -616,7 +614,6 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     removed = []
     edited = undefined
     formGen += 1
-    analyzedReply = previous.text ? { chars: previous.text.length, isCut: previous.isCut } : undefined
     status = ''
     analyzedAt = await $.clock.now()
     if (STATS_ON) {
