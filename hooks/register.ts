@@ -374,6 +374,7 @@ export const register: Register = (on, options) => {
       analyzedReply,
       // An empty box after sending is not a changed draft.
       isStale: !!analysis && !!draft.trim() && draft.trim() !== analyzedText.trim(),
+      canAnalyze: canAnalyze(),
       ownRules: { path: ownRulesPath(), rules: ownRules, note: ownRulesNote, gen: ruleGen },
       ruleList: {
         general: ruleFiles['general.md'] ?? [],
@@ -539,9 +540,19 @@ async function typingPaused($: EngineInterface): Promise<void> {
   $.ui.invalidate('ui.render')
 }
 
+/** Analyze is grayed out while one runs and once the draft is analyzed, until the draft changes. */
+function canAnalyze(): boolean {
+  return !isRunning && !(analysis && draft.trim() === analyzedText.trim())
+}
+
 async function analyzeNow($: EngineInterface): Promise<void> {
   const text = (await $.prompt.read()).text
   draft = text
+  // A grayed-out Analyze does nothing, its hotkey included.
+  if (!canAnalyze()) {
+    $.ui.invalidate('ui.render')
+    return
+  }
   if (!text.trim()) {
     status = 'Type a draft in the prompt box first.'
     $.ui.invalidate('ui.render')

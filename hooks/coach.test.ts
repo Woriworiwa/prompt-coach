@@ -498,13 +498,15 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(await ui.find({ key: 'detail-why' })).toBeUndefined()
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
   expect(await ui.find({ text: 'Name the finish line' })).toBeDefined()
-  // The rewrite box comes right after the draft box, before the buttons and the checklist.
+  // Analyze sits right under the draft box (v0.22.0), then the rewrite, then Copy to prompt and Send, then the checklist.
   const order = (await ui.findAll({})).filter(el => ['Code', 'Input', 'Text', 'Button'].includes(el.type)).map(el => el.text ?? '')
   const draftAt = order.findIndex(t => t.includes('think step by step and fix the login thing'))
   const rewriteAt = order.findIndex(t => t.includes('Fix the login bug in [which file?]'))
   expect(draftAt).toBeGreaterThan(-1)
   expect(rewriteAt).toBeGreaterThan(draftAt)
-  expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Analyze'))
+  expect(order.findIndex(t => t === 'Analyze')).toBeGreaterThan(draftAt)
+  expect(rewriteAt).toBeGreaterThan(order.findIndex(t => t === 'Analyze'))
+  expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Copy to prompt'))
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.
   expect(s.analysisSystems[0]).not.toContain('<tips>')
@@ -963,7 +965,30 @@ test('on mobile the model choices are buttons, and Sources lists the pages under
   await ui.unmount()
 })
 
-test('Apply sits right before Apply and send, and fills the box without sending', async ($, on) => {
+test('Analyze is grayed out once the draft is analyzed, does nothing then, and wakes when the draft changes', async ($, on) => {
+  const { s, clock } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses).toHaveLength(1)
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(true)
+  // Pressed again with the same draft: no second analysis.
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses).toHaveLength(1)
+  // Typing a change wakes it once the typing pauses, before any press.
+  await type($, s, 'fix the login thing in auth.ts')
+  await clock.advance(500)
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses).toHaveLength(2)
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(true)
+  await ui.unmount()
+})
+
+test('Copy to prompt sits right before Send, and fills the box without sending', async ($, on) => {
   const { s } = world(on)
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -973,7 +998,8 @@ test('Apply sits right before Apply and send, and fills the box without sending'
   await ui.press({ key: 'analyze' })
   const keys = (await ui.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key)
   expect(keys.indexOf('fill')).toBe(keys.indexOf('apply') - 1)
-  expect(await ui.find({ key: 'fill', text: 'Apply' })).toBeDefined()
+  expect(await ui.find({ key: 'fill', text: 'Copy to prompt' })).toBeDefined()
+  expect(await ui.find({ key: 'apply', text: 'Send' })).toBeDefined()
 
   await ui.press({ key: 'fill' })
   const rewrite = 'Fix the login bug in [which file?]. Done means the login test passes.'

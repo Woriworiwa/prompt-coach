@@ -48,6 +48,8 @@ export type View = {
   analyzedReply?: { chars: number; isCut: boolean }
   /** True when the prompt box no longer holds the draft that was analyzed. */
   isStale: boolean
+  /** False while an analysis runs and after one, until the draft changes: Analyze is then grayed out. */
+  canAnalyze: boolean
   liveCalls: number
   rulesAsOf: string
   ownRules: OwnRules
@@ -284,6 +286,19 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   out.push(heading(E, 'Your draft'))
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
+  // Analyze sits under the draft it reads. Mods have no disabled Button, so a dim label and a press that does nothing stand in for one.
+  out.push(
+    row(E, [
+      E.Button({
+        key: 'analyze',
+        label: v.isRunning ? 'Analyzing…' : 'Analyze',
+        hotkey: 'a',
+        ...(v.canAnalyze ? (v.analysis ? {} : { variant: 'primary' as const }) : { dimColor: true }),
+        onPress: a.analyze,
+      }),
+    ]),
+  )
+  if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Analyzing') ? 'suggestion' : 'warning' }))
   // The rewrite sits right under the draft, so the two read side by side.
   if (v.analysis) {
     out.push(heading(E, 'Rewrite'))
@@ -291,24 +306,15 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
   }
 
-  out.push(
-    row(E, [
-      E.Button({
-        key: 'analyze',
-        label: v.isRunning ? 'Analyzing…' : 'Analyze',
-        hotkey: 'a',
-        ...(v.analysis ? {} : { variant: 'primary' as const }),
-        onPress: a.analyze,
-      }),
-      ...(v.analysis
-        ? [
-            E.Button({ key: 'fill', label: 'Apply', onPress: a.fill }),
-            E.Button({ key: 'apply', label: 'Apply and send', hotkey: 'p', variant: 'primary', onPress: a.apply }),
-          ]
-        : []),
-    ]),
-  )
-  if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Analyzing') ? 'suggestion' : 'warning' }))
+  // Copy to prompt only fills the prompt box; Send fills it and sends.
+  if (v.analysis) {
+    out.push(
+      row(E, [
+        E.Button({ key: 'fill', label: 'Copy to prompt', onPress: a.fill }),
+        E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply }),
+      ]),
+    )
+  }
 
   if (v.analysis) {
     const an = v.analysis
