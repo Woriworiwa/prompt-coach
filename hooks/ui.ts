@@ -545,8 +545,10 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
   for (const [i, p] of placeholders.entries()) {
     const id = `gap-${v.formGen}-${i}`
     const fields: RenderElement[] = [text(E, p.question, { weight: 'semibold', wrap: 'wrap' })]
+    // The dropdown and the text field share one line (v0.25.2), wrapping only when the pane is too narrow.
+    const controls: RenderElement[] = []
     if (p.options.length) {
-      fields.push(
+      controls.push(
         F.Select({
           key: `${id}-pick`,
           label: 'Pick',
@@ -556,7 +558,7 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
         }),
       )
     }
-    fields.push(
+    controls.push(
       F.Input({
         key: `${id}-type`,
         label: p.options.length ? 'Or type' : 'Answer',
@@ -567,6 +569,7 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
         onSubmit: value => a.submitAnswer(p.token, value),
       }),
     )
+    fields.push(E.Box({ key: `${id}-fields`, flexDirection: 'row', alignItems: 'center', columnGap: 2, flexWrap: 'wrap', children: controls }))
     if (v.removed.includes(p.token)) {
       fields.push(text(E, 'Removed from the rewrite, with its sentence. Type or pick an answer to bring it back.', { color: 'warning', wrap: 'wrap' }))
     }

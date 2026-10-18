@@ -1021,6 +1021,19 @@ test('Analyze is always active: no gray look, and a second press with the same d
   await ui.unmount()
 })
 
+test('Fill in the gaps: the dropdown and the text field share one line', async ($, on) => {
+  const { s } = world(on, { analysis: WITH_GAPS })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const line = boxNode(await ui.drawn(), 'gap-1-0-fields')!
+  expect(line.props.flexDirection).toBe('row')
+  expect(line.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['gap-1-0-pick', 'gap-1-0-type'])
+  await ui.unmount()
+})
+
 test('Copy to prompt sits right before Send, and fills the box without sending', async ($, on) => {
   const { s } = world(on)
   s.box = 'fix the login thing'
