@@ -17,6 +17,7 @@ import {
   fillPlaceholders,
   removeSentences,
   withAdditions,
+  withoutAddition,
   isPersonPrompt,
   lastReply,
   liveSkipReason,
@@ -126,6 +127,11 @@ let added: number[] = []
 /** Gaps Omar chose to drop (Enter in an empty field): their sentences leave the rewrite until they get an answer. */
 let removed: string[] = []
 let formGen = 0
+/** The rewrite as the person edited it in the pane; undefined until they type in it. */
+let edited: string | undefined
+/** The rewrite field's text as last drawn, and a count that changes its key whenever the code changes that text. */
+let rewriteShown = ''
+let rewriteGen = 0
 /** Claude's last reply as the last analysis read it: its length, and whether it was cut. Undefined at the start of a conversation. */
 let analyzedReply: { chars: number; isCut: boolean } | undefined
 let isRunning = false
@@ -358,6 +364,7 @@ export const register: Register = (on, options) => {
       isRunning,
       analysis,
       filledRewrite: filled(),
+      rewriteKey: rewriteKey(),
       typed,
       picked,
       added,
@@ -412,12 +419,22 @@ export const register: Register = (on, options) => {
       fill: () => (analysis ? fillRewrite($, filled()) : undefined),
       apply: () => (analysis ? applyRewrite($, filled()) : undefined),
       toggleAddition: index => {
-        added = added.includes(index) ? added.filter(i => i !== index) : [...added, index]
+        const isAdded = added.includes(index)
+        const s = analysis?.additions[index]
+        // Once edited, Add and Remove work on the person's text, not the model's rewrite.
+        if (edited !== undefined && s) edited = isAdded ? withoutAddition(edited, s.text) : withAdditions(edited, [s], [0])
+        added = isAdded ? added.filter(i => i !== index) : [...added, index]
         $.ui.invalidate('ui.render')
       },
       pick: (token, value) => {
         picked = { ...picked, [token]: value }
         if (value !== NO_PICK) removed = removed.filter(t => t !== token)
+        $.ui.invalidate('ui.render')
+      },
+      // Each keystroke in the rewrite is only noted, as in the gap fields; Enter redraws.
+      editRewrite: value => editRewrite(value),
+      submitRewrite: value => {
+        editRewrite(value)
         $.ui.invalidate('ui.render')
       },
       // Each keystroke is only noted: a redraw per key would replace the field being typed in.
@@ -573,6 +590,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     picked = {}
     added = []
     removed = []
+    edited = undefined
     formGen += 1
     analyzedReply = previous.text ? { chars: previous.text.length, isCut: previous.isCut } : undefined
     status = ''
@@ -597,8 +615,34 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
 function filled(): string {
   if (!analysis) return ''
   const answers = answersFor(analysis.placeholders, typed, picked)
-  const rewrite = removeSentences(withAdditions(analysis.rewrite, analysis.additions, added), droppedGaps())
-  return fillPlaceholders(rewrite, answers)
+  const base = edited ?? withAdditions(analysis.rewrite, analysis.additions, added)
+  return fillPlaceholders(removeSentences(base, droppedGaps()), answers)
+}
+
+/**
+ * The person's own text for the rewrite. It replaces the model's from here on:
+ * gaps still in it can be filled, and Add and Remove change it. A suggestion
+ * counts as added while its sentence is in the text.
+ */
+function editRewrite(value: string): void {
+  if (!analysis) return
+  edited = value
+  added = analysis.additions.flatMap((s, i) => (value.includes(s.text) ? [i] : []))
+}
+
+/**
+ * The rewrite field's key. A field kept under one key keeps the text it was
+ * first drawn with, so whenever the text changed since the last drawing (a gap
+ * answer, Add, or the person's own typing, which redraws only on Enter or
+ * another action), it gets a new key and is drawn afresh with the text.
+ */
+function rewriteKey(): string {
+  const value = filled()
+  if (value !== rewriteShown) {
+    rewriteShown = value
+    rewriteGen += 1
+  }
+  return `rewrite-${formGen}-${rewriteGen}`
 }
 
 /** The gaps to drop: chosen with an empty Enter and still without an answer (an answer typed since wins). */

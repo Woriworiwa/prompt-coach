@@ -31,6 +31,8 @@ export type View = {
   analysis?: Analysis
   /** The rewrite with the answers filled in so far. */
   filledRewrite: string
+  /** The rewrite field's key; it changes whenever the field's text changed since it was drawn. */
+  rewriteKey: string
   /** What was typed and picked for each placeholder, by its token. */
   typed: Record<string, string>
   picked: Record<string, string>
@@ -137,6 +139,8 @@ export type Actions = {
   fill: () => Promise<void> | undefined
   apply: () => Promise<void> | undefined
   toggleAddition: (index: number) => void
+  editRewrite: (value: string) => void
+  submitRewrite: (value: string) => void
   pick: (token: string, value: string) => void
   type: (token: string, value: string) => void
   submitAnswer: (token: string, value: string) => void
@@ -281,7 +285,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   // The rewrite sits right under the draft, so the two read side by side.
   if (v.analysis) {
     out.push(heading(E, 'Rewrite'))
-    out.push(code(E, v.filledRewrite))
+    out.push(F ? rewriteField(F, v, a) : code(E, v.filledRewrite))
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
   }
 
@@ -488,6 +492,19 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
       ]),
       text(E, s.text, { dimColor: true, wrap: 'wrap' }),
     ],
+  })
+}
+
+/** The rewrite as a field the person can edit before Apply; its height follows the text, 3 to 12 lines. */
+function rewriteField(F: Form, v: View, a: Actions): RenderElement {
+  const lines = v.filledRewrite.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 60)), 0)
+  return F.Input({
+    key: v.rewriteKey,
+    value: v.filledRewrite,
+    rows: Math.min(12, Math.max(3, lines)),
+    submitLabel: 'keep',
+    onInput: value => a.editRewrite(value),
+    onSubmit: value => a.submitRewrite(value),
   })
 }
 

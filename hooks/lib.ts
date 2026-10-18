@@ -343,6 +343,15 @@ export function withAdditions(rewrite: string, additions: Addition[], chosen: re
   return body + (body.includes('\n') ? '\n' : ' ') + added.join(' ')
 }
 
+/** `text` without the sentence `sentence` (a suggestion added earlier), and without the space or line it leaves. */
+export function withoutAddition(text: string, sentence: string): string {
+  const at = text.lastIndexOf(sentence)
+  if (at < 0) return text
+  const before = text.slice(0, at).replace(/[ \t]+$/, '')
+  const after = text.slice(at + sentence.length)
+  return (before.endsWith('\n') && after.startsWith('\n') ? before + after.slice(1) : before + after).trimEnd()
+}
+
 /** A `[placeholder]` in a rewrite; not a Markdown link's text. */
 const PLACEHOLDER = /\[[^[\]\n]{1,120}\](?!\()/g
 
