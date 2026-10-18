@@ -355,6 +355,7 @@ export const register: Register = (on, options) => {
     const now = await $.clock.now()
     const view: View = {
       surface: e.surface,
+      columns: e.viewport?.columns,
       tab,
       mode,
       modelLabel,

@@ -27,7 +27,7 @@ import {
   parseChecklist,
   withoutChecklist,
 } from './lib.ts'
-import { BAR_CELLS, barCount, barRuns } from './ui.ts'
+import { BAR_CELLS, barCount, barRuns, rowsFor } from './ui.ts'
 import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
 import { parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
@@ -121,6 +121,15 @@ describe('suggestions', () => {
     expect(withAdditions('Fix it.', adds, [1, 0])).toBe('Fix it. First. Second.')
     expect(withAdditions('Fix it.\nThen test.\n', adds, [1])).toBe('Fix it.\nThen test.\nSecond.')
     expect(withAdditions('Fix it.', adds, [])).toBe('Fix it.')
+  })
+
+  test('rowsFor gives the rewrite field room for its text and one spare line, up to 12 lines, past which it scrolls', () => {
+    expect(rowsFor('Fix it.')).toBe(2)
+    expect(rowsFor('a'.repeat(600))).toBe(11) // 60 a line when the surface hasn't said
+    expect(rowsFor('a'.repeat(600), 200)).toBe(11) // a wide window still wraps at 60
+    expect(rowsFor('a'.repeat(400), 44)).toBe(11) // a narrow pane: 40 a line
+    expect(rowsFor('a'.repeat(600), 44)).toBe(12) // 16 needed: capped, the rest scrolls
+    expect(rowsFor('One.\n\nTwo.')).toBe(4)
   })
 
   test('withoutAddition takes a suggestion back out of an edited rewrite, with the space or line it left', () => {

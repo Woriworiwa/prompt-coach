@@ -31,6 +31,8 @@ export type View = {
   analysis?: Analysis
   /** The rewrite with the answers filled in so far. */
   filledRewrite: string
+  /** The surface's width in cells, when it has said; sizes the rewrite field. */
+  columns?: number
   /** The rewrite field's key; it changes whenever the field's text changed since it was drawn. */
   rewriteKey: string
   /** What was typed and picked for each placeholder, by its token. */
@@ -285,7 +287,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   // The rewrite sits right under the draft, so the two read side by side.
   if (v.analysis) {
     out.push(heading(E, 'Rewrite'))
-    out.push(F ? rewriteField(F, v, a) : code(E, v.filledRewrite))
+    out.push(F ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
   }
 
@@ -495,16 +497,38 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
   })
 }
 
-/** The rewrite as a field the person can edit before Apply; its height follows the text, 3 to 12 lines. */
-function rewriteField(F: Form, v: View, a: Actions): RenderElement {
-  const lines = v.filledRewrite.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 60)), 0)
-  return F.Input({
-    key: v.rewriteKey,
-    value: v.filledRewrite,
-    rows: Math.min(12, Math.max(3, lines)),
-    submitLabel: 'keep',
-    onInput: value => a.editRewrite(value),
-    onSubmit: value => a.submitRewrite(value),
+/**
+ * The lines a field needs to show all of `text`: each line wrapped at a width
+ * a little under the pane's (40 to 60 characters, 60 when the surface hasn't
+ * said), plus one spare line, so a guess on the short side never hides text.
+ * At most `REWRITE_MAX_ROWS`; a longer text scrolls within the field.
+ */
+export function rowsFor(text: string, columns?: number): number {
+  const width = Math.min(60, Math.max(40, (columns ?? 64) - 4))
+  const lines = text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / width)), 0) + 1
+  return Math.min(REWRITE_MAX_ROWS, lines)
+}
+
+/** The rewrite field's tallest; past it the field scrolls. */
+export const REWRITE_MAX_ROWS = 12
+
+/** The rewrite as a field the person can edit before Apply, across the pane's full width and as tall as its text, up to 12 lines. */
+function rewriteField(E: UI, F: Form, v: View, a: Actions): RenderElement {
+  return E.Box({
+    key: 'rewrite-field',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    width: '100%',
+    children: [
+      F.Input({
+        key: v.rewriteKey,
+        value: v.filledRewrite,
+        rows: rowsFor(v.filledRewrite, v.columns),
+        submitLabel: 'keep',
+        onInput: value => a.editRewrite(value),
+        onSubmit: value => a.submitRewrite(value),
+      }),
+    ],
   })
 }
 
