@@ -5,7 +5,6 @@ import {
   LIVE_DEBOUNCE_MS,
   SYSTEM,
   answersFor,
-  asOfDate,
   buildAnalysisRequest,
   buildRequest,
   NO_PICK,
@@ -97,6 +96,8 @@ const STORE = {
 const PREVIEW_DEBOUNCE_MS = 400
 /** How often an open pane checks whether the session's model changed. */
 const MODEL_POLL_MS = 5000
+/** How often the open pane reads the prompt box. */
+const DRAFT_POLL_MS = 1000
 
 let rewriteModel = 'sonnet'
 /** The choices plugin.json declares for the two model settings. */
@@ -144,6 +145,8 @@ let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
 const buttons = new Map<string, ElementCache>()
 let modelPoll: Timer | undefined
+/** Reads the prompt box while the pane is open, so the draft follows typing even where no edit event arrives. */
+let draftPoll: Timer | undefined
 
 // What the session's model gives the pane, refreshed when the model changes.
 let model = ''
@@ -153,7 +156,6 @@ let isSynced = false
 let answeredModel = ''
 let modelLabel = ''
 let hasModelRules = false
-let rulesAsOf = ''
 let sources: string[] = []
 /** The shipped rule files as sections, by file name (general.md and each model's), for the Analytics tab's rules list. */
 let ruleFiles: Record<string, RuleSection[]> = {}
@@ -384,7 +386,6 @@ export const register: Register = (on, options) => {
         open: rulesOpen,
       },
       liveCalls,
-      rulesAsOf,
       sources,
       analytics,
       refresh,
@@ -499,11 +500,13 @@ export const register: Register = (on, options) => {
 async function openPane($: EngineInterface): Promise<void> {
   await syncModel($)
   await loadOwnRules($)
-  draft = (await $.prompt.read()).text
+  noteDraft((await $.prompt.read()).text)
   const opened = await $.ui.open({ id: PANE, title: 'Prompt Coach', closeOnEscape: true })
   isPaneOpen = true
   modelPoll?.cancel()
   modelPoll = $.clock.every(MODEL_POLL_MS, () => void pollModel($))
+  draftPoll?.cancel()
+  draftPoll = $.clock.every(DRAFT_POLL_MS, () => void pollDraft($))
   if (!opened.isPlaced) $.ui.toast(`The coach pane is open but not shown yet: ${opened.reason}`)
   $.ui.invalidate('ui.render')
 }
@@ -513,12 +516,32 @@ function closed(): void {
   buttons.clear()
   pauseTimer?.cancel()
   modelPoll?.cancel()
+  draftPoll?.cancel()
   pauseTimer = undefined
   modelPoll = undefined
+  draftPoll = undefined
+}
+
+/**
+ * Takes `text` from the prompt box as the draft. Once a draft is analyzed, an
+ * empty box doesn't clear it: it stays on screen until typing starts (a
+ * non-empty, different text). Sending clears it on its own. True when it changed.
+ */
+function noteDraft(text: string): boolean {
+  if (!text.trim() && analysis && draft.trim()) return false
+  if (text === draft) return false
+  draft = text
+  return true
+}
+
+/** The prompt box as it is now: a typed change shows at once and wakes Analyze. */
+async function pollDraft($: EngineInterface): Promise<void> {
+  if (isRunning) return
+  if (noteDraft((await $.prompt.read()).text)) $.ui.invalidate('ui.render')
 }
 
 function draftChanged($: EngineInterface, text: string): void {
-  draft = text
+  noteDraft(text)
   pauseTimer?.cancel()
   pauseTimer = $.clock.after(mode === 'live' ? LIVE_DEBOUNCE_MS : PREVIEW_DEBOUNCE_MS, () => void typingPaused($))
 }
@@ -527,7 +550,7 @@ function draftChanged($: EngineInterface, text: string): void {
 async function typingPaused($: EngineInterface): Promise<void> {
   if (mode === 'live') {
     const text = (await $.prompt.read()).text
-    draft = text
+    noteDraft(text)
     const skip = liveSkipReason({ text, lastAnalyzed: analyzedText, isRunning, liveCalls })
     if (!skip) {
       liveCalls += 1
@@ -547,7 +570,7 @@ function canAnalyze(): boolean {
 
 async function analyzeNow($: EngineInterface): Promise<void> {
   const text = (await $.prompt.read()).text
-  draft = text
+  noteDraft(text)
   // A grayed-out Analyze does nothing, its hotkey included.
   if (!canAnalyze()) {
     $.ui.invalidate('ui.render')
@@ -759,10 +782,6 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   hasModelRules = !!target
 
   const root = $.plugin.root
-  const dates = [await readOr($, `${root}/rules/general.md`), target ? await readOr($, `${root}/rules/${target.file}`) : '']
-    .map(asOfDate)
-    .filter((d): d is string => !!d)
-  rulesAsOf = dates.sort()[0] ?? ''
   await loadRuleFiles($)
 
   try {

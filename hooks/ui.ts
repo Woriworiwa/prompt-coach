@@ -51,7 +51,6 @@ export type View = {
   /** False while an analysis runs and after one, until the draft changes: Analyze is then grayed out. */
   canAnalyze: boolean
   liveCalls: number
-  rulesAsOf: string
   ownRules: OwnRules
   ruleList: RuleList
   sources: string[]
@@ -328,7 +327,6 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(settingsGroup(E, v, 'checklist', 'Checklist', rows, after, true))
   }
 
-  out.push(footer(E, v))
   return out
 }
 
@@ -543,7 +541,7 @@ function rewriteField(E: UI, F: Form, v: View, a: Actions): RenderElement {
 /** A dropdown of likely answers and a text field for each placeholder; on mobile, a list to fill in later. */
 function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form): RenderElement[] {
   const help =
-    'A typed answer wins over a pick. Press Enter in a field to update the rewrite; Apply uses what you typed either way. Enter in an empty field removes that gap and its sentence.'
+    'A typed answer wins over a pick. Press Enter in a field to update the rewrite; Copy to prompt and Send use what you typed either way. Enter in an empty field removes that gap and its sentence.'
   const out = F ? [...withHelp(E, 'Fill in the gaps', 'gaps-help', help)] : [heading(E, 'Fill in the gaps')]
   if (!F) {
     out.push(text(E, `Fill these in after Apply: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' }))
@@ -605,14 +603,6 @@ function withHelp(E: UI, title: string, scope: string, help: string): RenderElem
       children: [text(E, help, { dimColor: true, wrap: 'wrap' })],
     }),
   ]
-}
-
-function footer(E: UI, v: View): RenderElement {
-  return E.Box({
-    key: 'footer',
-    flexDirection: 'column',
-    children: [text(E, `Rules as of ${v.rulesAsOf || 'unknown'} · your own rules: ${v.ownRules.path || 'not found'}`, { dimColor: true, wrap: 'wrap' })],
-  })
 }
 
 /**

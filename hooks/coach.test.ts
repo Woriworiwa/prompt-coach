@@ -479,7 +479,8 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   // No "For <model>" line under the tabs.
   expect(await ui.find({ text: /^For / })).toBeUndefined()
   expect(await ui.find({ type: 'Code', text: 'think step by step' })).toBeDefined()
-  expect(await ui.find({ text: /Rules as of 2026-09/ })).toBeDefined()
+  // No rules-date line since v0.23.0.
+  expect(await ui.find({ text: /Rules as of/ })).toBeUndefined()
   // Tips are gone (v0.17.0): the Analytics tab has no tips section.
   await ui.press({ key: 'tab-analytics' })
   expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeUndefined()
@@ -621,8 +622,10 @@ test('an empty box after sending is not reported as a changed draft', async ($, 
   await type($, s, 'fix the login bug after timeout, and the logout one')
   await clock.advance(500)
   expect(await ui.find({ text: /Your draft changed/ })).toBeDefined()
-  await type($, s, '')
-  await clock.advance(500)
+  // Sending (not just emptying the box, which keeps the draft since v0.23.0) clears it.
+  await $.prompt.submit({ text: s.box, wait: false, origin: { kind: 'composer' } })
+  s.box = ''
+  await clock.advance(1500)
   expect(await ui.find({ text: /Your draft changed/ })).toBeUndefined()
   await ui.unmount()
 })
@@ -635,7 +638,7 @@ test('when the session reports no model, the pane still loads the rules, then ta
   expect(await ui.find({ text: /^For / })).toBeUndefined()
   expect(await ui.find({ text: /hasn't said which model/ })).toBeDefined()
   expect(await ui.find({ text: /No rules for/ })).toBeUndefined()
-  expect(await ui.find({ text: /Rules as of 2026-10/ })).toBeDefined()
+  expect(await ui.find({ text: /Rules as of/ })).toBeUndefined()
   await ui.press({ key: 'tab-analytics' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
@@ -985,6 +988,45 @@ test('Analyze is grayed out once the draft is analyzed, does nothing then, and w
   await ui.press({ key: 'analyze' })
   expect(s.analyses).toHaveLength(2)
   expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(true)
+  await ui.unmount()
+})
+
+test('after an analysis the draft stays on screen through an empty box, and typing replaces it', async ($, on) => {
+  const { s, clock } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  // The box empties (Desktop can report it so): the analyzed draft stays, and Analyze stays grayed out.
+  await type($, s, '')
+  await clock.advance(1500)
+  expect(await ui.find({ type: 'Code', text: 'fix the login thing' })).toBeDefined()
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(true)
+  // Typing starts: the box shows the new draft instead.
+  await type($, s, 'add a logout test')
+  await clock.advance(500)
+  expect(await ui.find({ type: 'Code', text: 'fix the login thing' })).toBeUndefined()
+  expect(await ui.find({ type: 'Code', text: 'add a logout test' })).toBeDefined()
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
+  await ui.unmount()
+})
+
+test('with no edit events at all, the pane reads the prompt box each second, so typing still wakes Analyze', async ($, on) => {
+  const { s, clock } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBe(true)
+  // The box changes with no prompt.edit, as in Desktop.
+  s.box = 'fix the login thing in auth.ts'
+  await clock.advance(1000)
+  expect(await ui.find({ type: 'Code', text: 'fix the login thing in auth.ts' })).toBeDefined()
+  expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
+  await ui.press({ key: 'analyze' })
+  expect(s.analyses).toHaveLength(2)
   await ui.unmount()
 })
 
@@ -1883,7 +1925,6 @@ test('Your rules: Settings lists the rules file in the data folder, and Remove t
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  expect(await ui.find({ text: new RegExp(`your own rules: ${OWN_RULES}`) })).toBeDefined()
   await ui.press({ key: 'tab-settings' })
   const group = JSON.stringify(boxNode(await ui.drawn(), 'group-own-rules'))
   expect(group).toContain(OWN_RULES)
