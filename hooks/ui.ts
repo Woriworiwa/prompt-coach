@@ -283,14 +283,15 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   out.push(heading(E, 'Your draft'))
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
-  // Rewrite (the analyze button) sits under the draft it reads, always active (the gray-out of v0.22.0–0.24.1 is gone at Omar's say).
+  // Rewrite (the analyze button) sits under the draft it reads, always active and always the primary style: it used to
+  // drop to the plain style once a rewrite existed, which read as grayed out in Desktop (v0.25.3).
   out.push(
     row(E, [
       E.Button({
         key: 'analyze',
         label: v.isRunning ? 'Rewriting…' : 'Rewrite',
         hotkey: 'a',
-        ...(v.analysis ? {} : { variant: 'primary' as const }),
+        variant: 'primary',
         onPress: a.analyze,
       }),
     ]),

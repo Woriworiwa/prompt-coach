@@ -104,3 +104,4 @@ Notes from the build:
 - v0.25.0: the Analyze button renamed Rewrite (Rewriting… and "Rewriting for <model>…" while it runs; key and hotkey unchanged); the Rewrite heading above the rewrite box removed. 133 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.25.1: the remaining pane text that named Analyze now says Rewrite (stale note, Mode help, Rewrite model help, empty statistics). 133 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
 - v0.25.2: in Fill in the gaps, each gap's Pick dropdown and Or type field sit on one line (a row that wraps when the pane is narrow). 134 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.
+- v0.25.3: the Rewrite button keeps the primary style after a rewrite (it dropped to the plain style, which read as grayed out in Desktop). 134 tests pass on 2.1.299 and 2.1.302. Not yet checked in Desktop.

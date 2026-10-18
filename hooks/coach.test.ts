@@ -852,8 +852,8 @@ test('buttons follow the desktop design system: neutral, primary for the main ac
 
   await ui.press({ key: 'analyze' })
   const tree = await ui.drawn()
-  // Analyzed: neutral, and always active (no gray-out since v0.24.2).
-  expect(buttonLook(tree, 'analyze')).toEqual({ color: undefined, variant: undefined })
+  // Rewritten: Rewrite keeps the primary style (v0.25.3), so it never looks grayed out.
+  expect(buttonLook(tree, 'analyze')).toEqual({ color: undefined, variant: 'primary' })
   expect(buttonLook(tree, 'apply')).toEqual({ color: undefined, variant: 'primary' })
   expect(buttonLook(tree, 'fill')).toEqual({ color: undefined, variant: undefined })
   expect(buttonLook(tree, 'add-1-0')?.color).toBeUndefined()
@@ -1014,9 +1014,11 @@ test('Analyze is always active: no gray look, and a second press with the same d
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
+  expect((await ui.find({ key: 'analyze' }))?.props).toMatchObject({ variant: 'primary' })
   expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
   await ui.press({ key: 'analyze' })
   expect(s.analyses).toHaveLength(2)
+  expect((await ui.find({ key: 'analyze' }))?.props).toMatchObject({ variant: 'primary' })
   expect((await ui.find({ key: 'analyze' }))?.props.dimColor).toBeUndefined()
   await ui.unmount()
 })
