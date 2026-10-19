@@ -1302,6 +1302,8 @@ test('the checklist sits in one box like a Settings section: an item per row, a 
   // The mark, name and note on one row (v0.24.0).
   const itemRow = boxNode(tree, 'check-Context-row')!
   expect(itemRow.props.flexDirection).toBe('row')
+  // Top-aligned, so the mark and name sit at the first line of a wrapped note (v0.26.2).
+  expect(itemRow.props.alignItems).toBe('flex-start')
   expect(JSON.stringify(itemRow)).toContain('"Context"')
   expect(JSON.stringify(itemRow)).toContain('no file or error named')
   expect(boxNode(tree, 'check-Context-head')).toBeUndefined()

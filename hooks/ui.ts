@@ -436,6 +436,8 @@ function checklistWithFixes(E: UI, v: View, a: Actions, an: Analysis): { rows: R
           E.Box({
             key: `check-${c.item}-row`,
             flexDirection: 'row',
+            // The mark and name sit at the top of a note that wraps (v0.26.2), not centred on it.
+            alignItems: 'flex-start',
             columnGap: 1,
             children: [text(E, m.mark, { color: m.color }), text(E, c.item, { weight: 'semibold' }), text(E, c.note, { dimColor: true, wrap: 'wrap' })],
           }),
