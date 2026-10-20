@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.29.0
+# Handover: prompt-coach v0.30.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -72,6 +72,7 @@ Omar chose option A for merging the Checklist and Why each change (v0.18.0) and 
 
 Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the reader profile.
 
+- **Versions line** (v0.30.0): the tab's first line (`week-versions`, also above the archive) reads `versionsLine(code, desktop)`. `loadVersions` runs when the pane opens: Claude Code from `$.session.version()` (`base`, else `version`; in Desktop, the bundled engine), Claude Desktop from the env var `CLAUDE_CODE_DESKTOP_APP_VERSION` that Desktop sets for the engine it starts, else `plistVersion` of `/Applications/Claude.app/Contents/Info.plist` (`DESKTOP_PLIST`), else "not found".
 - **Writing:** "Write Claude Week NN" shows only while this ISO week has no edition. Since v0.27.0 (Omar), "Rewrite Claude Week NN" (`week-redo`, on this week's edition only) asks first (`week-redo-ask`: Replace, red, or Cancel), then `writeEdition($, true)` writes it again: this week's feedback isn't sent, and only once the new edition is stored are this week's feedback and read marks dropped (`withoutEditionMarks` in `week.ts`); a failed rewrite keeps everything and offers "Try the rewrite again". Older weeks are never rewritten. `writeEdition` fetches every page in `week/sources.json` at once (`$.http.fetch`, each raced against 20 seconds). `pageText` cuts HTML or a feed to text (20,000 characters a page), and `releasesText` keeps the last 14 days of GitHub releases. Then one `$.model.complete` call (`weekModel`, default opus; system `week/edition-prompt.md`; 16,000 max tokens; 9-minute timeout) with `buildWeekRequest`: today, the profile, the last 4 editions' feedback, the pages and an `<unread>` list. The tab shows the job's progress.
 - **Claude Desktop section** (v0.26.3): `week/sources.json` has the Claude Desktop release notes (`https://claude.com/docs/cowork/changelog`, tier 1; the newest release fits well inside the 20,000-character cut), and `edition-prompt.md` says the section comes from that page only, by Desktop version (e.g. v3.1623.0), never from Claude Code's GitHub releases. Before, with no Desktop source, W40–W43 filled it with Claude Code versions.
 - **Why not a subagent:** auto mode's classifier refused the mod's `$.agent.spawn`, and a `tool.check` hook allowing it was blocked as a bypass, so Omar chose fetch plus `model.complete`. The cost is no web search and only titles and dates from index pages. `edition-prompt.md` says so.
@@ -154,6 +155,7 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 **Check in Desktop:** v0.27.0 News: on W43, Rewrite Claude Week 43, then Replace; the new W43's Claude Desktop section covers v3.1623.0 (Oct 20) by Desktop version, and W43's old votes and read marks are gone.
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.30.0 News: the top line reads "Claude Code 2.1.304 · Claude Desktop 3.1623.0".
 - v0.29.0 Coach: no Copy to prompt; Send alone under the rewrite.
 - v0.28.1 Coach: the rewrite field has an empty Enter label (`submitLabel: ''`, was "keep"). Does Desktop draw nothing beside the focused field, or "submit", or an empty button? If not nothing, put "keep" back.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.

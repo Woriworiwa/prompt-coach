@@ -13,6 +13,8 @@ import {
   pageText,
   parseEdition,
   parseWeekSources,
+  plistVersion,
+  versionsLine,
   profilePath,
   releasesText,
   prune,
@@ -190,6 +192,13 @@ describe('reading', () => {
 })
 
 describe('source pages', () => {
+  test('plistVersion reads an app\'s CFBundleShortVersionString; versionsLine says what is missing', () => {
+    expect(plistVersion('<dict>\n\t<key>CFBundleShortVersionString</key>\n\t<string>3.1623.0</string>\n</dict>')).toBe('3.1623.0')
+    expect(plistVersion('<dict><key>CFBundleVersion</key><string>9</string></dict>')).toBeUndefined()
+    expect(versionsLine('2.1.304', '3.1623.0')).toBe('Claude Code 2.1.304 · Claude Desktop 3.1623.0')
+    expect(versionsLine(undefined, undefined)).toBe('Claude Code unknown · Claude Desktop not found')
+  })
+
   test('parseWeekSources keeps https pages with a tier and label, in tier order, with kind and link', () => {
     const json = JSON.stringify({
       pages: [

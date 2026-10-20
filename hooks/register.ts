@@ -55,6 +55,8 @@ import {
   type WeekSource,
   archiveRows,
   withoutEditionMarks,
+  DESKTOP_PLIST,
+  plistVersion,
   buildWeekRequest,
   editionIds,
   feedbackForPrompt,
@@ -181,6 +183,8 @@ let editions: Editions = {}
 let feedback: FeedbackStore = {}
 /** True while the Week tab asks to confirm rewriting this week's edition. */
 let weekRedoAsk = false
+/** The Claude Code version this session runs and the installed Claude Desktop version, read when the pane opens. */
+let versions: { code?: string; desktop?: string } = {}
 let readState: ReadState = {}
 let weekJob: StoredJob = { state: 'idle' }
 /** The edition on screen; the newest when unset. */
@@ -508,6 +512,7 @@ export const register: Register = (on, options) => {
 async function openPane($: EngineInterface): Promise<void> {
   await syncModel($)
   await loadOwnRules($)
+  await loadVersions($)
   noteDraft((await $.prompt.read()).text)
   const opened = await $.ui.open({ id: PANE, title: 'Prompt Coach', closeOnEscape: true })
   isPaneOpen = true
@@ -1037,6 +1042,7 @@ function weekView($: EngineInterface, now: number): View['week'] {
     currentId: week.id,
     currentTitle: week.title,
     redoAsk: weekRedoAsk,
+    versions,
     feedback,
     read: readState,
     details: weekDetails,
@@ -1058,6 +1064,19 @@ function weekView($: EngineInterface, now: number): View['week'] {
  * Week model request with week/edition-prompt.md as its system prompt and the
  * reader profile, the last four editions' feedback and the pages' text.
  */
+/**
+ * The versions the News tab shows. Claude Code's is the engine this session
+ * runs (in Desktop, the copy Desktop bundles). Desktop passes its own version
+ * to the engine it starts; elsewhere (a terminal session on a Mac) the app's
+ * Info.plist gives the installed one, if any.
+ */
+async function loadVersions($: EngineInterface): Promise<void> {
+  const code = await $.session.version().then(v => v.base ?? v.version).catch(() => undefined)
+  let desktop = await $.env.get('CLAUDE_CODE_DESKTOP_APP_VERSION')
+  if (!desktop) desktop = await $.fs.read(DESKTOP_PLIST).then(plistVersion, () => undefined)
+  versions = { code: code || undefined, desktop: desktop || undefined }
+}
+
 /**
  * Writes this ISO week's edition. With `replace`, a stored one is written
  * afresh (the Week tab's Rewrite, after a confirm): its feedback isn't sent to

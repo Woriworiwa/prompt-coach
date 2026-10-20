@@ -350,6 +350,19 @@ export function pageText(source: string, base: string, max = PAGE_MAX_CHARS): st
 }
 
 /** The GitHub releases API's JSON as release notes: the last 14 days' releases (the latest 3 if none), newest first. */
+/** Where macOS keeps the Claude Desktop app's version, read when Desktop didn't pass it (a terminal session). */
+export const DESKTOP_PLIST = '/Applications/Claude.app/Contents/Info.plist'
+
+/** The version in an app's Info.plist (XML): its CFBundleShortVersionString, or undefined. */
+export function plistVersion(xml: string): string | undefined {
+  return /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/.exec(xml)?.[1]?.trim() || undefined
+}
+
+/** The News tab's top line: the Claude Code version this session runs, and the installed Claude Desktop version. */
+export function versionsLine(code: string | undefined, desktop: string | undefined): string {
+  return `Claude Code ${code ?? 'unknown'} · Claude Desktop ${desktop ?? 'not found'}`
+}
+
 export function releasesText(json: string, nowMs: number, max = RELEASES_MAX_CHARS): string {
   const all = (JSON.parse(json) as Record<string, unknown>[])
     .filter(r => typeof r.published_at === 'string')

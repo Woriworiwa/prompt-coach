@@ -323,7 +323,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string> } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string>; engine?: string; desktopEnv?: string } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -374,7 +374,8 @@ function world(
   })
   const fileAt = (file: string) => s.written.get(file) ?? ((opts.noProfile && file === PROFILE) || (opts.noOwnRules && file === OWN_RULES) ? undefined : (opts.files?.[file] ?? FILES[file]))
   on('fs.exists', async ($, e) => ({ value: fileAt(rel(String(e.path))) !== undefined }))
-  on('env.get', async ($, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? '/home/u/.claude' : undefined }))
+  on('env.get', async ($, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? '/home/u/.claude' : e.name === 'CLAUDE_CODE_DESKTOP_APP_VERSION' ? opts.desktopEnv : undefined }))
+  on('session.version', async () => ({ value: { version: opts.engine ?? '2.1.304', base: opts.engine ?? '2.1.304' } }))
   on('fs.write', async ($, e) => {
     s.written.set(rel(String(e.path)), String(e.text))
     return { value: undefined }
@@ -1570,6 +1571,25 @@ const REDO_FEEDBACK = {
   '2026-W42-idle': { story_id: '2026-W42-idle', edition_id: '2026-W42', section: 'code', title: 'Idle compaction', verdict: 'up', why: 'useful', take: null, updated_at: '2026-10-17T08:00:00Z' },
   '2026-W41-old': { story_id: '2026-W41-old', edition_id: '2026-W41', section: 'code', title: 'Last week', verdict: 'down', why: 'too long', take: null, updated_at: '2026-10-10T08:00:00Z' },
 }
+
+test('Week: the top line shows the Claude Code version this session runs and the Desktop version Desktop passes', async ($, on) => {
+  const { ui } = await weekPane($, on, { engine: '2.1.304', desktopEnv: '3.1623.0' })
+  expect(await ui.find({ key: 'week-versions', text: 'Claude Code 2.1.304 · Claude Desktop 3.1623.0' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Week: with no Desktop version passed (a terminal session), the app\'s Info.plist gives it, or it says not found', async ($, on) => {
+  const plist = '<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>3.1600.0</string></dict></plist>'
+  const found = await weekPane($, on, { engine: '2.1.302', files: { '/Applications/Claude.app/Contents/Info.plist': plist } }, 'terminal')
+  expect(await found.ui.find({ key: 'week-versions', text: 'Claude Code 2.1.302 · Claude Desktop 3.1600.0' })).toBeDefined()
+  await found.ui.unmount()
+})
+
+test('Week: no Desktop version and no Info.plist reads as not found', async ($, on) => {
+  const { ui } = await weekPane($, on, { engine: '2.1.302' }, 'terminal')
+  expect(await ui.find({ key: 'week-versions', text: 'Claude Code 2.1.302 · Claude Desktop not found' })).toBeDefined()
+  await ui.unmount()
+})
 
 test('Week: Rewrite asks first, then writes this week afresh, replacing the edition and its votes and read marks', async ($, on) => {
   const answer = WEEK_ANSWER.replace('Idle compaction lands.', 'Desktop v3.1623.0 adds Storage.')

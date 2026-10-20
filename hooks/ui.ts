@@ -5,7 +5,7 @@ import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, STATS_ON, scoreTrend, strengths, tokenSummary } from './analytics.ts'
 import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
-import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts } from './week.ts'
+import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts, versionsLine } from './week.ts'
 
 /** The elements every surface draws, so one tree fits the terminal, Desktop and mobile. */
 export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | 'Code' | 'Markdown'> & Partial<Pick<Elements['mobile'], 'Svg'>>
@@ -92,6 +92,8 @@ export type WeekView = {
   currentTitle: string
   /** True while Rewrite this week waits for its confirm. */
   redoAsk: boolean
+  /** The Claude Code version this session runs and the installed Claude Desktop version, shown at the top of the tab. */
+  versions: { code?: string; desktop?: string }
   feedback: FeedbackStore
   read: ReadState
   /** Stories whose More detail is open, and whose take box is open. */
@@ -1009,8 +1011,10 @@ function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
  */
 function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const w = v.week
-  if (w.archive) return weekArchive(E, v, a)
-  const out: RenderElement[] = []
+  // The installed versions first, on the edition and the archive alike (v0.30.0).
+  const versions = E.Box({ key: 'week-versions', children: [text(E, versionsLine(w.versions.code, w.versions.desktop), { dimColor: true, wrap: 'wrap' })] })
+  if (w.archive) return [versions, ...weekArchive(E, v, a)]
+  const out: RenderElement[] = [versions]
   const ed = w.edition
 
   const i = ed ? w.editionIds.indexOf(ed.edition_id) : -1
