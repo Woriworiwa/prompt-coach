@@ -499,7 +499,7 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(await ui.find({ key: 'detail-why' })).toBeUndefined()
   expect(await ui.find({ text: 'no file or error named' })).toBeDefined()
   expect(await ui.find({ text: 'Name the finish line' })).toBeDefined()
-  // Analyze sits right under the draft box (v0.22.0), then the rewrite, then Copy to prompt and Send, then the checklist.
+  // Analyze sits right under the draft box (v0.22.0), then the rewrite, then Send, then the checklist.
   const order = (await ui.findAll({})).filter(el => ['Code', 'Input', 'Text', 'Button'].includes(el.type)).map(el => el.text ?? '')
   const draftAt = order.findIndex(t => t.includes('think step by step and fix the login thing'))
   const rewriteAt = order.findIndex(t => t.includes('Fix the login bug in [which file?]'))
@@ -510,10 +510,9 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   // No heading above the rewrite box since v0.25.0: the only "Rewrite" before it is the button.
   expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(1)
   expect((await ui.find({ key: 'analyze' }))?.text).toBe('Rewrite')
-  expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Copy to prompt'))
-  // Send then Copy to prompt right under the rewrite box (v0.26.0), and no "Your draft" label above the draft.
+  // Send right under the rewrite box, with no Copy to prompt beside it (v0.29.0), and no "Your draft" label above the draft.
   expect(order[rewriteAt + 1]).toBe('Send')
-  expect(order[rewriteAt + 2]).toBe('Copy to prompt')
+  expect(order).not.toContain('Copy to prompt')
   expect(textLook(await ui.drawn(), 'Your draft')).toEqual({ found: false })
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.
@@ -859,7 +858,7 @@ test('buttons follow the desktop design system: neutral, primary for the main ac
   // Rewritten: Rewrite keeps the primary style (v0.25.3), so it never looks grayed out.
   expect(buttonLook(tree, 'analyze')).toEqual({ color: undefined, variant: 'primary' })
   expect(buttonLook(tree, 'apply')).toEqual({ color: undefined, variant: 'primary' })
-  expect(buttonLook(tree, 'fill')).toEqual({ color: undefined, variant: undefined })
+  expect(buttonLook(tree, 'fill')).toBeUndefined()
   expect(buttonLook(tree, 'add-1-0')?.color).toBeUndefined()
   // The Copy button is gone; Desktop's own icon on the rewrite box copies it.
   expect(buttonLook(tree, 'copy')).toBeUndefined()
@@ -1043,26 +1042,17 @@ test('Fill in the gaps: the dropdown and the text field share one line', async (
   await ui.unmount()
 })
 
-test('Send sits right before Copy to prompt, and Copy to prompt fills the box without sending', async ($, on) => {
+test('Send is the only button under the rewrite: no Copy to prompt (v0.29.0)', async ($, on) => {
   const { s } = world(on)
   s.box = 'fix the login thing'
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  expect(await ui.find({ key: 'fill' })).toBeUndefined()
+  expect(await ui.find({ key: 'apply' })).toBeUndefined()
   await ui.press({ key: 'analyze' })
-  const keys = (await ui.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key)
-  // Send first, then Copy to prompt (v0.26.0).
-  expect(keys.indexOf('fill')).toBe(keys.indexOf('apply') + 1)
-  expect(await ui.find({ key: 'fill', text: 'Copy to prompt' })).toBeDefined()
   expect(await ui.find({ key: 'apply', text: 'Send' })).toBeDefined()
-
-  await ui.press({ key: 'fill' })
-  const rewrite = 'Fix the login bug in [which file?]. Done means the login test passes.'
-  expect(s.filled).toEqual([rewrite])
-  expect(s.box).toBe(rewrite)
-  expect(s.submitted).toEqual([])
-  expect(await ui.find({ text: /Your draft changed/ })).toBeUndefined()
+  expect(await ui.find({ key: 'fill' })).toBeUndefined()
+  expect(await ui.find({ text: 'Copy to prompt' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -1167,7 +1157,7 @@ test('on mobile, which has no fields, the gaps are listed to fill in later', asy
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
   await ui.press({ key: 'analyze' })
-  expect(await ui.find({ text: /Fill these in after Copy to prompt: \[which file\?\]/ })).toBeDefined()
+  expect(await ui.find({ text: /Still in brackets: \[which file\?\]\. Send leaves them as they are\./ })).toBeDefined()
   expect(await ui.find({ type: 'Input' })).toBeUndefined()
   // The rewrite can't be edited there, so it shows as text.
   expect(await ui.find({ type: 'Code', text: 'Fix the login bug in [which file?].' })).toBeDefined()
@@ -1234,8 +1224,8 @@ editTest('the rewrite is a field you can edit: Apply sends your text, gaps and A
   expect(await ui.find({ type: 'Input', text: 'Stop and ask me' })).toBeUndefined()
   await ui.press({ key: 'add-1-0' })
 
-  await ui.press({ key: 'fill' })
-  expect(s.filled).toEqual(['Fix the login bug in auth.ts without touching the tests. Done means the login test passes. Stop and ask me before deleting anything.'])
+  await ui.press({ key: 'apply' })
+  expect(s.submitted[0]?.text).toBe('Fix the login bug in auth.ts without touching the tests. Done means the login test passes. Stop and ask me before deleting anything.')
 
   // Typing a suggestion's sentence in by hand counts it as added.
   s.box = 'fix the login thing again'
@@ -1916,7 +1906,7 @@ statsTest('Statistics: Add and Apply are counted as advice taken, with the sugge
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
   await ui.press({ key: 'add-1-0' })
-  await ui.press({ key: 'fill' })
+  await ui.press({ key: 'apply' })
   const d = (saved.get('analytics') as Analytics).drafts[0]!
   expect(d).toMatchObject({ applied: true, added: 1 })
   expect(d.offered).toHaveLength(3)

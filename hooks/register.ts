@@ -419,7 +419,6 @@ export const register: Register = (on, options) => {
       },
       mode: m => setMode($, m),
       analyze: () => analyzeNow($),
-      fill: () => (analysis ? fillRewrite($, filled()) : undefined),
       apply: () => (analysis ? applyRewrite($, filled()) : undefined),
       toggleAddition: index => {
         const isAdded = added.includes(index)
@@ -690,15 +689,6 @@ async function noteApplied($: EngineInterface): Promise<void> {
   if (!STATS_ON || !analysis || !analyzedAt) return
   analytics = recordUse(analytics, analyzedAt, added.length)
   await $.store.set(STORE.analytics, analytics)
-}
-
-/** Puts the rewrite in the prompt box and sends nothing. */
-async function fillRewrite($: EngineInterface, rewrite: string): Promise<void> {
-  await noteApplied($)
-  analyzedText = rewrite
-  draft = rewrite
-  await fillPrompt($, rewrite)
-  $.ui.invalidate('ui.render')
 }
 
 /** Puts the rewrite in the prompt box, then sends it as Omar's own prompt, as Enter would. */

@@ -138,7 +138,6 @@ export type Actions = {
   toggleRules: (group: RuleGroup) => void
   mode: (mode: Mode) => Promise<void>
   analyze: () => Promise<void>
-  fill: () => Promise<void> | undefined
   apply: () => Promise<void> | undefined
   toggleAddition: (index: number) => void
   editRewrite: (value: string) => void
@@ -302,17 +301,12 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     ]),
   )
   if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' }))
-  // The rewrite sits right under the draft, so the two read side by side; Send and Copy to prompt right under it
+  // The rewrite sits right under the draft, so the two read side by side; Send right under it (Copy to prompt went in v0.29.0)
   // (v0.26.0), then the gap questions, then the suggestions to add.
   if (v.analysis) {
     out.push(F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
-    // Send fills the prompt box and sends; Copy to prompt only fills it.
-    out.push(
-      row(E, [
-        E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply }),
-        E.Button({ key: 'fill', label: 'Copy to prompt', onPress: a.fill }),
-      ]),
-    )
+    // Send fills the prompt box and sends.
+    out.push(row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })]))
     if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
     if (v.analysis.additions.length) {
       out.push(E.Box({ key: 'suggestions', flexDirection: 'column', gap: 1, children: v.analysis.additions.map((s, i) => suggestion(E, v, a, s, i)) }))
@@ -540,7 +534,7 @@ function gaps(E: UI, v: View, a: Actions, placeholders: Placeholder[], F?: Form)
   // No "Fill in the gaps" heading since v0.26.0: each question stands on its own.
   const out: RenderElement[] = []
   if (!F) {
-    out.push(E.Box({ key: 'gaps-later', paddingLeft: 2, children: [text(E, `Fill these in after Copy to prompt: ${placeholders.map(p => p.token).join(', ')}`, { dimColor: true, wrap: 'wrap' })] }))
+    out.push(E.Box({ key: 'gaps-later', paddingLeft: 2, children: [text(E, `Still in brackets: ${placeholders.map(p => p.token).join(', ')}. Send leaves them as they are.`, { dimColor: true, wrap: 'wrap' })] }))
     return out
   }
   for (const [i, p] of placeholders.entries()) {
