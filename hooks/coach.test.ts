@@ -1574,6 +1574,62 @@ test('Week: Write reads the source pages, asks the Week model once, and its answ
   await ui.unmount()
 })
 
+const REDO_FEEDBACK = {
+  '2026-W42-idle': { story_id: '2026-W42-idle', edition_id: '2026-W42', section: 'code', title: 'Idle compaction', verdict: 'up', why: 'useful', take: null, updated_at: '2026-10-17T08:00:00Z' },
+  '2026-W41-old': { story_id: '2026-W41-old', edition_id: '2026-W41', section: 'code', title: 'Last week', verdict: 'down', why: 'too long', take: null, updated_at: '2026-10-10T08:00:00Z' },
+}
+
+test('Week: Rewrite asks first, then writes this week afresh, replacing the edition and its votes and read marks', async ($, on) => {
+  const answer = WEEK_ANSWER.replace('Idle compaction lands.', 'Desktop v3.1623.0 adds Storage.')
+  const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: answer })
+  expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()
+  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe('Rewrite Claude Week 42')
+
+  // The first press only asks; Cancel leaves everything as it was.
+  await ui.press({ key: 'week-redo' })
+  expect(await ui.find({ text: /replaces this one, and this week's votes, reasons, takes and read marks go with it/ })).toBeDefined()
+  expect(s.weekRequests).toHaveLength(0)
+  await ui.press({ key: 'week-redo-cancel' })
+  expect(await ui.find({ key: 'week-redo-ask' })).toBeUndefined()
+  expect(s.weekRequests).toHaveLength(0)
+
+  // Replace writes it again, without this week's old feedback in the request.
+  await ui.press({ key: 'week-redo' })
+  await ui.press({ key: 'week-redo-confirm' })
+  expect(s.weekRequests).toHaveLength(1)
+  expect(s.weekRequests[0]!.prompt).not.toContain('2026-W42-idle')
+  expect(s.weekRequests[0]!.prompt).toContain('2026-W41-old')
+  expect(await ui.find({ text: 'Desktop v3.1623.0 adds Storage.' })).toBeDefined()
+  expect((saved.get('weekEditions') as Record<string, { intro: string }>)['2026-W42']!.intro).toBe('Desktop v3.1623.0 adds Storage.')
+  // This week's votes and read marks are gone; last week's feedback stays.
+  expect(Object.keys(saved.get('weekFeedback') as object)).toEqual(['2026-W41-old'])
+  expect(saved.get('weekRead')).toEqual({})
+  expect(await ui.find({ text: '0 of 2 stories read' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Week: a rewrite that fails keeps this week\'s edition, votes and read marks, and offers to try again', async ($, on) => {
+  const { saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: 'I could not reach the sources.' })
+  await ui.press({ key: 'week-redo' })
+  await ui.press({ key: 'week-redo-confirm' })
+  expect(await ui.find({ text: /Couldn't write Claude Week 42/ })).toBeDefined()
+  expect(await ui.find({ text: 'Idle compaction lands.' })).toBeDefined()
+  expect(Object.keys(saved.get('weekFeedback') as object).sort()).toEqual(['2026-W41-old', '2026-W42-idle'])
+  expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
+  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe('Try the rewrite again')
+  await ui.unmount()
+})
+
+test('Week: Rewrite shows only on this week\'s edition, not on an older one', async ($, on) => {
+  const w41 = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('Claude Week 42', 'Claude Week 41'), '2026-W41')
+  if (!('edition' in w41)) throw new Error(w41.reason)
+  const { ui } = await weekPane($, on, { saved: { weekEditions: { ...storedEdition().weekEditions, '2026-W41': w41.edition } } })
+  expect(buttonProps(await ui.drawn(), 'week-redo')).toBeDefined()
+  await ui.press({ key: 'week-older' })
+  expect(buttonProps(await ui.drawn(), 'week-redo')).toBeUndefined()
+  await ui.unmount()
+})
+
 test('Week: an answer that is not an edition says why and offers Try again', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { weekAnswer: 'I could not reach the sources.' })
   await ui.press({ key: 'week-write' })

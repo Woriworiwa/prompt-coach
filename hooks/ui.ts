@@ -90,6 +90,8 @@ export type WeekView = {
   /** This ISO week's edition id and title, which the write button names. */
   currentId: string
   currentTitle: string
+  /** True while Rewrite this week waits for its confirm. */
+  redoAsk: boolean
   feedback: FeedbackStore
   read: ReadState
   /** Stories whose More detail is open, and whose take box is open. */
@@ -158,6 +160,10 @@ export type Actions = {
 /** What the Week tab's controls do. */
 export type WeekActions = {
   write: () => Promise<void> | undefined
+  /** Rewrite this week's stored edition: ask first, then replace it, or cancel. */
+  redo: () => void
+  redoConfirm: () => Promise<void> | undefined
+  redoCancel: () => void
   show: (editionId: string) => void
   vote: (storyId: string, verdict: 'up' | 'down') => Promise<void>
   /** Typing only notes the text (and saves it quietly after a pause); Enter saves and redraws. */
@@ -1030,6 +1036,12 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     )
   }
 
+  // This week's edition can be written afresh, from the newest edition only, after a confirm (v0.27.0).
+  const redoing = hasCurrent && ed?.edition_id === w.currentId && w.job.state !== 'running'
+  if (redoing && !w.redoAsk) {
+    nav.push(E.Button({ key: 'week-redo', label: w.job.state === 'failed' ? 'Try the rewrite again' : `Rewrite ${w.currentTitle}`, onPress: a.week.redo }))
+  }
+
   if (w.job.state === 'running') {
     const at = new Date(w.job.startedAt).toISOString().slice(11, 16)
     out.push(text(E, `${w.job.title}, started ${at} UTC: ${w.job.progress} You can keep working.`, { color: 'suggestion', wrap: 'wrap' }))
@@ -1048,6 +1060,22 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   if (ed.intro) out.push(text(E, ed.intro, { wrap: 'wrap' }))
   if (ed.feedback_note) out.push(text(E, `From your feedback: ${ed.feedback_note}`, { dimColor: true, wrap: 'wrap' }))
   if (nav.length) out.push(row(E, nav))
+  if (redoing && w.redoAsk) {
+    out.push(
+      E.Box({
+        key: 'week-redo-ask',
+        flexDirection: 'column',
+        gap: 1,
+        children: [
+          text(E, `Write ${w.currentTitle} again from today's pages? The new edition replaces this one, and this week's votes, reasons, takes and read marks go with it. Until it arrives, this one stays.`, { color: 'warning', wrap: 'wrap' }),
+          row(E, [
+            E.Button({ key: 'week-redo-confirm', ...tinted(E, 'Replace', 'error'), onPress: a.week.redoConfirm }),
+            E.Button({ key: 'week-redo-cancel', label: 'Cancel', onPress: a.week.redoCancel }),
+          ]),
+        ],
+      }),
+    )
+  }
 
   const all = ed.sections.flatMap(s => s.stories)
   const top = ed.top3.map(id => all.find(s => s.id === id)).filter((s): s is Story => !!s)

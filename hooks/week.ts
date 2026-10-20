@@ -48,6 +48,19 @@ export type FeedbackStore = Record<string, Feedback>
 /** Which stories are read, by id. Kept on this config only and never sent to the writer. */
 export type ReadState = Record<string, boolean>
 
+/**
+ * Feedback and read marks without edition `id`'s, for when that week's edition
+ * is replaced by a new one: its stories, and so their votes, reasons, takes and
+ * read marks, go with it.
+ */
+export function withoutEditionMarks(feedback: FeedbackStore, read: ReadState, edition: Edition | undefined, id: string): { feedback: FeedbackStore; read: ReadState } {
+  const stories = new Set((edition?.sections ?? []).flatMap(s => s.stories.map(st => st.id)))
+  return {
+    feedback: Object.fromEntries(Object.entries(feedback).filter(([, f]) => f.edition_id !== id)),
+    read: Object.fromEntries(Object.entries(read).filter(([storyId]) => !stories.has(storyId))),
+  }
+}
+
 /** What a feedback record copies from its story, so the writer needs no old edition. */
 export type StoryRef = { story_id: string; edition_id: string; section: string; title: string }
 

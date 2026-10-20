@@ -54,6 +54,7 @@ import {
   type ReadState,
   type WeekSource,
   archiveRows,
+  withoutEditionMarks,
   buildWeekRequest,
   editionIds,
   feedbackForPrompt,
@@ -178,6 +179,8 @@ const WEEK_SAVE_MS = 800
 type StoredJob = WeekJob & { editionId?: string; raw?: string }
 let editions: Editions = {}
 let feedback: FeedbackStore = {}
+/** True while the Week tab asks to confirm rewriting this week's edition. */
+let weekRedoAsk = false
 let readState: ReadState = {}
 let weekJob: StoredJob = { state: 'idle' }
 /** The edition on screen; the newest when unset. */
@@ -459,6 +462,15 @@ export const register: Register = (on, options) => {
       reject: () => rejectRefresh($),
       week: {
         write: () => (weekJob.state === 'running' ? undefined : writeEdition($)),
+        redo: () => {
+          weekRedoAsk = true
+          $.ui.invalidate('ui.render')
+        },
+        redoConfirm: () => (weekJob.state === 'running' ? undefined : writeEdition($, true)),
+        redoCancel: () => {
+          weekRedoAsk = false
+          $.ui.invalidate('ui.render')
+        },
         show: id => {
           weekShown = id
           weekArchive = false
@@ -1034,6 +1046,7 @@ function weekView($: EngineInterface, now: number): View['week'] {
     editionIds: ids,
     currentId: week.id,
     currentTitle: week.title,
+    redoAsk: weekRedoAsk,
     feedback,
     read: readState,
     details: weekDetails,
@@ -1055,10 +1068,17 @@ function weekView($: EngineInterface, now: number): View['week'] {
  * Week model request with week/edition-prompt.md as its system prompt and the
  * reader profile, the last four editions' feedback and the pages' text.
  */
-async function writeEdition($: EngineInterface): Promise<void> {
+/**
+ * Writes this ISO week's edition. With `replace`, a stored one is written
+ * afresh (the Week tab's Rewrite, after a confirm): its feedback isn't sent to
+ * the writer, and only once the new edition is stored do the old edition, its
+ * votes, reasons, takes and read marks go. A failed rewrite keeps them all.
+ */
+async function writeEdition($: EngineInterface, replace = false): Promise<void> {
+  weekRedoAsk = false
   const now = await $.clock.now()
   const week = isoWeek(now)
-  if (editions[week.id]) {
+  if (editions[week.id] && !replace) {
     weekShown = week.id
     $.ui.invalidate('ui.render')
     return
@@ -1091,7 +1111,7 @@ async function writeEdition($: EngineInterface): Promise<void> {
     const reply = await $.model.complete({
       model: weekModel,
       system,
-      prompt: buildWeekRequest(profile, feedbackForPrompt(feedback), week, pages),
+      prompt: buildWeekRequest(profile, feedbackForPrompt(replace ? withoutEditionMarks(feedback, readState, editions[week.id], week.id).feedback : feedback), week, pages),
       maxTokens: WEEK_MAX_TOKENS,
       timeoutMs: WEEK_TIMEOUT_MS,
     })
@@ -1100,6 +1120,13 @@ async function writeEdition($: EngineInterface): Promise<void> {
     if ('reason' in parsed) {
       weekJob = { state: 'failed', title: week.title, editionId: week.id, reason: `the answer couldn't be read as an edition: ${parsed.reason}.`, raw: reply.text.slice(0, 20_000) }
     } else {
+      if (replace && editions[week.id]) {
+        const kept = withoutEditionMarks(feedback, readState, editions[week.id], week.id)
+        feedback = kept.feedback
+        readState = kept.read
+        await $.store.set(STORE.weekFeedback, feedback)
+        await $.store.set(STORE.weekRead, readState)
+      }
       await $.store.set(STORE.weekEditions, { ...editions, [week.id]: parsed.edition })
       editions = { ...editions, [week.id]: parsed.edition }
       weekShown = week.id
