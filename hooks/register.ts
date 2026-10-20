@@ -1233,9 +1233,11 @@ async function toggleRead($: EngineInterface, id: string): Promise<void> {
  */
 async function askAside($: EngineInterface, text: string): Promise<void> {
   const btw = `/btw ${text}`
-  const filled = await $.prompt.fill({ text: btw, mode: 'replace' })
+  // A leading space (v0.30.1, Omar's trial): with the box starting "/btw", Desktop ran the side question at once,
+  // though the mod only fills the box. The space should keep it a draft until it's deleted.
+  const filled = await $.prompt.fill({ text: ` ${btw}`, mode: 'replace' })
   if (filled.isFilled) {
-    $.ui.toast('Press Enter to ask it in the side chat.')
+    $.ui.toast('Delete the space before /btw, then press Enter to ask it in the side chat.')
     return
   }
   const copied = await $.ui.copy({ text: btw })
