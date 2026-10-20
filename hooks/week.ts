@@ -406,22 +406,33 @@ function cut(s: string, max: number): string {
 
 /**
  * What a side chat about a story asks: the story's prompt, then the story
- * itself, since the side chat sees only the session's conversation. One line,
- * as a typed `/btw` question is.
+ * itself, since the side chat sees only the session's conversation, each part
+ * a paragraph of its own.
  */
 export function asideAboutStory(s: Story): string {
-  const about = [s.summary, s.detail].filter(Boolean).join(' ')
-  const sources = s.links.length ? ` Sources: ${s.links.map(l => l.url).join(', ')}.` : ''
-  return oneLine(`${s.prompt ?? s.title} (This is about the Claude Week story "${s.title}": ${about}${sources})`)
+  return paragraphs([
+    s.prompt ?? s.title,
+    `This is about the Claude Week story "${s.title}".`,
+    s.summary,
+    s.detail,
+    s.links.length ? `Sources: ${s.links.map(l => l.url).join(', ')}` : '',
+  ])
 }
 
 /** What a side chat about one of an edition's questions asks: its prompt, with the question it comes from. */
 export function asideAboutQuestion(q: Question, editionTitle: string): string {
-  return oneLine(`${q.prompt ?? q.text} (From the questions in ${editionTitle}: "${q.text}")`)
+  return paragraphs([q.prompt ?? q.text, `From the questions in ${editionTitle}: "${q.text}"`])
 }
 
-function oneLine(s: string): string {
-  return s.replace(/\s+/g, ' ').trim()
+/**
+ * The parts as paragraphs with a blank line between them (v0.31.2: they used to
+ * run together on one line). Each part is one line of its own; empty parts go.
+ */
+function paragraphs(parts: (string | null | undefined)[]): string {
+  return parts
+    .map(p => (p ?? '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 /** Read counts: the edition's news stories (tips aside) and each news section's. */

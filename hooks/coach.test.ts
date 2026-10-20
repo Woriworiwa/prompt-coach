@@ -1721,11 +1721,12 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-idle')?.label).toBe('Ask in side chat')
   await ui.press({ key: 'aside-2026-W42-idle' })
   expect(s.box).toBe(
-    '/btw Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
+    '/btw Explain idle compaction.\n\nThis is about the Claude Week story "Idle compaction".\n\nv2.1.299 (Oct 14) adds idle compaction.\n\nTerminal only.\n\nSources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299',
   )
   expect(s.toasts.at(-1)).toBe('Press Enter to ask it in the side chat.')
   await ui.press({ key: 'week-q-aside-2026-W42-0' })
-  expect(s.box).toBe('/btw Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
+  // Paragraphs are separated by a blank line (v0.31.2).
+  expect(s.box).toBe('/btw Audit my hooks.\n\nFrom the questions in Claude Week 42: "Which hooks enforce a rule?"')
   expect(s.submitted).toEqual([])
   // A story with no prompt has no side chat button.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')).toBeUndefined()
@@ -1865,7 +1866,7 @@ test('Week: a redraw keeps the story buttons\' press handles', async ($, on) => 
 test('Week: when the prompt box can\'t take the side question, it goes on the clipboard and a toast says so', async ($, on) => {
   const { s, ui } = await weekPane($, on, { saved: storedEdition(), boxBlocked: true })
   await ui.press({ key: 'aside-2026-W42-idle' })
-  expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\. \(This is about the Claude Week story/)
+  expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\.\n\nThis is about the Claude Week story/)
   expect(s.toasts.at(-1)).toContain("Couldn't put the side question in the prompt box, so it's on the clipboard")
   await ui.unmount()
 })
