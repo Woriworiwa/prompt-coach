@@ -1717,15 +1717,15 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   await ui.press({ key: 'detail-2026-W42-idle' })
   expect(await ui.find({ text: 'Terminal only.' })).toBeDefined()
 
-  // The prompt box gets " /btw" (a leading space, v0.30.1, so Desktop doesn't run it at once) with the prompt and the story it's about. Nothing is sent.
+  // The prompt box gets /btw with the prompt and the story it's about, with no leading space (v0.31.1). Nothing is sent: Omar sends it.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-idle')?.label).toBe('Ask in side chat')
   await ui.press({ key: 'aside-2026-W42-idle' })
   expect(s.box).toBe(
-    ' /btw Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
+    '/btw Explain idle compaction. (This is about the Claude Week story "Idle compaction": v2.1.299 (Oct 14) adds idle compaction. Terminal only. Sources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299.)',
   )
-  expect(s.toasts.at(-1)).toBe('Delete the space before /btw, then press Enter to ask it in the side chat.')
+  expect(s.toasts.at(-1)).toBe('Press Enter to ask it in the side chat.')
   await ui.press({ key: 'week-q-aside-2026-W42-0' })
-  expect(s.box).toBe(' /btw Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
+  expect(s.box).toBe('/btw Audit my hooks. (From the questions in Claude Week 42: "Which hooks enforce a rule?")')
   expect(s.submitted).toEqual([])
   // A story with no prompt has no side chat button.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')).toBeUndefined()
