@@ -491,12 +491,12 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
 }
 
 /**
- * Whether the rewrite is an editable field (v0.19.0). Off since v0.19.2: Desktop's
- * bundled Claude Code 2.1.299 drops Input `rows`, so the field is one line there,
- * and Omar chose the v0.18.0 text block until Desktop ships a newer one. Turn it
- * on then; the editing code and its tests are kept.
+ * Whether the rewrite is an editable field (v0.19.0). Off in v0.19.2–0.27.0:
+ * Desktop's bundled Claude Code 2.1.299 drops Input `rows`, so the field was one
+ * line there. Back on in v0.28.0, since Desktop v3.1623.0 bundles 2.1.304, which
+ * keeps `rows`. False shows the v0.18.0 Code block again.
  */
-export const REWRITE_EDITABLE = false
+export const REWRITE_EDITABLE = true
 
 /**
  * The lines a field needs to show all of `text`: each line wrapped at a width
