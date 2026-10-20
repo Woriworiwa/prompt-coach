@@ -45,6 +45,7 @@ Check sources in this order. Use a lower tier only to fill a gap or to cover a s
 - claude.dev blog: https://claude.dev/blog/
 - Anthropic newsroom: https://www.anthropic.com/news
 - Claude release notes (Help Center): https://support.claude.com/en/articles/12138966-release-notes
+- Claude Desktop release notes: https://claude.com/docs/cowork/changelog (each Desktop release with its version, date and the Claude Code version it bundles)
 - Claude Code releases on GitHub: https://github.com/anthropics/claude-code/releases
 - Claude and Claude Code documentation, for explaining how a feature works
 
@@ -65,6 +66,7 @@ Check sources in this order. Use a lower tier only to fill a gap or to cover a s
 
 - Every factual claim must trace to a source you actually opened for this edition, which here means a `<page>` in the request. Don't carry claims over from earlier editions or from memory.
 - For a Claude Code release, read the GitHub release notes themselves. If a tracker says something the release notes don't, leave it out.
+- For a Claude Desktop release, read the Claude Desktop release notes page. Desktop releases have their own version numbers (for example v3.1623.0), separate from Claude Code's (for example v2.1.304).
 - If a story comes only from secondary coverage and Anthropic hasn't confirmed it, say so in the story text, for example "Reported, not confirmed by Anthropic".
 - **Say where a feature works.** The reader uses Claude Code in the desktop app. If release notes limit a feature to the terminal, the IDE extensions, cloud sessions or organizations behind a gateway, say that in the story, and say whether it affects the desktop app.
 - Check that every link is one that appears in the pages, and that it points to the page it claims to.
@@ -77,7 +79,7 @@ Group stories into these sections, in this order. Leave out any section with no 
 |---|---|---|
 | `models` | Models and platform | New models, pricing, API and platform features |
 | `code` | Claude Code | Releases and features |
-| `desktop` | Claude Desktop | Desktop app changes, including the Code tab |
+| `desktop` | Claude Desktop | Desktop app releases from the Claude Desktop release notes page only: each release this week by its Desktop version and date (for example "v3.1623.0, Oct 20"), including changes to the Code tab, and which Claude Code version it bundles. Claude Code releases from GitHub go under Claude Code, never here, even when they mention the desktop app. If the page shows no Desktop release in this edition's dates, say nothing shipped. |
 | `limits` | Limits and money | Usage limits, plans, pricing changes that affect a subscriber |
 | `company` | Company and policy | Business news, partnerships, offices, policy, reported stories |
 | `people` | People | Posts and moves by people the reader follows. Name it after the person when there is only one. |
@@ -85,7 +87,7 @@ Group stories into these sections, in this order. Leave out any section with no 
 
 After the sections come three or four **questions to think about**, drawn from the week's stories, each with a prompt the reader can copy.
 
-Give each section a short date or version range, for example "Oct 7 – Oct 9" or "v2.1.293 → v2.1.299".
+Give each section a short date or version range, for example "Oct 7 – Oct 9" or "v2.1.293 → v2.1.299". The Claude Desktop range uses Desktop versions (for example "v2.42304.2 → v3.1623.0"), never Claude Code versions.
 
 ## Length and priority
 

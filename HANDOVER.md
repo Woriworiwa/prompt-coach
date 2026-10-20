@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.26.2
+# Handover: prompt-coach v0.26.3
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -73,6 +73,7 @@ Omar chose option A for merging the Checklist and Why each change (v0.18.0) and 
 Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the reader profile.
 
 - **Writing:** "Write Claude Week NN" shows only while this ISO week has no edition. `writeEdition` fetches every page in `week/sources.json` at once (`$.http.fetch`, each raced against 20 seconds). `pageText` cuts HTML or a feed to text (20,000 characters a page), and `releasesText` keeps the last 14 days of GitHub releases. Then one `$.model.complete` call (`weekModel`, default opus; system `week/edition-prompt.md`; 16,000 max tokens; 9-minute timeout) with `buildWeekRequest`: today, the profile, the last 4 editions' feedback, the pages and an `<unread>` list. The tab shows the job's progress.
+- **Claude Desktop section** (v0.26.3): `week/sources.json` has the Claude Desktop release notes (`https://claude.com/docs/cowork/changelog`, tier 1; the newest release fits well inside the 20,000-character cut), and `edition-prompt.md` says the section comes from that page only, by Desktop version (e.g. v3.1623.0), never from Claude Code's GitHub releases. Before, with no Desktop source, W40–W43 filled it with Claude Code versions.
 - **Why not a subagent:** auto mode's classifier refused the mod's `$.agent.spawn`, and a `tool.check` hook allowing it was blocked as a bypass, so Omar chose fetch plus `model.complete`. The cost is no web search and only titles and dates from index pages. `edition-prompt.md` says so.
 - **The answer:** `parseEdition` reads the JSON, forces the edition id, orders the sections, adds Claude Desktop, and keeps at most 15 news stories while keeping the Top 3. A bad answer fails the job, keeps the raw answer under `weekJob.raw`, and shows Try again. A job is stored only when it fails, and a `running` job found at session start shows as failed.
 - **Ask in side chat:** puts `/btw <question>` in the prompt box (`askAside`, `$.prompt.fill`) for Omar to send with Enter; if the box can't be filled, the question goes on the clipboard. `$.command.run('btw')` can't work, because in Desktop `/btw` is drawn by the app, not listed in the engine, and no mods API opens the side chat.
@@ -110,7 +111,7 @@ npx -y -p typescript@5.6.3 tsc -p . --noEmit --allowImportingTsExtensions
 claude plugin validate . --strict && claude plugin test .
 ```
 
-Run the second line again with Desktop's bundled binary, `~/Library/Application Support/Claude/claude-code/2.1.299/<hash>/claude.app/Contents/MacOS/claude`. Desktop runs that version and refuses the whole module if it lacks an event. The terminal is on 2.1.302.
+Run the second line again with Desktop's bundled binaries, `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`: 2.1.299 and, since Desktop v3.1623.0 (2026-10-20), 2.1.304. Desktop refuses the whole module if its version lacks an event. The terminal is on 2.1.302.
 
 ## Rules learned the hard way
 
@@ -149,6 +150,10 @@ Run the second line again with Desktop's bundled binary, `~/Library/Application 
 **Decide:** how Statistics come back now that each model has its own checklist (the stored records and the score assume the old six items), then turn them on and check them in Desktop.
 
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
+
+**Decide:** W43 (business config) was written before v0.26.3, so its Claude Desktop section lists Claude Code releases; editions are never overwritten, so Write only returns in W44. Asked Omar whether to let him redo W43.
+
+**Now possible:** Desktop v3.1623.0 bundles Claude Code 2.1.304 (folder present since 2026-10-20), so the `REWRITE_EDITABLE` check below can go ahead once Omar wants it.
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.

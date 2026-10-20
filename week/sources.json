@@ -4,6 +4,7 @@
     { "tier": 1, "label": "claude.dev blog", "url": "https://claude.dev/blog/" },
     { "tier": 1, "label": "Anthropic newsroom", "url": "https://www.anthropic.com/news" },
     { "tier": 1, "label": "Claude release notes (Help Center)", "url": "https://support.claude.com/en/articles/12138966-release-notes" },
+    { "tier": 1, "label": "Claude Desktop release notes", "url": "https://claude.com/docs/cowork/changelog" },
     {
       "tier": 1,
       "label": "Claude Code releases on GitHub",
