@@ -1204,8 +1204,7 @@ editTest('the rewrite is a field you can edit: Apply sends your text, gaps and A
   await ui.press({ key: 'analyze' })
   const field = await ui.find({ type: 'Input', text: 'Fix the login bug in [which file?]. Done means the login test passes.' })
   expect(field?.key).toMatch(/^rewrite-/)
-  // No Enter label beside the field (v0.28.1): typing is already saved on each keystroke.
-  expect(field?.props.submitLabel).toBe('')
+  expect(field?.props.submitLabel).toBe('keep')
   const key = field!.key!
 
   // Typing is only noted, with no redraw under the cursor; Enter keeps it and draws the field with it.

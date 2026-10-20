@@ -489,10 +489,11 @@ function suggestion(E: UI, v: View, a: Actions, s: Addition, i: number): RenderE
 /**
  * Whether the rewrite is an editable field (v0.19.0). Off in v0.19.2–0.27.0:
  * Desktop's bundled Claude Code 2.1.299 drops Input `rows`, so the field was one
- * line there. Back on in v0.28.0, since Desktop v3.1623.0 bundles 2.1.304, which
- * keeps `rows`. False shows the v0.18.0 Code block again.
+ * line there. On in v0.28.0–0.30.1, since Desktop v3.1623.0 bundles 2.1.304, which
+ * keeps `rows`. Turned back off in v0.31.0 at Omar's request: false shows the
+ * v0.18.0 read-only Code block. The editing code and its test stay in place for later.
  */
-export const REWRITE_EDITABLE = true
+export const REWRITE_EDITABLE = false
 
 /**
  * The lines a field needs to show all of `text`: each line wrapped at a width
@@ -521,9 +522,7 @@ function rewriteField(E: UI, F: Form, v: View, a: Actions): RenderElement {
         key: v.rewriteKey,
         value: v.filledRewrite,
         rows: rowsFor(v.filledRewrite, v.columns),
-        // No Enter label (v0.28.1, Omar's trial): typing is saved on every keystroke, so the label Desktop draws
-        // beside a focused field ("keep" until now, "submit" by default) only redrew the pane. Enter still does that.
-        submitLabel: '',
+        submitLabel: 'keep',
         onInput: value => a.editRewrite(value),
         onSubmit: value => a.submitRewrite(value),
       }),
