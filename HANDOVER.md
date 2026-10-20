@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.28.0
+# Handover: prompt-coach v0.28.1
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -154,6 +154,7 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 **Check in Desktop:** v0.27.0 News: on W43, Rewrite Claude Week 43, then Replace; the new W43's Claude Desktop section covers v3.1623.0 (Oct 20) by Desktop version, and W43's old votes and read marks are gone.
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.28.1 Coach: the rewrite field has an empty Enter label (`submitLabel: ''`, was "keep"). Does Desktop draw nothing beside the focused field, or "submit", or an empty button? If not nothing, put "keep" back.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
 - v0.28.0 Coach: the rewrite is an editable field again: it shows several lines and grows with its text, scrolls past 12 lines, and whether it spans the pane; Copy to prompt and Send use the edit; a gap pick and Add/Remove still work after editing. If it's one line, Desktop isn't on 2.1.304 yet; set `REWRITE_EDITABLE` back to false.
 - v0.26.2 Coach: checklist marks and names sit at the top of a wrapped note.

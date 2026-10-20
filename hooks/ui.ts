@@ -525,7 +525,9 @@ function rewriteField(E: UI, F: Form, v: View, a: Actions): RenderElement {
         key: v.rewriteKey,
         value: v.filledRewrite,
         rows: rowsFor(v.filledRewrite, v.columns),
-        submitLabel: 'keep',
+        // No Enter label (v0.28.1, Omar's trial): typing is saved on every keystroke, so the label Desktop draws
+        // beside a focused field ("keep" until now, "submit" by default) only redrew the pane. Enter still does that.
+        submitLabel: '',
         onInput: value => a.editRewrite(value),
         onSubmit: value => a.submitRewrite(value),
       }),
