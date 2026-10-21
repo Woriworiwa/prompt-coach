@@ -194,13 +194,13 @@ describe('reading', () => {
 })
 
 describe('source pages', () => {
-  test('sameStory: the same title (case and spacing aside) and a shared link, or no links on either', () => {
+  test('sameStory: the same title (case and spacing aside) and a shared link; with no links on either side, the title decides', () => {
     const st = (title: string, urls: string[]) => ({ id: 'x', title, summary: '', links: urls.map(url => ({ label: '', url })), detail: null, ask: null, prompt: null })
     expect(sameStory(st('Idle compaction', ['https://a/1']), st('idle  compaction ', ['https://a/1/']))).toBe(true)
     expect(sameStory(st('Idle compaction', ['https://a/1']), st('Idle compaction', ['https://a/2']))).toBe(false)
     expect(sameStory(st('Idle compaction', ['https://a/1']), st('Idle compaction, again', ['https://a/1']))).toBe(false)
     expect(sameStory(st('Tip', []), st('tip', []))).toBe(true)
-    expect(sameStory(st('Tip', []), st('Tip', ['https://a/1']))).toBe(false)
+    expect(sameStory(st('Tip', []), st('Tip', ['https://a/1']))).toBe(true)
   })
 
   test('mergeEdition keeps the old edition whole and appends only new stories, in section order', () => {
@@ -220,6 +220,43 @@ describe('source pages', () => {
     expect(edition.sections[1]!.stories.map(s => s.id)).toEqual(['a'])
     expect(edition.sources.map(s => s.url)).toEqual(['https://s/1', 'https://s/2'])
     expect(mergeEdition(old, old).added).toBe(0)
+  })
+
+  test('a tip keeps based_on only when it names another story of the edition, prefixed like story ids', () => {
+    const json = JSON.stringify({
+      title: 'Claude Week 43', date_from: '2026-10-19', date_to: '2026-10-21', intro: 'i', feedback_note: null, top3: [], questions: [], sources: [],
+      sections: [
+        { id: 'desktop', title: 'Claude Desktop', range: null, note: null, stories: [{ id: 'desk', title: 'Storage page', summary: 's', links: [{ label: 'Desktop notes', url: 'https://claude.com/docs/cowork/changelog' }] }] },
+        { id: 'tips', title: 'Try this week', range: null, note: null, stories: [
+          { id: 'tip-a', title: 'Check /storage', summary: 's', links: [{ label: 'Desktop notes', url: 'https://claude.com/docs/cowork/changelog' }], based_on: 'desk' },
+          { id: 'tip-b', title: 'Other', summary: 's', links: [], based_on: 'nope' },
+        ] },
+      ],
+    })
+    const r = parseEdition(json, '2026-W43')
+    if (!('edition' in r)) throw new Error(r.reason)
+    const tips = r.edition.sections.find(s => s.id === 'tips')!.stories
+    expect(tips.map(t => t.based_on)).toEqual(['2026-W43-desk', null])
+  })
+
+  test('mergeEdition gives an old tip with no links the fresh links and story, and counts it as filled, not added', () => {
+    const st = (id: string, title: string, urls: string[], based_on: string | null = null) => ({ id, title, summary: '', links: urls.map(url => ({ label: '', url })), detail: null, ask: null, prompt: null, based_on })
+    const base = { edition_id: 'W', title: 'T', date_from: '', date_to: '', intro: '', feedback_note: null, top3: [], questions: [], sources: [] }
+    const old = { ...base, sections: [
+      { id: 'desktop', title: 'Claude Desktop', range: null, note: null, stories: [st('W-desk', 'Storage page', ['https://d'])] },
+      { id: 'tips', title: 'Try this week', range: null, note: null, stories: [st('W-tip', 'Check /storage', [])] },
+    ] }
+    const fresh = { ...base, sections: [
+      { id: 'desktop', title: 'Claude Desktop', range: null, note: null, stories: [st('W-storage', 'Storage page', ['https://d'])] },
+      { id: 'tips', title: 'Try this week', range: null, note: null, stories: [st('W-tip2', 'Check /storage', ['https://d'], 'W-storage')] },
+    ] }
+    const { edition, added, filled } = mergeEdition(old, fresh)
+    expect([added, filled]).toEqual([0, 1])
+    const tip = edition.sections.find(s => s.id === 'tips')!.stories[0]!
+    expect(tip.id).toBe('W-tip')
+    expect(tip.links.map(l => l.url)).toEqual(['https://d'])
+    // The fresh story id is mapped to the old story it matched.
+    expect(tip.based_on).toBe('W-desk')
   })
 
   test('plistVersion reads an app\'s CFBundleShortVersionString; versionsLine says what is missing', () => {

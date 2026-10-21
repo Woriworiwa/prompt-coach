@@ -1175,6 +1175,9 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
   if (s.summary) children.push(text(E, s.summary, { wrap: 'wrap' }))
   if (s.detail && w.details.includes(s.id)) children.push(text(E, s.detail, { dimColor: true, wrap: 'wrap' }))
   if (s.ask) children.push(text(E, `Ask yourself: ${s.ask}`, { dimColor: true, wrap: 'wrap' }))
+  // A tip names the story it's drawn from (v0.34.0); its links are that story's source.
+  const from = s.based_on ? w.edition?.sections.flatMap(sec => sec.stories.map(st => ({ st, sec }))).find(x => x.st.id === s.based_on) : undefined
+  if (from) children.push(text(E, `From the story "${from.st.title}" in ${from.sec.title}`, { dimColor: true, wrap: 'wrap' }))
   if (s.links.length) {
     children.push(E.Box({ key: `links-${s.id}`, flexDirection: 'row', columnGap: 2, flexWrap: 'wrap', children: s.links.map(l => E.Link({ href: l.url, label: l.label })) }))
   }

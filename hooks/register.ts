@@ -1118,8 +1118,8 @@ async function writeEdition($: EngineInterface, update = false): Promise<void> {
       weekJob = { state: 'failed', title: week.title, editionId: week.id, reason: `the answer couldn't be read as an edition: ${parsed.reason}.`, raw: reply.text.slice(0, 20_000) }
     } else {
       const old = update ? editions[week.id] : undefined
-      const merged = old ? mergeEdition(old, parsed.edition) : { edition: parsed.edition, added: 0 }
-      if (!old || merged.added) {
+      const merged = old ? mergeEdition(old, parsed.edition) : { edition: parsed.edition, added: 0, filled: 0 }
+      if (!old || merged.added || merged.filled) {
         await $.store.set(STORE.weekEditions, { ...editions, [week.id]: merged.edition })
         editions = { ...editions, [week.id]: merged.edition }
       }
@@ -1130,7 +1130,9 @@ async function writeEdition($: EngineInterface, update = false): Promise<void> {
           ? `${parsed.edition.title} is ready in the coach pane's Week tab.`
           : merged.added
             ? `Added ${merged.added} new ${merged.added === 1 ? 'story' : 'stories'} to ${old.title}.`
-            : `No new stories for ${old.title}; it's unchanged.`,
+            : merged.filled
+              ? `No new stories for ${old.title}; added sources to ${merged.filled} that had none.`
+              : `No new stories for ${old.title}; it's unchanged.`,
       )
     }
   } catch (err) {

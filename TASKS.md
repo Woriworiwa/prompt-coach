@@ -124,3 +124,4 @@ Notes from the build:
 - v0.33.2: News story boxes breathe: padding 'md' across and 'sm' down, 'sm' between a story's parts, 'md' between stories. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
 - v0.33.3: Ask in side chat shows on every News story; a story the writer gave no prompt asks its title. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
 - v0.33.4: Ask in side chat no longer shows a "Press Enter" toast; the clipboard fallback's toast stays. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
+- v0.34.0: tips name the story they're drawn from (based_on) and link its source; the pane shows "From the story … in …". Rewrite fills old link-less tips (title match) instead of duplicating them. 148 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.

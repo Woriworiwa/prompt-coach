@@ -1617,6 +1617,22 @@ function updateAnswer(): string {
   return JSON.stringify(e)
 }
 
+test('Week: a tip says which story it comes from and links that story\'s source (v0.34.0)', async ($, on) => {
+  const e = JSON.parse(WEEK_ANSWER)
+  e.sections.push({ id: 'tips', title: 'Try this week', range: null, note: null, stories: [
+    { id: '2026-W42-tip-idle', title: 'Leave a long session idle once', summary: 'See what idle compaction does.', links: [{ label: 'Claude Code v2.1.299 release notes', url: 'https://github.com/anthropics/claude-code/releases/tag/v2.1.299' }], detail: null, ask: null, prompt: null, based_on: '2026-W42-idle' },
+  ] })
+  const r = parseEdition(JSON.stringify(e), '2026-W42')
+  if (!('edition' in r)) throw new Error(r.reason)
+  const { ui } = await weekPane($, on, { saved: { weekEditions: { '2026-W42': r.edition } } })
+  const tip = JSON.stringify(boxNode(await ui.drawn(), 'story-2026-W42-tip-idle'))
+  expect(tip).toContain('From the story \\"Idle compaction\\" in Claude Code')
+  expect(tip).toContain('https://github.com/anthropics/claude-code/releases/tag/v2.1.299')
+  // Other stories carry no such line.
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'story-2026-W42-idle'))).not.toContain('From the story')
+  await ui.unmount()
+})
+
 test('Week: Rewrite on an existing week runs at once, keeps everything and adds only the stories it lacks', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: updateAnswer() })
   expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()

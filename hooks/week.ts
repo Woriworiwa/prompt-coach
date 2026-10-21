@@ -14,6 +14,8 @@ export type Story = {
   detail: string | null
   ask: string | null
   prompt: string | null
+  /** A tip's story (v0.34.0): the id of the story in the same edition the tip is drawn from. Absent in older editions. */
+  based_on?: string | null
 }
 export type Section = { id: string; title: string; range: string | null; note: string | null; stories: Story[] }
 export type Question = { text: string; prompt: string | null }
@@ -50,8 +52,9 @@ export type ReadState = Record<string, boolean>
 
 /**
  * Whether two stories are the same item (v0.33.0): the same title (case and
- * spacing aside) and the same link, that is at least one URL in common, or
- * no links on either.
+ * spacing aside) and the same link, that is at least one URL in common. When
+ * either has no links (a tip from before tips had links, v0.34.0), the title
+ * decides.
  */
 export function sameStory(a: Story, b: Story): boolean {
   const title = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -59,7 +62,7 @@ export function sameStory(a: Story, b: Story): boolean {
   const urls = (s: Story) => new Set(s.links.map(l => l.url.trim().replace(/\/+$/, '')))
   const ua = urls(a)
   const ub = urls(b)
-  if (!ua.size && !ub.size) return true
+  if (!ua.size || !ub.size) return true
   return [...ua].some(u => ub.has(u))
 }
 
@@ -71,9 +74,11 @@ export function sameStory(a: Story, b: Story): boolean {
  * section, a section the old edition lacks is added in the fixed order, and a
  * section that had no stories takes the fresh range and note. A new story
  * whose id is taken gets a suffix, so votes stay with the story they were for.
- * New source links are appended. `added` counts the stories added.
+ * New source links are appended. `added` counts the stories added. A story
+ * that is already there but has no links (a tip from before v0.34.0) takes the
+ * fresh one's links and story (`based_on`); `filled` counts those.
  */
-export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; added: number } {
+export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; added: number; filled: number } {
   const all = old.sections.flatMap(s => s.stories)
   const ids = new Set(all.map(s => s.id))
   const freeId = (id: string) => {
@@ -82,13 +87,36 @@ export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; 
     ids.add(next)
     return next
   }
+  // Where each fresh story ends up: the old story it matches, or its new id.
+  const where = new Map<string, string>()
   let added = 0
-  const sections = old.sections.map(s => ({ ...s, stories: [...s.stories] }))
+  let filled = 0
+  const sections = old.sections.map(s => ({ ...s, stories: s.stories.map(st => ({ ...st })) }))
+  const oldStories = sections.flatMap(s => s.stories)
+  const pending: { section: Section; stories: Story[] }[] = []
   for (const fs of fresh.sections) {
-    const news = fs.stories.filter(st => !all.some(o => sameStory(o, st)) && fs.stories.indexOf(st) === fs.stories.findIndex(x => sameStory(x, st)))
-    if (!news.length) continue
-    added += news.length
-    const stories = news.map(st => ({ ...st, id: freeId(st.id) }))
+    const news: Story[] = []
+    for (const st of fs.stories) {
+      const match = oldStories.find(o => sameStory(o, st))
+      if (match) {
+        where.set(st.id, match.id)
+        // Only fill what the old story lacks: a tip's links and story, never anything it already has.
+        if (!match.links.length && st.links.length) {
+          match.links = st.links
+          if (!match.based_on && st.based_on) match.based_on = st.based_on
+          filled++
+        }
+        continue
+      }
+      if (news.some(n => sameStory(n, st))) continue
+      const story = { ...st, id: freeId(st.id) }
+      where.set(st.id, story.id)
+      news.push(story)
+    }
+    if (news.length) pending.push({ section: fs, stories: news })
+  }
+  for (const { section: fs, stories } of pending) {
+    added += stories.length
     const at = sections.find(s => s.id === fs.id)
     if (!at) sections.push({ ...fs, stories })
     else {
@@ -96,6 +124,8 @@ export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; 
       at.stories.push(...stories)
     }
   }
+  // based_on ids came from the fresh edition: point them at where those stories are now.
+  for (const sec of sections) for (const st of sec.stories) if (st.based_on && where.has(st.based_on)) st.based_on = where.get(st.based_on)!
   const order = (id: string) => {
     const i = SECTIONS.findIndex(s => s.id === id)
     return i < 0 ? SECTIONS.length : i
@@ -103,7 +133,7 @@ export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; 
   sections.sort((x, y) => order(x.id) - order(y.id))
   const urls = new Set(old.sources.map(l => l.url))
   const sources = [...old.sources, ...fresh.sources.filter(l => !urls.has(l.url))]
-  return { edition: { ...old, sections, sources }, added }
+  return { edition: { ...old, sections, sources }, added, filled }
 }
 
 /** What a feedback record copies from its story, so the writer needs no old edition. */
@@ -197,12 +227,15 @@ export function parseEdition(text: string, editionId: string): { edition: Editio
         detail: str(st.detail) ?? null,
         ask: str(st.ask) ?? null,
         prompt: str(st.prompt) ?? null,
+        based_on: str(st.based_on) ? storyId(str(st.based_on)!) : null,
       })
     }
     const fallback = SECTIONS.find(x => x.id === id)?.title ?? id
     byId.set(id, { id, title: str(sec.title) ?? fallback, range: str(sec.range) ?? null, note: str(sec.note) ?? null, stories })
   }
   if (seen.size === 0) return { reason: 'the edition has no stories' }
+  // A tip may only point at a story of this edition, never at itself.
+  for (const sec of byId.values()) for (const st of sec.stories) if (st.based_on && (!seen.has(st.based_on) || st.based_on === st.id)) st.based_on = null
 
   if (!byId.has('desktop')) byId.set('desktop', { id: 'desktop', title: 'Claude Desktop', range: null, note: 'Nothing new for Claude Desktop this week.', stories: [] })
   const order = (id: string) => {

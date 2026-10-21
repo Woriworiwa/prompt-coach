@@ -83,7 +83,7 @@ Group stories into these sections, in this order. Leave out any section with no 
 | `limits` | Limits and money | Usage limits, plans, pricing changes that affect a subscriber |
 | `company` | Company and policy | Business news, partnerships, offices, policy, reported stories |
 | `people` | People | Posts and moves by people the reader follows. Name it after the person when there is only one. |
-| `tips` | Try this week | Two or three small, practical Claude Code tips tied to this week's news. These are suggestions, not news, and have no source links. |
+| `tips` | Try this week | Two or three small, practical Claude Code tips tied to this week's news. These are suggestions, not news. Each tip names the story it is drawn from in `based_on` and carries that story's primary link (see "How a story is written"). |
 
 After the sections come three or four **questions to think about**, drawn from the week's stories, each with a prompt the reader can copy.
 
@@ -104,6 +104,7 @@ Each story has:
 - **Links**: one to four "read more" links: the primary source first, then the best explainer. Label each with the site and topic, for example "Claude Code v2.1.295 release notes" or "Claude Code docs: Hooks".
 - **Detail** (optional): background the summary leaves out: what the change means in practice, exact setting names, what it replaces, who it doesn't apply to. Only include it when there is real detail. Never use it for notes about your own research.
 - **Ask** (optional): one question that connects the story to the reader's own work.
+- **Based on** (tips only, required for a tip): the `id` of the story in this edition the tip is drawn from. A tip's links are that story's primary source link or links, so the reader can see where its information comes from; never a link the story doesn't carry. Advice in a tip that goes beyond the story (how often to do it, what to watch out for) is yours: say it as a suggestion.
 - **Prompt** (optional): a ready-made prompt the reader can paste into Claude to act on the story, written as an instruction to Claude, for example "Help me turn one rule from my CLAUDE.md into a hook that blocks the action."
 
 Don't add status tags. Put any doubt in the sentence itself.
@@ -154,6 +155,7 @@ Return one edition as JSON in exactly this shape, and nothing else: no prose bef
 - `story.id` is unique across all editions and never changes after publishing: start it with the edition id, then a short slug, as above. Feedback is keyed to it.
 - `section.note` is the one-line "nothing new this week" text, or null.
 - `detail`, `ask` and `prompt` may be null.
+- A story in `tips` also has `"based_on": "<id of a story in this edition>"`; other stories leave it out or set it to null.
 
 ## Feedback format
 
