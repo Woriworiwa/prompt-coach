@@ -49,16 +49,61 @@ export type FeedbackStore = Record<string, Feedback>
 export type ReadState = Record<string, boolean>
 
 /**
- * Feedback and read marks without edition `id`'s, for when that week's edition
- * is replaced by a new one: its stories, and so their votes, reasons, takes and
- * read marks, go with it.
+ * Whether two stories are the same item (v0.33.0): the same title (case and
+ * spacing aside) and the same link, that is at least one URL in common, or
+ * no links on either.
  */
-export function withoutEditionMarks(feedback: FeedbackStore, read: ReadState, edition: Edition | undefined, id: string): { feedback: FeedbackStore; read: ReadState } {
-  const stories = new Set((edition?.sections ?? []).flatMap(s => s.stories.map(st => st.id)))
-  return {
-    feedback: Object.fromEntries(Object.entries(feedback).filter(([, f]) => f.edition_id !== id)),
-    read: Object.fromEntries(Object.entries(read).filter(([storyId]) => !stories.has(storyId))),
+export function sameStory(a: Story, b: Story): boolean {
+  const title = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase()
+  if (title(a.title) !== title(b.title)) return false
+  const urls = (s: Story) => new Set(s.links.map(l => l.url.trim().replace(/\/+$/, '')))
+  const ua = urls(a)
+  const ub = urls(b)
+  if (!ua.size && !ub.size) return true
+  return [...ua].some(u => ub.has(u))
+}
+
+/**
+ * This week's stored edition with the news a fresh write found that it lacks
+ * (v0.33.0, Rewrite on an existing week). Nothing is removed or changed: every
+ * story, the intro, Top 3, questions and notes stay. A fresh story that is
+ * already there (`sameStory`) is skipped; the others are appended to their
+ * section, a section the old edition lacks is added in the fixed order, and a
+ * section that had no stories takes the fresh range and note. A new story
+ * whose id is taken gets a suffix, so votes stay with the story they were for.
+ * New source links are appended. `added` counts the stories added.
+ */
+export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; added: number } {
+  const all = old.sections.flatMap(s => s.stories)
+  const ids = new Set(all.map(s => s.id))
+  const freeId = (id: string) => {
+    let next = id
+    for (let n = 2; ids.has(next); n++) next = `${id}-${n}`
+    ids.add(next)
+    return next
   }
+  let added = 0
+  const sections = old.sections.map(s => ({ ...s, stories: [...s.stories] }))
+  for (const fs of fresh.sections) {
+    const news = fs.stories.filter(st => !all.some(o => sameStory(o, st)) && fs.stories.indexOf(st) === fs.stories.findIndex(x => sameStory(x, st)))
+    if (!news.length) continue
+    added += news.length
+    const stories = news.map(st => ({ ...st, id: freeId(st.id) }))
+    const at = sections.find(s => s.id === fs.id)
+    if (!at) sections.push({ ...fs, stories })
+    else {
+      if (!at.stories.length) Object.assign(at, { range: fs.range ?? at.range, note: fs.note })
+      at.stories.push(...stories)
+    }
+  }
+  const order = (id: string) => {
+    const i = SECTIONS.findIndex(s => s.id === id)
+    return i < 0 ? SECTIONS.length : i
+  }
+  sections.sort((x, y) => order(x.id) - order(y.id))
+  const urls = new Set(old.sources.map(l => l.url))
+  const sources = [...old.sources, ...fresh.sources.filter(l => !urls.has(l.url))]
+  return { edition: { ...old, sections, sources }, added }
 }
 
 /** What a feedback record copies from its story, so the writer needs no old edition. */

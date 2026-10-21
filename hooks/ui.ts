@@ -161,7 +161,7 @@ export type Actions = {
 /** What the Week tab's controls do. */
 export type WeekActions = {
   write: () => Promise<void> | undefined
-  /** Rewrite this week's stored edition: ask first, then replace it, or cancel. */
+  /** Rewrite this week's stored edition: ask first, then add the stories it lacks (nothing is removed), or cancel. */
   redo: () => void
   redoConfirm: () => Promise<void> | undefined
   redoCancel: () => void
@@ -1035,7 +1035,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     )
   }
 
-  // This week's edition can be written afresh, from the newest edition only, after a confirm (v0.27.0).
+  // This week's edition can be updated with the news it lacks, from the newest edition only, after a confirm (v0.27.0; adds only since v0.33.0).
   const redoing = hasCurrent && ed?.edition_id === w.currentId && w.job.state !== 'running'
   if (redoing && !w.redoAsk) {
     nav.push(E.Button({ key: 'week-redo', label: w.job.state === 'failed' ? 'Try the rewrite again' : `Rewrite ${w.currentTitle}`, onPress: a.week.redo }))
@@ -1066,9 +1066,9 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
         flexDirection: 'column',
         gap: 1,
         children: [
-          text(E, `Write ${w.currentTitle} again from today's pages? The new edition replaces this one, and this week's votes, reasons, takes and read marks go with it. Until it arrives, this one stays.`, { color: 'warning', wrap: 'wrap' }),
+          text(E, `Read today's pages for ${w.currentTitle} again and add the stories it doesn't have yet? Everything already in it stays, with its votes, reasons, takes and read marks.`, { dimColor: true, wrap: 'wrap' }),
           row(E, [
-            E.Button({ key: 'week-redo-confirm', ...tinted(E, 'Replace', 'error'), onPress: a.week.redoConfirm }),
+            E.Button({ key: 'week-redo-confirm', label: 'Add new stories', variant: 'primary', onPress: a.week.redoConfirm }),
             E.Button({ key: 'week-redo-cancel', label: 'Cancel', onPress: a.week.redoCancel }),
           ]),
         ],

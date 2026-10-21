@@ -54,7 +54,7 @@ import {
   type ReadState,
   type WeekSource,
   archiveRows,
-  withoutEditionMarks,
+  mergeEdition,
   DESKTOP_PLIST,
   plistVersion,
   buildWeekRequest,
@@ -1078,16 +1078,16 @@ async function loadVersions($: EngineInterface): Promise<void> {
 }
 
 /**
- * Writes this ISO week's edition. With `replace`, a stored one is written
- * afresh (the Week tab's Rewrite, after a confirm): its feedback isn't sent to
- * the writer, and only once the new edition is stored do the old edition, its
- * votes, reasons, takes and read marks go. A failed rewrite keeps them all.
+ * Writes this ISO week's edition. With `update` (the Week tab's Rewrite, after
+ * a confirm), a stored one is written again from today's pages and merged in
+ * (`mergeEdition`): it keeps every story, vote, reason, take and read mark, and
+ * gains only the stories it doesn't have yet. It is never deleted (v0.33.0).
  */
-async function writeEdition($: EngineInterface, replace = false): Promise<void> {
+async function writeEdition($: EngineInterface, update = false): Promise<void> {
   weekRedoAsk = false
   const now = await $.clock.now()
   const week = isoWeek(now)
-  if (editions[week.id] && !replace) {
+  if (editions[week.id] && !update) {
     weekShown = week.id
     $.ui.invalidate('ui.render')
     return
@@ -1120,7 +1120,7 @@ async function writeEdition($: EngineInterface, replace = false): Promise<void> 
     const reply = await $.model.complete({
       model: weekModel,
       system,
-      prompt: buildWeekRequest(profile, feedbackForPrompt(replace ? withoutEditionMarks(feedback, readState, editions[week.id], week.id).feedback : feedback), week, pages),
+      prompt: buildWeekRequest(profile, feedbackForPrompt(feedback), week, pages),
       maxTokens: WEEK_MAX_TOKENS,
       timeoutMs: WEEK_TIMEOUT_MS,
     })
@@ -1129,18 +1129,21 @@ async function writeEdition($: EngineInterface, replace = false): Promise<void> 
     if ('reason' in parsed) {
       weekJob = { state: 'failed', title: week.title, editionId: week.id, reason: `the answer couldn't be read as an edition: ${parsed.reason}.`, raw: reply.text.slice(0, 20_000) }
     } else {
-      if (replace && editions[week.id]) {
-        const kept = withoutEditionMarks(feedback, readState, editions[week.id], week.id)
-        feedback = kept.feedback
-        readState = kept.read
-        await $.store.set(STORE.weekFeedback, feedback)
-        await $.store.set(STORE.weekRead, readState)
+      const old = update ? editions[week.id] : undefined
+      const merged = old ? mergeEdition(old, parsed.edition) : { edition: parsed.edition, added: 0 }
+      if (!old || merged.added) {
+        await $.store.set(STORE.weekEditions, { ...editions, [week.id]: merged.edition })
+        editions = { ...editions, [week.id]: merged.edition }
       }
-      await $.store.set(STORE.weekEditions, { ...editions, [week.id]: parsed.edition })
-      editions = { ...editions, [week.id]: parsed.edition }
       weekShown = week.id
       weekJob = { state: 'idle' }
-      $.ui.toast(`${parsed.edition.title} is ready in the coach pane's Week tab.`)
+      $.ui.toast(
+        !old
+          ? `${parsed.edition.title} is ready in the coach pane's Week tab.`
+          : merged.added
+            ? `Added ${merged.added} new ${merged.added === 1 ? 'story' : 'stories'} to ${old.title}.`
+            : `No new stories for ${old.title}; it's unchanged.`,
+      )
     }
   } catch (err) {
     weekJob = { state: 'failed', title: week.title, editionId: week.id, reason: message(err) }

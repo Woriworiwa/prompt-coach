@@ -14,6 +14,8 @@ import {
   parseEdition,
   parseWeekSources,
   plistVersion,
+  mergeEdition,
+  sameStory,
   versionsLine,
   profilePath,
   releasesText,
@@ -192,6 +194,34 @@ describe('reading', () => {
 })
 
 describe('source pages', () => {
+  test('sameStory: the same title (case and spacing aside) and a shared link, or no links on either', () => {
+    const st = (title: string, urls: string[]) => ({ id: 'x', title, summary: '', links: urls.map(url => ({ label: '', url })), detail: null, ask: null, prompt: null })
+    expect(sameStory(st('Idle compaction', ['https://a/1']), st('idle  compaction ', ['https://a/1/']))).toBe(true)
+    expect(sameStory(st('Idle compaction', ['https://a/1']), st('Idle compaction', ['https://a/2']))).toBe(false)
+    expect(sameStory(st('Idle compaction', ['https://a/1']), st('Idle compaction, again', ['https://a/1']))).toBe(false)
+    expect(sameStory(st('Tip', []), st('tip', []))).toBe(true)
+    expect(sameStory(st('Tip', []), st('Tip', ['https://a/1']))).toBe(false)
+  })
+
+  test('mergeEdition keeps the old edition whole and appends only new stories, in section order', () => {
+    const st = (id: string, title: string, url: string) => ({ id, title, summary: '', links: [{ label: '', url }], detail: null, ask: null, prompt: null })
+    const base = { edition_id: 'W', title: 'T', date_from: '', date_to: '', intro: 'old', feedback_note: null, top3: ['a'], questions: [{ text: 'q', prompt: null }], sources: [{ label: 's', url: 'https://s/1' }] }
+    const old = { ...base, sections: [{ id: 'limits', title: 'Limits', range: null, note: null, stories: [st('a', 'A', 'https://a')] }] }
+    const fresh = { ...base, intro: 'new', top3: ['z'], sources: [{ label: 's2', url: 'https://s/2' }], sections: [
+      { id: 'code', title: 'Claude Code', range: 'r', note: null, stories: [st('a', 'B', 'https://b'), st('c', 'B', 'https://b')] },
+      { id: 'limits', title: 'Limits', range: null, note: null, stories: [st('a', 'A', 'https://a')] },
+    ] }
+    const { edition, added } = mergeEdition(old, fresh)
+    expect(added).toBe(1)
+    expect(edition.intro).toBe('old')
+    expect(edition.top3).toEqual(['a'])
+    expect(edition.sections.map(s => s.id)).toEqual(['code', 'limits'])
+    expect(edition.sections[0]!.stories.map(s => [s.id, s.title])).toEqual([['a-2', 'B']])
+    expect(edition.sections[1]!.stories.map(s => s.id)).toEqual(['a'])
+    expect(edition.sources.map(s => s.url)).toEqual(['https://s/1', 'https://s/2'])
+    expect(mergeEdition(old, old).added).toBe(0)
+  })
+
   test('plistVersion reads an app\'s CFBundleShortVersionString; versionsLine says what is missing', () => {
     expect(plistVersion('<dict>\n\t<key>CFBundleShortVersionString</key>\n\t<string>3.1623.0</string>\n</dict>')).toBe('3.1623.0')
     expect(plistVersion('<dict><key>CFBundleVersion</key><string>9</string></dict>')).toBeUndefined()

@@ -29,7 +29,7 @@ import {
 } from './lib.ts'
 import { BAR_CELLS, REWRITE_EDITABLE, barCount, barRuns, rowsFor } from './ui.ts'
 import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
-import { parseEdition } from './week.ts'
+import { type Edition, parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
 const ANALYSIS = `<checklist>
@@ -1602,32 +1602,62 @@ test('Week: each story sits in its own box; a section has its title band and no 
   await ui.unmount()
 })
 
-test('Week: Rewrite asks first, then writes this week afresh, replacing the edition and its votes and read marks', async ($, on) => {
-  const answer = WEEK_ANSWER.replace('Idle compaction lands.', 'Desktop v3.1623.0 adds Storage.')
-  const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: answer })
+/** The writer's answer: Idle compaction again (same title and link), a new Claude Code story under Haiku's old id, and a Desktop story. */
+function updateAnswer(): string {
+  const e = JSON.parse(WEEK_ANSWER)
+  e.intro = 'A different intro that must not replace the old one.'
+  const code = e.sections.find((x: { id: string }) => x.id === 'code')
+  // The fresh answer drops Haiku and reuses its id for a new story: Haiku stays, and the new one gets another id.
+  code.stories = code.stories.filter((x: { id: string }) => x.id !== '2026-W42-haiku')
+  code.stories.push({ id: '2026-W42-haiku', title: 'Storage in Settings', summary: 'Settings shows disk space.', links: [{ label: 'Desktop notes', url: 'https://claude.com/docs/cowork/changelog' }], detail: null, ask: null, prompt: null })
+  e.sections.push({ id: 'desktop', title: 'Claude Desktop', range: 'v3.1623.0', note: null, stories: [{ id: '2026-W42-desk', title: 'Desktop v3.1623.0', summary: 'Oct 20: Storage in Settings.', links: [{ label: 'Desktop notes', url: 'https://claude.com/docs/cowork/changelog' }], detail: null, ask: null, prompt: null }] })
+  return JSON.stringify(e)
+}
+
+test('Week: Rewrite on an existing week asks first, then keeps everything and adds only the stories it lacks', async ($, on) => {
+  const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: updateAnswer() })
   expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()
   expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe('Rewrite Claude Week 42')
 
   // The first press only asks; Cancel leaves everything as it was.
   await ui.press({ key: 'week-redo' })
-  expect(await ui.find({ text: /replaces this one, and this week's votes, reasons, takes and read marks go with it/ })).toBeDefined()
-  expect(s.weekRequests).toHaveLength(0)
+  expect(await ui.find({ text: /add the stories it doesn't have yet\? Everything already in it stays/ })).toBeDefined()
+  expect(buttonProps(await ui.drawn(), 'week-redo-confirm')?.label).toBe('Add new stories')
   await ui.press({ key: 'week-redo-cancel' })
   expect(await ui.find({ key: 'week-redo-ask' })).toBeUndefined()
   expect(s.weekRequests).toHaveLength(0)
 
-  // Replace writes it again, without this week's old feedback in the request.
   await ui.press({ key: 'week-redo' })
   await ui.press({ key: 'week-redo-confirm' })
   expect(s.weekRequests).toHaveLength(1)
-  expect(s.weekRequests[0]!.prompt).not.toContain('2026-W42-idle')
-  expect(s.weekRequests[0]!.prompt).toContain('2026-W41-old')
-  expect(await ui.find({ text: 'Desktop v3.1623.0 adds Storage.' })).toBeDefined()
-  expect((saved.get('weekEditions') as Record<string, { intro: string }>)['2026-W42']!.intro).toBe('Desktop v3.1623.0 adds Storage.')
-  // This week's votes and read marks are gone; last week's feedback stays.
-  expect(Object.keys(saved.get('weekFeedback') as object)).toEqual(['2026-W41-old'])
-  expect(saved.get('weekRead')).toEqual({})
-  expect(await ui.find({ text: '0 of 2 stories read' })).toBeDefined()
+  // This week's feedback is sent too: nothing of it is dropped.
+  expect(s.weekRequests[0]!.prompt).toContain('2026-W42-idle')
+  const ed = (saved.get('weekEditions') as Record<string, Edition>)['2026-W42']!
+  // The old intro, stories and their ids stay; the story with the same title and link isn't added twice.
+  expect(ed.intro).toBe('Idle compaction lands.')
+  const code = ed.sections.find(x => x.id === 'code')!.stories.map(x => [x.id, x.title])
+  expect(code).toEqual([['2026-W42-idle', 'Idle compaction'], ['2026-W42-haiku', 'Haiku default'], ['2026-W42-haiku-2', 'Storage in Settings']])
+  // The empty Desktop section takes the new story, its range and its note.
+  const desk = ed.sections.find(x => x.id === 'desktop')!
+  expect(desk.stories.map(x => x.title)).toEqual(['Desktop v3.1623.0'])
+  expect(desk.range).toBe('v3.1623.0')
+  expect(desk.note).toBeNull()
+  // Votes, reasons and read marks all stay.
+  expect(Object.keys(saved.get('weekFeedback') as object).sort()).toEqual(['2026-W41-old', '2026-W42-idle'])
+  expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
+  expect(s.toasts.at(-1)).toBe('Added 2 new stories to Claude Week 42.')
+  await ui.unmount()
+})
+
+test('Week: a Rewrite that finds nothing new leaves the week exactly as it was', async ($, on) => {
+  const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekRead: { '2026-W42-idle': true } } })
+  const before = JSON.stringify(storedEdition().weekEditions['2026-W42'])
+  await ui.press({ key: 'week-redo' })
+  await ui.press({ key: 'week-redo-confirm' })
+  expect(s.weekRequests).toHaveLength(1)
+  expect(saved.has('weekEditions') ? JSON.stringify((saved.get('weekEditions') as Record<string, Edition>)['2026-W42']) : before).toBe(before)
+  expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
+  expect(s.toasts.at(-1)).toBe("No new stories for Claude Week 42; it's unchanged.")
   await ui.unmount()
 })
 
