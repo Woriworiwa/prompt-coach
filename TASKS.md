@@ -123,3 +123,4 @@ Notes from the build:
 - v0.33.1: Rewrite Claude Week NN runs as soon as it's pressed; the confirm step (Add new stories / Cancel) is gone at Omar's say. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
 - v0.33.2: News story boxes breathe: padding 'md' across and 'sm' down, 'sm' between a story's parts, 'md' between stories. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
 - v0.33.3: Ask in side chat shows on every News story; a story the writer gave no prompt asks its title. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.
+- v0.33.4: Ask in side chat no longer shows a "Press Enter" toast; the clipboard fallback's toast stays. 145 tests pass on 2.1.299, 2.1.303 and 2.1.304. Not yet checked in Desktop.

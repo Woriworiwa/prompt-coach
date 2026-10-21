@@ -1759,7 +1759,8 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   expect(s.box).toBe(
     '/btw Explain idle compaction.\n\nThis is about the Claude Week story "Idle compaction".\n\nv2.1.299 (Oct 14) adds idle compaction.\n\nTerminal only.\n\nSources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299',
   )
-  expect(s.toasts.at(-1)).toBe('Press Enter to ask it in the side chat.')
+  // No toast telling Omar to press Enter (v0.33.4).
+  expect(s.toasts.some(t => /Press Enter/.test(t))).toBe(false)
   await ui.press({ key: 'week-q-aside-2026-W42-0' })
   // Paragraphs are separated by a blank line (v0.31.2).
   expect(s.box).toBe('/btw Audit my hooks.\n\nFrom the questions in Claude Week 42: "Which hooks enforce a rule?"')

@@ -1224,12 +1224,9 @@ async function toggleRead($: EngineInterface, id: string): Promise<void> {
  */
 async function askAside($: EngineInterface, text: string): Promise<void> {
   const btw = `/btw ${text}`
-  // Only fills; Omar sends it (v0.31.1, which dropped v0.30.1's leading-space trial).
+  // Only fills; Omar sends it (v0.31.1, which dropped v0.30.1's leading-space trial), with no toast (v0.33.4).
   const filled = await $.prompt.fill({ text: btw, mode: 'replace' })
-  if (filled.isFilled) {
-    $.ui.toast('Press Enter to ask it in the side chat.')
-    return
-  }
+  if (filled.isFilled) return
   const copied = await $.ui.copy({ text: btw })
   $.ui.toast(
     copied.isCopied
