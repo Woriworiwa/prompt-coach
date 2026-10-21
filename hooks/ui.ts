@@ -1106,11 +1106,12 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     }),
   )
 
+  // Each section: its title on the subtle band and its note, with no box of its own; each story is boxed instead (v0.32.0).
   for (const s of ed.sections) {
-    const children: RenderElement[] = []
+    const children: RenderElement[] = [E.Box({ backgroundColor: 'subtle', paddingX: 1, children: [heading(E, s.range ? `${s.title} · ${s.range}` : s.title)] })]
     if (s.note) children.push(text(E, s.note, { dimColor: true, wrap: 'wrap' }))
     for (const story of s.stories) children.push(storyCard(E, w, a, story, F))
-    out.push(group(E, `week-${s.id}`, s.range ? `${s.title} · ${s.range}` : s.title, children))
+    out.push(E.Box({ key: `group-week-${s.id}`, flexDirection: 'column', gap: 1, children }))
   }
 
   if (ed.questions.length) {
@@ -1181,6 +1182,7 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
   if (w.read[s.id]) {
     return E.Box({
       key: `story-${s.id}`,
+      ...STORY_BOX,
       flexDirection: 'row',
       columnGap: 2,
       flexWrap: 'wrap',
@@ -1246,8 +1248,11 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
   const saved = w.saves[s.id]
   if (saved) children.push(text(E, saved, { ...(saved.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' }))
 
-  return E.Box({ key: `story-${s.id}`, flexDirection: 'column', children })
+  return E.Box({ key: `story-${s.id}`, ...STORY_BOX, flexDirection: 'column', children })
 }
+
+/** Each story's box on the News tab (v0.32.0): the round subtle border the pane's other boxes use. */
+const STORY_BOX = { borderStyle: 'round', borderColor: 'subtle', paddingX: 1 } as const
 
 // ---- Small builders ----
 

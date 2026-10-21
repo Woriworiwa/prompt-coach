@@ -1590,6 +1590,18 @@ test('Week: no Desktop version and no Info.plist reads as not found', async ($, 
   await ui.unmount()
 })
 
+test('Week: each story sits in its own box; a section has its title band and no box (v0.32.0)', async ($, on) => {
+  const { ui } = await weekPane($, on, { saved: { ...storedEdition(), weekRead: { '2026-W42-haiku': true } } })
+  const tree = await ui.drawn()
+  const section = boxNode(tree, 'group-week-code')!
+  expect(section.props.borderStyle).toBeUndefined()
+  expect((section.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBe('subtle')
+  for (const id of ['story-2026-W42-idle', 'story-2026-W42-haiku']) {
+    expect(boxNode(tree, id)?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle', paddingX: 1 })
+  }
+  await ui.unmount()
+})
+
 test('Week: Rewrite asks first, then writes this week afresh, replacing the edition and its votes and read marks', async ($, on) => {
   const answer = WEEK_ANSWER.replace('Idle compaction lands.', 'Desktop v3.1623.0 adds Storage.')
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: answer })
