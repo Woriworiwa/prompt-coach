@@ -100,7 +100,9 @@ Give each section a short date or version range, for example "Oct 7 – Oct 9" o
 Each story has:
 
 - **Title**: says what changed, in plain words.
-- **Summary**: two to four sentences. Lead with the version or date, for example "v2.1.299 (Oct 14) adds idle compaction and…". Plain and factual, no hype.
+- **Summary**: two to four sentences. Lead with the version or date, for example "v2.1.299 (Oct 14) adds idle compaction and…". Plain and factual, no hype. When it covers more than one release or change, give each its own paragraph, separated by a blank line (`\n\n`). Put commands, settings, environment variables, file names and flags in backticks, for example `/auto-mode-setup` or `CLAUDE_CODE_AUTO_MODE_MODEL`; the pane draws them as code.
+- **Tag**: a short uppercase category line shown above the title, two parts joined by " // ": the kind of change, then the area. For example "NEW FEATURE // CLI-AGENT", "FIX // DESKTOP", "POLICY // COMPANY", "TIP // WORKFLOW". At most 40 characters.
+- **Version** (optional): the version the story is mainly about, as a badge, for example "v2.1.304" or "v3.1623.0"; for a range, the newest with a plus, "v2.1.300+". Null when the story isn't about a release.
 - **Links**: one to four "read more" links: the primary source first, then the best explainer. Label each with the site and topic, for example "Claude Code v2.1.295 release notes" or "Claude Code docs: Hooks".
 - **Detail** (optional): background the summary leaves out: what the change means in practice, exact setting names, what it replaces, who it doesn't apply to. Only include it when there is real detail. Never use it for notes about your own research.
 - **Ask** (optional): one question that connects the story to the reader's own work.
@@ -132,6 +134,8 @@ Return one edition as JSON in exactly this shape, and nothing else: no prose bef
         {
           "id": "2026-W42-idle-compaction",
           "title": "Idle compaction: the session tidies itself while you're away",
+          "tag": "NEW FEATURE // CLI-AGENT",
+          "version": "v2.1.299",
           "summary": "v2.1.299 (Oct 14) adds idle compaction…",
           "links": [
             { "label": "Claude Code v2.1.299 release notes", "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.299" }
@@ -154,7 +158,7 @@ Return one edition as JSON in exactly this shape, and nothing else: no prose bef
 
 - `story.id` is unique across all editions and never changes after publishing: start it with the edition id, then a short slug, as above. Feedback is keyed to it.
 - `section.note` is the one-line "nothing new this week" text, or null.
-- `detail`, `ask` and `prompt` may be null.
+- `detail`, `ask`, `prompt` and `version` may be null; `tag` is always given.
 - A story in `tips` also has `"based_on": "<id of a story in this edition>"`; other stories leave it out or set it to null.
 
 ## Feedback format

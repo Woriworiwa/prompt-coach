@@ -259,6 +259,16 @@ describe('source pages', () => {
     expect(tip.based_on).toBe('W-desk')
   })
 
+  test('mergeEdition gives old stories the tag and version they lack, without touching anything else', () => {
+    const st = (id: string, extra: Record<string, unknown> = {}) => ({ id, title: 'A', summary: 's', links: [{ label: '', url: 'https://a' }], detail: null, ask: null, prompt: null, ...extra })
+    const base = { edition_id: 'W', title: 'T', date_from: '', date_to: '', intro: '', feedback_note: null, top3: [], questions: [], sources: [] }
+    const old = { ...base, sections: [{ id: 'code', title: 'Claude Code', range: null, note: null, stories: [st('W-a')] }] }
+    const fresh = { ...base, sections: [{ id: 'code', title: 'Claude Code', range: null, note: null, stories: [st('W-b', { tag: 'FIX // DESKTOP', version: 'v1', summary: 'other' })] }] }
+    const { edition, added, filled } = mergeEdition(old, fresh)
+    expect([added, filled]).toEqual([0, 1])
+    expect(edition.sections[0]!.stories[0]).toMatchObject({ id: 'W-a', summary: 's', tag: 'FIX // DESKTOP', version: 'v1' })
+  })
+
   test('plistVersion reads an app\'s CFBundleShortVersionString; versionsLine says what is missing', () => {
     expect(plistVersion('<dict>\n\t<key>CFBundleShortVersionString</key>\n\t<string>3.1623.0</string>\n</dict>')).toBe('3.1623.0')
     expect(plistVersion('<dict><key>CFBundleVersion</key><string>9</string></dict>')).toBeUndefined()

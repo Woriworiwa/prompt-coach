@@ -1006,10 +1006,10 @@ function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
  */
 function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const w = v.week
-  // The installed versions first, on the edition and the archive alike (v0.30.0).
-  const versions = E.Box({ key: 'week-versions', children: [text(E, versionsLine(w.versions.code, w.versions.desktop), { dimColor: true, wrap: 'wrap' })] })
+  // The installed versions first, on the edition and the archive alike (v0.30.0), as the design's "SYS:" line (v0.35.0).
+  const versions = E.Box({ key: 'week-versions', children: [spans(E, [['SYS: ', { color: 'claude' }], [versionsLine(w.versions.code, w.versions.desktop), { dimColor: true }]], { wrap: 'wrap' })] })
   if (w.archive) return [versions, ...weekArchive(E, v, a)]
-  const out: RenderElement[] = [versions]
+  const out: RenderElement[] = []
   const ed = w.edition
 
   const i = ed ? w.editionIds.indexOf(ed.edition_id) : -1
@@ -1032,77 +1032,156 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   }
 
   // This week's edition can be updated with the news it lacks, from the newest edition only (v0.27.0; adds only since
-  // v0.33.0; no confirm since v0.33.1, at Omar's say: a press runs it).
+  // v0.33.0; no confirm since v0.33.1, at Omar's say: a press runs it). ":rewrite" and primary, as the design has it (v0.35.0).
   const redoing = hasCurrent && ed?.edition_id === w.currentId && w.job.state !== 'running'
   if (redoing) {
-    nav.push(E.Button({ key: 'week-redo', label: w.job.state === 'failed' ? 'Try the rewrite again' : `Rewrite ${w.currentTitle}`, onPress: a.week.redo }))
+    nav.push(E.Button({ key: 'week-redo', label: w.job.state === 'failed' ? 'Try the rewrite again' : `:rewrite ${w.currentTitle}`, variant: 'primary', onPress: a.week.redo }))
   }
 
+  const status: RenderElement[] = []
   if (w.job.state === 'running') {
     const at = new Date(w.job.startedAt).toISOString().slice(11, 16)
-    out.push(text(E, `${w.job.title}, started ${at} UTC: ${w.job.progress} You can keep working.`, { color: 'suggestion', wrap: 'wrap' }))
+    status.push(mono(E, `${w.job.title}, started ${at} UTC: ${w.job.progress} You can keep working.`, { color: 'suggestion', wrap: 'wrap' }))
   } else if (w.job.state === 'failed') {
-    out.push(text(E, `Couldn't write ${w.job.title}: ${w.job.reason}`, { color: 'warning', wrap: 'wrap' }))
+    status.push(mono(E, `Couldn't write ${w.job.title}: ${w.job.reason}`, { color: 'warning', wrap: 'wrap' }))
   }
 
   if (!ed) {
-    out.push(text(E, "No edition yet. Write reads the pages listed under Settings → Claude Week, then the Week model writes the week's stories.", { dimColor: true, wrap: 'wrap' }))
+    out.push(versions, ...status)
+    out.push(mono(E, "No edition yet. Write reads the pages listed under Settings → Claude Week, then the Week model writes the week's stories.", { dimColor: true, wrap: 'wrap' }))
     if (nav.length) out.push(row(E, nav))
     return out
   }
 
+  // The header card (the Stitch design, v0.35.0): SYS line, "> title · dates", the intro, then the buttons.
   const range = ed.date_from && ed.date_to ? ` · ${dateRange(ed.date_from, ed.date_to)}` : ''
-  out.push(heading(E, `${ed.title}${range}`))
-  if (ed.intro) out.push(text(E, ed.intro, { wrap: 'wrap' }))
-  if (ed.feedback_note) out.push(text(E, `From your feedback: ${ed.feedback_note}`, { dimColor: true, wrap: 'wrap' }))
-  if (nav.length) out.push(row(E, nav))
+  out.push(
+    E.Box({
+      key: 'week-head',
+      ...CARD,
+      children: [
+        versions,
+        ...hairline(E, v, 'week-head-1'),
+        spans(E, [['> ', { color: 'claude' }], [ed.title, {}], [range, { dimColor: true, weight: 'regular' }]], { size: 'title', weight: 'bold', wrap: 'wrap' }),
+        ...(ed.intro ? [mono(E, ed.intro, { wrap: 'wrap' })] : []),
+        ...(ed.feedback_note ? [mono(E, `From your feedback: ${ed.feedback_note}`, { dimColor: true, wrap: 'wrap' })] : []),
+        ...status,
+        ...(nav.length ? [...hairline(E, v, 'week-head-2'), row(E, nav)] : []),
+      ],
+    }),
+  )
+
   const all = ed.sections.flatMap(s => s.stories)
   const top = ed.top3.map(id => all.find(s => s.id === id)).filter((s): s is Story => !!s)
   if (top.length) {
     out.push(
       E.Box({
         key: 'week-top3',
-        flexDirection: 'column',
+        ...CARD,
+        borderColor: 'claude',
         children: [
-          heading(E, 'Top 3'),
+          E.Box({
+            key: 'week-top3-head',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            children: [mono(E, '[▲] TOP 3 STORIES', { color: 'warning', weight: 'bold' }), mono(E, 'PRIORITY_QUEUE', { dimColor: true })],
+          }),
           ...top.map((s, n) => {
             const section = ed.sections.find(x => x.stories.includes(s))?.title ?? ''
-            return text(E, `${w.read[s.id] ? '✓' : `${n + 1}.`} ${s.title}${section ? ` — ${section}` : ''}`, { wrap: 'wrap', dimColor: !!w.read[s.id] })
+            const done = !!w.read[s.id]
+            return E.Box({
+              key: `week-top3-${n}`,
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              columnGap: 1,
+              children: [
+                mono(E, done ? '✓' : `${n + 1}.`, done ? { color: 'success' } : { color: 'warning', weight: 'bold' }),
+                E.Box({
+                  flexDirection: 'column',
+                  flexShrink: 1,
+                  children: [
+                    mono(E, s.title, { wrap: 'wrap', ...(done ? { dimColor: true, strikethrough: true } : {}) }),
+                    ...(section ? [mono(E, `— ${section}`, { dimColor: true, wrap: 'wrap', ...(done ? { strikethrough: true } : {}) })] : []),
+                  ],
+                }),
+              ],
+            })
           }),
         ],
       }),
     )
   }
 
+  // Reading status: the count, a bar, and a chip per section (orange while reading, green when done).
   const counts = readCounts(ed, w.read)
+  const pct = counts.total ? Math.round((counts.read / counts.total) * 100) : 0
   out.push(
     E.Box({
       key: 'week-progress',
-      flexDirection: 'column',
+      ...CARD,
       children: [
-        text(E, `${counts.read} of ${counts.total} stories read`),
-        text(E, counts.sections.map(s => `${s.title} ${s.read}/${s.total}`).join(' · '), { dimColor: true, wrap: 'wrap' }),
+        E.Box({
+          key: 'week-progress-head',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          children: [
+            spans(E, [['> ', { color: 'suggestion' }], ['Reading Status:', {}]]),
+            mono(E, `${counts.read} / ${counts.total} stories read (${pct}%)`, { color: 'claude', weight: 'bold' }),
+          ],
+        }),
+        progressBar(E, v, pct),
+        E.Box({
+          key: 'week-progress-chips',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 'sm',
+          children: counts.sections.map(c => {
+            const tone = c.total && c.read === c.total ? 'success' : c.read ? 'claude' : undefined
+            return E.Box({
+              key: `week-chip-${c.id}`,
+              borderStyle: 'round',
+              borderColor: tone ?? 'subtle',
+              paddingX: 'sm',
+              children: [mono(E, `${c.title}: ${c.read}/${c.total}`, tone ? { color: tone } : {})],
+            })
+          }),
+        }),
       ],
     }),
   )
 
-  // Each section: its title on the subtle band and its note, with no box of its own; each story is boxed instead (v0.32.0).
+  // Each section: an uppercase title with its range and a line, a note in an amber box, then its stories, each boxed.
   for (const s of ed.sections) {
-    const children: RenderElement[] = [E.Box({ backgroundColor: 'subtle', paddingX: 1, children: [heading(E, s.range ? `${s.title} · ${s.range}` : s.title)] })]
-    if (s.note) children.push(text(E, s.note, { dimColor: true, wrap: 'wrap' }))
-    for (const story of s.stories) children.push(storyCard(E, w, a, story, F))
+    const children: RenderElement[] = [
+      spans(E, [[s.title.toUpperCase(), { color: 'claude', weight: 'bold' }], [s.range ? ` · ${s.range}` : '', { dimColor: true }]], { wrap: 'wrap' }),
+      ...hairline(E, v, `week-section-${s.id}`),
+    ]
+    if (s.note) {
+      children.push(
+        E.Box({
+          key: `week-note-${s.id}`,
+          borderStyle: 'round',
+          borderColor: 'warning',
+          paddingX: 'sm',
+          children: [spans(E, [['[!] ', { color: 'warning' }], [s.note, { dimColor: true }]], { wrap: 'wrap' })],
+        }),
+      )
+    }
+    for (const story of s.stories) children.push(storyCard(E, w, a, story, F, v))
     out.push(E.Box({ key: `group-week-${s.id}`, flexDirection: 'column', gap: 'md', children }))
   }
 
   if (ed.questions.length) {
-    out.push(heading(E, 'Questions to think about'))
+    out.push(spans(E, [['QUESTIONS TO THINK ABOUT', { color: 'claude', weight: 'bold' }]]))
     for (const [n, q] of ed.questions.entries()) {
       out.push(
         E.Box({
           key: `week-q-${ed.edition_id}-${n}`,
-          flexDirection: 'column',
+          ...CARD,
           children: [
-            text(E, q.text, { wrap: 'wrap' }),
+            spans(E, [['? ', { color: 'warning', weight: 'bold' }], [q.text, { italic: true }]], { wrap: 'wrap' }),
             ...(q.prompt ? [E.Button({ key: `week-q-aside-${ed.edition_id}-${n}`, label: 'Ask in side chat', onPress: () => a.week.askAside(asideAboutQuestion(q, ed.title)) })] : []),
           ],
         }),
@@ -1115,11 +1194,29 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       E.Box({
         key: 'week-sources',
         flexDirection: 'column',
-        children: [heading(E, 'Sources'), ...ed.sources.map(l => E.Link({ href: l.url, label: l.label }))],
+        children: [spans(E, [['SOURCES', { color: 'claude', weight: 'bold' }]]), ...ed.sources.map(l => E.Link({ href: l.url, label: `${l.label} ↗` }))],
       }),
     )
   }
+  out.push(E.Box({ key: 'week-end', flexDirection: 'row', justifyContent: 'center', children: [mono(E, '[ END OF STREAM ]', { dimColor: true })] }))
   return out
+}
+
+/** The reading bar: a drawn bar (solid for read, dotted for the rest) where the surface draws Svg, else a text bar. */
+function progressBar(E: UI, v: View, pct: number): RenderElement {
+  const label = mono(E, `${pct}% COMPLETE`, { dimColor: true })
+  if (!E.Svg || (v.surface !== 'desktop' && v.surface !== 'mobile')) {
+    const cells = 20
+    const fill = Math.round((pct / 100) * cells)
+    return E.Box({ key: 'week-bar', flexDirection: 'row', columnGap: 2, children: [mono(E, '█'.repeat(fill), { color: 'claude' }), mono(E, '░'.repeat(cells - fill), { dimColor: true }), label] })
+  }
+  const w = 1000
+  const fill = Math.round((pct / 100) * w)
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="24" viewBox="0 0 ${w} 24" preserveAspectRatio="none">` +
+    `<defs><pattern id="d" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="${CLAY}" fill-opacity="0.7"/></pattern></defs>` +
+    `<rect width="${w}" height="24" fill="url(#d)" fill-opacity="0.5"/><rect width="${fill}" height="24" fill="${CLAY}"/></svg>`
+  return E.Box({ key: 'week-bar', flexDirection: 'column', gap: 'xs', children: [E.Svg({ source: svg, alt: `${pct}% read`, height: 12 }), label] })
 }
 
 /**
@@ -1158,7 +1255,7 @@ function weekArchive(E: UI, v: View, a: Actions): RenderElement[] {
  * Ask in side chat. A vote opens its reason field; Your take opens its own.
  * On mobile, which has no fields, saved reasons and takes show as text.
  */
-function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderElement {
+function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form, v?: View): RenderElement {
   if (w.read[s.id]) {
     return E.Box({
       key: `story-${s.id}`,
@@ -1166,29 +1263,70 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
       flexDirection: 'row',
       columnGap: 2,
       flexWrap: 'wrap',
-      children: [text(E, `✓ ${s.title}`, { dimColor: true, wrap: 'wrap' }), E.Button({ key: `read-${s.id}`, label: 'Reopen', onPress: () => a.week.toggleRead(s.id) })],
+      alignItems: 'center',
+      children: [spans(E, [['✓ ', { color: 'success' }], [s.title, { dimColor: true }]], { wrap: 'wrap' }), E.Button({ key: `read-${s.id}`, label: 'Reopen', onPress: () => a.week.toggleRead(s.id) })],
     })
   }
 
   const fb = w.feedback[s.id]
-  const children: RenderElement[] = [text(E, s.title, { weight: 'semibold', wrap: 'wrap' })]
-  if (s.summary) children.push(text(E, s.summary, { wrap: 'wrap' }))
-  if (s.detail && w.details.includes(s.id)) children.push(text(E, s.detail, { dimColor: true, wrap: 'wrap' }))
-  if (s.ask) children.push(text(E, `Ask yourself: ${s.ask}`, { dimColor: true, wrap: 'wrap' }))
+  // The head (v0.35.0): the writer's tag over "> title", the version badge on the right, then a line.
+  const head = E.Box({
+    key: `story-head-${s.id}`,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    columnGap: 2,
+    children: [
+      E.Box({
+        flexDirection: 'column',
+        flexShrink: 1,
+        children: [
+          ...(s.tag ? [mono(E, s.tag, { color: 'warning', dimColor: true, size: 'footnote' })] : []),
+          spans(E, [['> ', { color: 'claude' }], [s.title, {}]], { weight: 'bold', wrap: 'wrap' }),
+        ],
+      }),
+      ...(s.version ? [E.Box({ key: `story-version-${s.id}`, borderStyle: 'round', borderColor: 'subtle', paddingX: 'sm', children: [mono(E, s.version, { dimColor: true })] })] : []),
+    ],
+  })
+  const children: RenderElement[] = [head, ...(v ? hairline(E, v, `story-${s.id}`) : [])]
+  for (const para of s.summary.split(/\n{2,}/).filter(p => p.trim())) children.push(codeText(E, para.trim(), { wrap: 'wrap' }))
+  if (s.detail && w.details.includes(s.id)) children.push(codeText(E, s.detail, { dimColor: true, wrap: 'wrap' }))
+  if (s.ask) {
+    children.push(
+      E.Box({
+        key: `ask-${s.id}`,
+        borderStyle: 'round',
+        borderColor: 'subtle',
+        paddingX: 'md',
+        paddingY: 'sm',
+        flexDirection: 'column',
+        gap: 'xs',
+        children: [mono(E, '? ASK YOURSELF:', { color: 'warning', weight: 'bold' }), mono(E, s.ask, { italic: true, wrap: 'wrap' })],
+      }),
+    )
+  }
   // A tip names the story it's drawn from (v0.34.0); its links are that story's source.
   const from = s.based_on ? w.edition?.sections.flatMap(sec => sec.stories.map(st => ({ st, sec }))).find(x => x.st.id === s.based_on) : undefined
-  if (from) children.push(text(E, `From the story "${from.st.title}" in ${from.sec.title}`, { dimColor: true, wrap: 'wrap' }))
+  if (from) children.push(mono(E, `From the story "${from.st.title}" in ${from.sec.title}`, { dimColor: true, wrap: 'wrap' }))
   if (s.links.length) {
-    children.push(E.Box({ key: `links-${s.id}`, flexDirection: 'row', columnGap: 2, flexWrap: 'wrap', children: s.links.map(l => E.Link({ href: l.url, label: l.label })) }))
+    children.push(
+      E.Box({
+        key: `links-${s.id}`,
+        flexDirection: 'row',
+        columnGap: 2,
+        flexWrap: 'wrap',
+        children: [mono(E, 'REF:', { dimColor: true }), ...s.links.map(l => E.Link({ href: l.url, label: `${l.label} ↗` }))],
+      }),
+    )
   }
+  if (v) children.push(...hairline(E, v, `story-${s.id}-actions`))
 
   const voteButton = (verdict: 'up' | 'down', label: string) =>
     E.Button({ key: `${verdict}-${s.id}`, label, ...(fb?.verdict === verdict ? { variant: 'primary' as const } : {}), onPress: () => a.week.vote(s.id, verdict) })
+  // Two rows of three, as the design lays them out.
   children.push(
+    row(E, [voteButton('up', '▲ Up'), voteButton('down', '▼ Down'), ...(F ? [E.Button({ key: `take-${s.id}`, label: 'Your take', onPress: () => a.week.toggleTake(s.id) })] : [])]),
     row(E, [
-      voteButton('up', '▲ Up'),
-      voteButton('down', '▼ Down'),
-      ...(F ? [E.Button({ key: `take-${s.id}`, label: 'Your take', onPress: () => a.week.toggleTake(s.id) })] : []),
       E.Button({ key: `read-${s.id}`, label: 'Mark read', onPress: () => a.week.toggleRead(s.id) }),
       ...(s.detail ? [E.Button({ key: `detail-${s.id}`, label: w.details.includes(s.id) ? 'Less detail' : 'More detail', onPress: () => a.week.toggleDetail(s.id) })] : []),
       // On every story (v0.33.3): with no prompt from the writer, the story's title is the question (asideAboutStory).
@@ -1225,14 +1363,37 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
       )
     }
   } else if (fb?.why || fb?.take) {
-    if (fb.why) children.push(text(E, `Why: ${fb.why}`, { dimColor: true, wrap: 'wrap' }))
-    if (fb.take) children.push(text(E, `Your take: ${fb.take}`, { dimColor: true, wrap: 'wrap' }))
-    children.push(text(E, 'Edit these in Desktop or the terminal.', { dimColor: true }))
+    if (fb.why) children.push(mono(E, `Why: ${fb.why}`, { dimColor: true, wrap: 'wrap' }))
+    if (fb.take) children.push(mono(E, `Your take: ${fb.take}`, { dimColor: true, wrap: 'wrap' }))
+    children.push(mono(E, 'Edit these in Desktop or the terminal.', { dimColor: true }))
   }
   const saved = w.saves[s.id]
-  if (saved) children.push(text(E, saved, { ...(saved.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' }))
+  if (saved) children.push(mono(E, saved, { ...(saved.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' }))
 
   return E.Box({ key: `story-${s.id}`, ...STORY_BOX, flexDirection: 'column', gap: 'sm', children })
+}
+
+/** A card on the News tab (v0.35.0): the header, Top 3, reading status and questions. */
+const CARD = { flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 'md', paddingY: 'sm', gap: 'sm' } as const
+
+/** The clay orange inside the reading bar's Svg, which can't use theme colors. */
+const CLAY = '#D97757'
+
+/** Monospaced text, the News tab's face since v0.35.0. */
+function mono(E: UI, value: string, props: Record<string, unknown> = {}): RenderElement {
+  return E.Text({ mono: true, ...props, children: [value] })
+}
+
+/** One monospaced line of runs, each with its own color and style; empty runs are left out. */
+function spans(E: UI, runs: [string, Record<string, unknown>][], props: Record<string, unknown> = {}): RenderElement {
+  return E.Text({ mono: true, ...props, children: runs.filter(([t]) => t).map(([t, p]) => (Object.keys(p).length ? E.Text({ ...p, children: [t] }) : t)) })
+}
+
+/** Monospaced text whose `backticked` parts are drawn as code chips: clay on the subtle background. */
+function codeText(E: UI, value: string, props: Record<string, unknown> = {}): RenderElement {
+  const parts = value.split('`')
+  if (parts.length < 3) return mono(E, value, props)
+  return spans(E, parts.map((t, i) => [t, i % 2 ? { color: 'claude', backgroundColor: 'subtle' } : {}] as [string, Record<string, unknown>]), props)
 }
 
 /**

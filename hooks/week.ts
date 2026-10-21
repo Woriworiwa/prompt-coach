@@ -16,6 +16,10 @@ export type Story = {
   prompt: string | null
   /** A tip's story (v0.34.0): the id of the story in the same edition the tip is drawn from. Absent in older editions. */
   based_on?: string | null
+  /** A short uppercase category line over the title, such as "NEW FEATURE // CLI-AGENT" (v0.35.0). */
+  tag?: string | null
+  /** The version the story is about, shown as a badge, such as "v2.1.304" (v0.35.0). */
+  version?: string | null
 }
 export type Section = { id: string; title: string; range: string | null; note: string | null; stories: Story[] }
 export type Question = { text: string; prompt: string | null }
@@ -101,11 +105,16 @@ export function mergeEdition(old: Edition, fresh: Edition): { edition: Edition; 
       if (match) {
         where.set(st.id, match.id)
         // Only fill what the old story lacks: a tip's links and story, never anything it already has.
+        let gained = false
         if (!match.links.length && st.links.length) {
           match.links = st.links
           if (!match.based_on && st.based_on) match.based_on = st.based_on
-          filled++
+          gained = true
         }
+        // The v0.35.0 look's tag and version badge, for stories written before them.
+        if (!match.tag && st.tag) (match.tag = st.tag), (gained = true)
+        if (!match.version && st.version) (match.version = st.version), (gained = true)
+        if (gained) filled++
         continue
       }
       if (news.some(n => sameStory(n, st))) continue
@@ -228,6 +237,8 @@ export function parseEdition(text: string, editionId: string): { edition: Editio
         ask: str(st.ask) ?? null,
         prompt: str(st.prompt) ?? null,
         based_on: str(st.based_on) ? storyId(str(st.based_on)!) : null,
+        tag: str(st.tag)?.toUpperCase().slice(0, 40) ?? null,
+        version: str(st.version)?.slice(0, 24) ?? null,
       })
     }
     const fallback = SECTIONS.find(x => x.id === id)?.title ?? id
@@ -491,7 +502,7 @@ export function asideAboutStory(s: Story): string {
   return paragraphs([
     s.prompt ?? s.title,
     `This is about the Claude Week story "${s.title}".`,
-    s.summary,
+    ...s.summary.split(/\n{2,}/),
     s.detail,
     s.links.length ? `Sources: ${s.links.map(l => l.url).join(', ')}` : '',
   ])

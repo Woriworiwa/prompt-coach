@@ -1555,10 +1555,12 @@ test('Week: Write reads the source pages, asks the Week model once, and its answ
   expect(Object.keys(saved.get('weekEditions') as object)).toEqual(['2026-W42'])
   expect(saved.has('weekJob')).toBe(false)
   expect(s.toasts.at(-1)).toContain('Claude Week 42 is ready')
-  expect(await ui.find({ text: 'Claude Week 42 · Oct 10 – Oct 17' })).toBeDefined()
+  // The header card's title, as the Stitch design draws it (v0.35.0).
+  expect(await ui.find({ text: '> Claude Week 42 · Oct 10 – Oct 17' })).toBeDefined()
   expect(await ui.find({ text: /From your feedback: Shortened release stories/ })).toBeDefined()
-  expect(await ui.find({ text: '1. Idle compaction — Claude Code' })).toBeDefined()
-  expect(await ui.find({ text: '0 of 2 stories read' })).toBeDefined()
+  const top1 = JSON.stringify(boxNode(await ui.drawn(), 'week-top3-0'))
+  for (const part of ['1.', 'Idle compaction', '— Claude Code']) expect(top1).toContain(part)
+  expect(await ui.find({ text: '0 / 2 stories read (0%)' })).toBeDefined()
   expect(await ui.find({ text: /Nothing new for Claude Desktop/ })).toBeDefined()
   expect(await ui.find({ type: 'Link', text: 'Claude Code v2.1.299 release notes' })).toBeDefined()
   // This week's edition exists, so there's nothing to write.
@@ -1595,7 +1597,9 @@ test('Week: each story sits in its own box; a section has its title band and no 
   const tree = await ui.drawn()
   const section = boxNode(tree, 'group-week-code')!
   expect(section.props.borderStyle).toBeUndefined()
-  expect((section.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBe('subtle')
+  // The section title: uppercase in clay with its range, on no band (v0.35.0).
+  expect((section.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBeUndefined()
+  expect(JSON.stringify(section.kids[0])).toContain('CLAUDE CODE')
   for (const id of ['story-2026-W42-idle', 'story-2026-W42-haiku']) {
     expect(boxNode(tree, id)?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle', paddingX: 'md', paddingY: 'sm' })
   }
@@ -1633,10 +1637,44 @@ test('Week: a tip says which story it comes from and links that story\'s source 
   await ui.unmount()
 })
 
+test('Week: the Stitch look: SYS line, header card, Top 3 and reading cards, tag and version, code chips, ask box, REF links, end line (v0.35.0)', async ($, on) => {
+  const e = JSON.parse(WEEK_ANSWER)
+  const idle = e.sections.find((x: { id: string }) => x.id === 'code').stories[0]
+  Object.assign(idle, { tag: 'new feature // cli-agent', version: 'v2.1.299', summary: 'v2.1.299 (Oct 14) adds `/compact` when idle.\n\nv2.1.298 set `CLAUDE_X`.', ask: 'Would you want it?' })
+  const r = parseEdition(JSON.stringify(e), '2026-W42')
+  if (!('edition' in r)) throw new Error(r.reason)
+  const { ui } = await weekPane($, on, { saved: { weekEditions: { '2026-W42': r.edition }, weekRead: { '2026-W42-haiku': true } }, engine: '2.1.304', desktopEnv: '3.1623.0' })
+  const tree = await ui.drawn()
+  const head = JSON.stringify(boxNode(tree, 'week-head'))
+  for (const part of ['SYS: ', 'Claude Code 2.1.304 · Claude Desktop 3.1623.0', '> ', 'Idle compaction lands.']) expect(head).toContain(part)
+  expect(boxNode(tree, 'week-head')?.props.borderStyle).toBe('round')
+  // Top 3: amber head, and a read story struck through.
+  const top = JSON.stringify(boxNode(tree, 'week-top3'))
+  expect(top).toContain('[▲] TOP 3 STORIES')
+  expect(top).toContain('PRIORITY_QUEUE')
+  const read = JSON.stringify(boxNode(tree, 'week-top3-1'))
+  expect(read).toContain('Haiku default')
+  expect(read).toContain('"strikethrough":true')
+  expect(read).toContain('✓')
+  expect(boxNode(tree, 'week-top3')?.props.borderColor).toBe('claude')
+  expect(JSON.stringify(boxNode(tree, 'week-progress'))).toContain('1 / 2 stories read (50%)')
+  // The story: its tag uppercased, the version badge, paragraphs, code chips, the ask box and REF links.
+  const card = JSON.stringify(boxNode(tree, 'story-2026-W42-idle'))
+  expect(card).toContain('NEW FEATURE // CLI-AGENT')
+  expect(JSON.stringify(boxNode(tree, 'story-version-2026-W42-idle'))).toContain('v2.1.299')
+  expect(card).toContain('"backgroundColor":"subtle"},"children":["/compact"]')
+  expect(card).toContain('CLAUDE_X')
+  expect(JSON.stringify(boxNode(tree, 'ask-2026-W42-idle'))).toContain('? ASK YOURSELF:')
+  expect(card).toContain('REF:')
+  expect(card).toContain('release notes ↗')
+  expect(await ui.find({ text: '[ END OF STREAM ]' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('Week: Rewrite on an existing week runs at once, keeps everything and adds only the stories it lacks', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: updateAnswer() })
   expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()
-  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe('Rewrite Claude Week 42')
+  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe(':rewrite Claude Week 42')
 
   // One press runs it: no confirm (v0.33.1).
   await ui.press({ key: 'week-redo' })
@@ -1789,13 +1827,16 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
 
   await ui.press({ key: 'read-2026-W42-idle' })
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
-  expect(await ui.find({ text: '✓ Idle compaction' })).toBeDefined()
-  expect(await ui.find({ text: '1 of 2 stories read' })).toBeDefined()
-  expect(await ui.find({ text: 'Claude Code 1/2' })).toBeDefined()
+  // Folded to a green check and the dim title (v0.35.0).
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'story-2026-W42-idle'))).toMatch(/✓ .*Idle compaction/)
+  expect(await ui.find({ text: '1 / 2 stories read (50%)' })).toBeDefined()
+  // A chip per section (v0.35.0), clay while partly read.
+  expect(await ui.find({ text: 'Claude Code: 1/2' })).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'week-chip-code')?.props.borderColor).toBe('claude')
   expect(buttonProps(await ui.drawn(), 'up-2026-W42-idle')).toBeUndefined()
   await ui.press({ key: 'read-2026-W42-idle' })
   expect(saved.get('weekRead')).toEqual({})
-  expect(await ui.find({ text: '0 of 2 stories read' })).toBeDefined()
+  expect(await ui.find({ text: '0 / 2 stories read (0%)' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1804,10 +1845,10 @@ test('Week: Older and Newer step through the stored editions', async ($, on) => 
   const { ui } = await weekPane($, on, { saved: { weekEditions: { ...storedEdition().weekEditions, '2026-W41': older.edition } } })
   expect(buttonProps(await ui.drawn(), 'week-newer')).toBeUndefined()
   await ui.press({ key: 'week-older' })
-  expect(await ui.find({ text: /^Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'week-older')).toBeUndefined()
   await ui.press({ key: 'week-newer' })
-  expect(await ui.find({ text: /^Claude Week 42/ })).toBeDefined()
+  expect(await ui.find({ text: /^> Claude Week 42/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1877,10 +1918,11 @@ test('Week: Archive lists every edition with its counts, and Open shows an older
   expect(buttonProps(await ui.drawn(), 'up-2026-W42-idle')).toBeUndefined()
 
   await ui.press({ key: 'week-open-2026-W41' })
-  expect(await ui.find({ text: /^Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
   expect(buttonLook(await ui.drawn(), 'up-2026-W41-idle')?.variant).toBe('primary')
   expect(await ui.find({ type: 'Input', key: 'take-field-2026-W41-idle' })).toBeDefined()
-  expect(await ui.find({ text: '✓ Haiku default' })).toBeDefined()
+  // Folded to a green check and the dim title (v0.35.0).
+  expect(JSON.stringify(await ui.drawn())).toMatch(/✓ .{0,200}Haiku default/)
 
   // Feedback on an older week saves like any other.
   await ui.press({ key: 'up-2026-W41-idle' })
@@ -1888,7 +1930,7 @@ test('Week: Archive lists every edition with its counts, and Open shows an older
 
   await ui.press({ key: 'week-archive' })
   await ui.press({ key: 'week-archive-back' })
-  expect(await ui.find({ text: /^Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'week-archive-back')).toBeUndefined()
   await ui.unmount()
 })
