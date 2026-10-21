@@ -168,21 +168,8 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 - v0.31.2 News: the side-chat text's paragraphs (prompt, story title, summary, detail, sources) are separated by blank lines in the box.
 - v0.31.1 News: Ask in side chat puts "/btw …" in the box and doesn't send it; Enter opens the side chat. If Desktop sends it at once, the mod isn't the cause (it never submits).
 - v0.30.0 News: the top line reads "Claude Code 2.1.304 · Claude Desktop 3.1623.0".
-- v0.29.0 Coach: no Copy to prompt; Send alone under the rewrite.
+- The Coach and Settings layout changes of v0.18.0–v0.29.0 (14 items, each in TASKS.md): check them together, in one pass over the Coach and Settings tabs.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
-- v0.26.2 Coach: checklist marks and names sit at the top of a wrapped note.
-- v0.26.1 Coach: gap questions indented like the suggestions; no "Read as a reply" note.
-- v0.26.0 Coach: no Your draft label; Send right under the rewrite; gap questions with no heading; suggestions in their own list after the gaps, none left in the checklist.
-- v0.25.3 Coach: Rewrite stays highlighted (primary) after a rewrite.
-- v0.25.2 Coach: each gap's Pick dropdown and Or type field on one line.
-- v0.25.0 Coach: the button reads Rewrite (Rewriting… while it runs); no heading above the rewrite box.
-- v0.24.2 Coach: Analyze always active, responds to every press.
-- v0.24.0 Coach: each checklist item's name and note on one row.
-- v0.23.0 Coach: no rules-date line; Your draft stays filled after an analysis and changes when you type; Your draft follows typing within about a second.
-- v0.22.0 Coach: Analyze under Your draft; Send sends.
-- v0.21.0 Coach: the Checklist in a box, a line between items, the note under each name, "Suggestion:" labels, spacing between entries; does it read clearly now?
-- v0.20.0–0.20.1 Settings: each section in a bordered box like Analytics' Rules, the title on no band with no padding, the rows a cell in; hairlines still between rows. Analytics: Rules' items and Statistics a cell in; Rules' title on no background (v0.20.2).
-- v0.18.0 Coach: one Checklist, no sub-tabs; under a missing item, "Rewrite" and why when the rewrite fixed it; Other changes and Other suggestions at the end.
 - Coach: Send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
 - A real `/coach refresh` after a source page changes. So far only the baseline run has happened.
 
