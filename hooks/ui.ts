@@ -1188,7 +1188,8 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
       ...(F ? [E.Button({ key: `take-${s.id}`, label: 'Your take', onPress: () => a.week.toggleTake(s.id) })] : []),
       E.Button({ key: `read-${s.id}`, label: 'Mark read', onPress: () => a.week.toggleRead(s.id) }),
       ...(s.detail ? [E.Button({ key: `detail-${s.id}`, label: w.details.includes(s.id) ? 'Less detail' : 'More detail', onPress: () => a.week.toggleDetail(s.id) })] : []),
-      ...(s.prompt ? [E.Button({ key: `aside-${s.id}`, label: 'Ask in side chat', onPress: () => a.week.askAside(asideAboutStory(s)) })] : []),
+      // On every story (v0.33.3): with no prompt from the writer, the story's title is the question (asideAboutStory).
+      E.Button({ key: `aside-${s.id}`, label: 'Ask in side chat', onPress: () => a.week.askAside(asideAboutStory(s)) }),
     ]),
   )
 

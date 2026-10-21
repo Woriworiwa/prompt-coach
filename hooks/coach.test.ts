@@ -1764,8 +1764,11 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   // Paragraphs are separated by a blank line (v0.31.2).
   expect(s.box).toBe('/btw Audit my hooks.\n\nFrom the questions in Claude Week 42: "Which hooks enforce a rule?"')
   expect(s.submitted).toEqual([])
-  // A story with no prompt has no side chat button.
-  expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')).toBeUndefined()
+  // A story with no prompt has the button too (v0.33.3), and its title is the question.
+  expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')?.label).toBe('Ask in side chat')
+  await ui.press({ key: 'aside-2026-W42-haiku' })
+  expect(s.box).toBe('/btw Haiku default\n\nThis is about the Claude Week story "Haiku default".\n\nOct 15: Haiku 5.5 is the default.')
+  expect(s.submitted).toEqual([])
 
   await ui.press({ key: 'read-2026-W42-idle' })
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
