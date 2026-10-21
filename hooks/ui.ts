@@ -90,8 +90,6 @@ export type WeekView = {
   /** This ISO week's edition id and title, which the write button names. */
   currentId: string
   currentTitle: string
-  /** True while Rewrite this week waits for its confirm. */
-  redoAsk: boolean
   /** The Claude Code version this session runs and the installed Claude Desktop version, shown at the top of the tab. */
   versions: { code?: string; desktop?: string }
   feedback: FeedbackStore
@@ -161,10 +159,8 @@ export type Actions = {
 /** What the Week tab's controls do. */
 export type WeekActions = {
   write: () => Promise<void> | undefined
-  /** Rewrite this week's stored edition: ask first, then add the stories it lacks (nothing is removed), or cancel. */
-  redo: () => void
-  redoConfirm: () => Promise<void> | undefined
-  redoCancel: () => void
+  /** Rewrite this week's stored edition at once: add the stories it lacks (nothing is removed). */
+  redo: () => Promise<void> | undefined
   show: (editionId: string) => void
   vote: (storyId: string, verdict: 'up' | 'down') => Promise<void>
   /** Typing only notes the text (and saves it quietly after a pause); Enter saves and redraws. */
@@ -1035,9 +1031,10 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     )
   }
 
-  // This week's edition can be updated with the news it lacks, from the newest edition only, after a confirm (v0.27.0; adds only since v0.33.0).
+  // This week's edition can be updated with the news it lacks, from the newest edition only (v0.27.0; adds only since
+  // v0.33.0; no confirm since v0.33.1, at Omar's say: a press runs it).
   const redoing = hasCurrent && ed?.edition_id === w.currentId && w.job.state !== 'running'
-  if (redoing && !w.redoAsk) {
+  if (redoing) {
     nav.push(E.Button({ key: 'week-redo', label: w.job.state === 'failed' ? 'Try the rewrite again' : `Rewrite ${w.currentTitle}`, onPress: a.week.redo }))
   }
 
@@ -1059,23 +1056,6 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   if (ed.intro) out.push(text(E, ed.intro, { wrap: 'wrap' }))
   if (ed.feedback_note) out.push(text(E, `From your feedback: ${ed.feedback_note}`, { dimColor: true, wrap: 'wrap' }))
   if (nav.length) out.push(row(E, nav))
-  if (redoing && w.redoAsk) {
-    out.push(
-      E.Box({
-        key: 'week-redo-ask',
-        flexDirection: 'column',
-        gap: 1,
-        children: [
-          text(E, `Read today's pages for ${w.currentTitle} again and add the stories it doesn't have yet? Everything already in it stays, with its votes, reasons, takes and read marks.`, { dimColor: true, wrap: 'wrap' }),
-          row(E, [
-            E.Button({ key: 'week-redo-confirm', label: 'Add new stories', variant: 'primary', onPress: a.week.redoConfirm }),
-            E.Button({ key: 'week-redo-cancel', label: 'Cancel', onPress: a.week.redoCancel }),
-          ]),
-        ],
-      }),
-    )
-  }
-
   const all = ed.sections.flatMap(s => s.stories)
   const top = ed.top3.map(id => all.find(s => s.id === id)).filter((s): s is Story => !!s)
   if (top.length) {

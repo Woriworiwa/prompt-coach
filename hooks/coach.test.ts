@@ -1614,21 +1614,14 @@ function updateAnswer(): string {
   return JSON.stringify(e)
 }
 
-test('Week: Rewrite on an existing week asks first, then keeps everything and adds only the stories it lacks', async ($, on) => {
+test('Week: Rewrite on an existing week runs at once, keeps everything and adds only the stories it lacks', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: updateAnswer() })
   expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()
   expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe('Rewrite Claude Week 42')
 
-  // The first press only asks; Cancel leaves everything as it was.
+  // One press runs it: no confirm (v0.33.1).
   await ui.press({ key: 'week-redo' })
-  expect(await ui.find({ text: /add the stories it doesn't have yet\? Everything already in it stays/ })).toBeDefined()
-  expect(buttonProps(await ui.drawn(), 'week-redo-confirm')?.label).toBe('Add new stories')
-  await ui.press({ key: 'week-redo-cancel' })
   expect(await ui.find({ key: 'week-redo-ask' })).toBeUndefined()
-  expect(s.weekRequests).toHaveLength(0)
-
-  await ui.press({ key: 'week-redo' })
-  await ui.press({ key: 'week-redo-confirm' })
   expect(s.weekRequests).toHaveLength(1)
   // This week's feedback is sent too: nothing of it is dropped.
   expect(s.weekRequests[0]!.prompt).toContain('2026-W42-idle')
@@ -1653,7 +1646,6 @@ test('Week: a Rewrite that finds nothing new leaves the week exactly as it was',
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekRead: { '2026-W42-idle': true } } })
   const before = JSON.stringify(storedEdition().weekEditions['2026-W42'])
   await ui.press({ key: 'week-redo' })
-  await ui.press({ key: 'week-redo-confirm' })
   expect(s.weekRequests).toHaveLength(1)
   expect(saved.has('weekEditions') ? JSON.stringify((saved.get('weekEditions') as Record<string, Edition>)['2026-W42']) : before).toBe(before)
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
@@ -1664,7 +1656,6 @@ test('Week: a Rewrite that finds nothing new leaves the week exactly as it was',
 test('Week: a rewrite that fails keeps this week\'s edition, votes and read marks, and offers to try again', async ($, on) => {
   const { saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: 'I could not reach the sources.' })
   await ui.press({ key: 'week-redo' })
-  await ui.press({ key: 'week-redo-confirm' })
   expect(await ui.find({ text: /Couldn't write Claude Week 42/ })).toBeDefined()
   expect(await ui.find({ text: 'Idle compaction lands.' })).toBeDefined()
   expect(Object.keys(saved.get('weekFeedback') as object).sort()).toEqual(['2026-W41-old', '2026-W42-idle'])

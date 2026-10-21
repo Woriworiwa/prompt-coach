@@ -181,8 +181,6 @@ const WEEK_SAVE_MS = 800
 type StoredJob = WeekJob & { editionId?: string; raw?: string }
 let editions: Editions = {}
 let feedback: FeedbackStore = {}
-/** True while the Week tab asks to confirm rewriting this week's edition. */
-let weekRedoAsk = false
 /** The Claude Code version this session runs and the installed Claude Desktop version, read when the pane opens. */
 let versions: { code?: string; desktop?: string } = {}
 let readState: ReadState = {}
@@ -465,15 +463,7 @@ export const register: Register = (on, options) => {
       reject: () => rejectRefresh($),
       week: {
         write: () => (weekJob.state === 'running' ? undefined : writeEdition($)),
-        redo: () => {
-          weekRedoAsk = true
-          $.ui.invalidate('ui.render')
-        },
-        redoConfirm: () => (weekJob.state === 'running' ? undefined : writeEdition($, true)),
-        redoCancel: () => {
-          weekRedoAsk = false
-          $.ui.invalidate('ui.render')
-        },
+        redo: () => (weekJob.state === 'running' ? undefined : writeEdition($, true)),
         show: id => {
           weekShown = id
           weekArchive = false
@@ -1041,7 +1031,6 @@ function weekView($: EngineInterface, now: number): View['week'] {
     editionIds: ids,
     currentId: week.id,
     currentTitle: week.title,
-    redoAsk: weekRedoAsk,
     versions,
     feedback,
     read: readState,
@@ -1078,13 +1067,12 @@ async function loadVersions($: EngineInterface): Promise<void> {
 }
 
 /**
- * Writes this ISO week's edition. With `update` (the Week tab's Rewrite, after
- * a confirm), a stored one is written again from today's pages and merged in
+ * Writes this ISO week's edition. With `update` (the Week tab's Rewrite, run at
+ * once since v0.33.1), a stored one is written again from today's pages and merged in
  * (`mergeEdition`): it keeps every story, vote, reason, take and read mark, and
  * gains only the stories it doesn't have yet. It is never deleted (v0.33.0).
  */
 async function writeEdition($: EngineInterface, update = false): Promise<void> {
-  weekRedoAsk = false
   const now = await $.clock.now()
   const week = isoWeek(now)
   if (editions[week.id] && !update) {
