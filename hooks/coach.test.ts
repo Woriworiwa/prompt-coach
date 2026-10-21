@@ -1597,8 +1597,11 @@ test('Week: each story sits in its own box; a section has its title band and no 
   expect(section.props.borderStyle).toBeUndefined()
   expect((section.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBe('subtle')
   for (const id of ['story-2026-W42-idle', 'story-2026-W42-haiku']) {
-    expect(boxNode(tree, id)?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle', paddingX: 1 })
+    expect(boxNode(tree, id)?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle', paddingX: 'md', paddingY: 'sm' })
   }
+  // Room between a story's parts, and between the stories (v0.33.2).
+  expect(boxNode(tree, 'story-2026-W42-idle')?.props.gap).toBe('sm')
+  expect(section.props.gap).toBe('md')
   await ui.unmount()
 })
 

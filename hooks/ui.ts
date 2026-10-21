@@ -1091,7 +1091,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     const children: RenderElement[] = [E.Box({ backgroundColor: 'subtle', paddingX: 1, children: [heading(E, s.range ? `${s.title} · ${s.range}` : s.title)] })]
     if (s.note) children.push(text(E, s.note, { dimColor: true, wrap: 'wrap' }))
     for (const story of s.stories) children.push(storyCard(E, w, a, story, F))
-    out.push(E.Box({ key: `group-week-${s.id}`, flexDirection: 'column', gap: 1, children }))
+    out.push(E.Box({ key: `group-week-${s.id}`, flexDirection: 'column', gap: 'md', children }))
   }
 
   if (ed.questions.length) {
@@ -1228,11 +1228,15 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form): RenderEl
   const saved = w.saves[s.id]
   if (saved) children.push(text(E, saved, { ...(saved.startsWith('Not saved') ? { color: 'warning' } : { dimColor: true }), wrap: 'wrap' }))
 
-  return E.Box({ key: `story-${s.id}`, ...STORY_BOX, flexDirection: 'column', children })
+  return E.Box({ key: `story-${s.id}`, ...STORY_BOX, flexDirection: 'column', gap: 'sm', children })
 }
 
-/** Each story's box on the News tab (v0.32.0): the round subtle border the pane's other boxes use. */
-const STORY_BOX = { borderStyle: 'round', borderColor: 'subtle', paddingX: 1 } as const
+/**
+ * Each story's box on the News tab (v0.32.0): the round subtle border the
+ * pane's other boxes use, with room inside (v0.33.2, Omar: "make it breathe").
+ * Named steps, so Desktop sizes them with its own scale.
+ */
+const STORY_BOX = { borderStyle: 'round', borderColor: 'subtle', paddingX: 'md', paddingY: 'sm' } as const
 
 // ---- Small builders ----
 
