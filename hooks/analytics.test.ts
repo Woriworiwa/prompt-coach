@@ -23,7 +23,7 @@ import type { Analysis, CheckStatus } from './lib.ts'
 /** An analysis with the given statuses (others unjudged), rules and suggestions. */
 function analysis(status: Partial<Record<CheckName, CheckStatus>>, rules: string[] = [], additions: Analysis['additions'] = []): Analysis {
   return {
-    checklist: Object.entries(status).map(([item, s]) => ({ item: item as CheckName, status: s, note: '' })),
+    checklist: Object.entries(status).map(([item, s]) => ({ item, status: s!, note: '' })),
     rewrite: 'x',
     changes: rules.map(rule => ({ rule, why: '' })),
     placeholders: [],
@@ -74,8 +74,13 @@ describe('recording', () => {
 
   test('asAnalytics keeps well-formed drafts and drops the rest, and reads the old statistics as none', () => {
     const good: DraftRecord = { at: 1, model: 'x', status: { Goal: 'present' }, rules: ['r'], offered: [{ text: 't' }], added: 1, applied: true }
-    const a = asAnalytics({ drafts: [good, { at: 'no' }, { at: 2, status: { Goal: 'odd', Nope: 'present' } }], tokens: { calls: 1, input: 2 } })
-    expect(a.drafts).toEqual([good, { at: 2, model: '', status: {}, rules: [], offered: [], added: 0, applied: false }])
+    const long = 'x'.repeat(41)
+    const a = asAnalytics({
+      drafts: [good, { at: 'no' }, { at: 2, status: JSON.parse(`{"Goal": "odd", "Examples": "present", "${long}": "present", "": "present", "__proto__": "present"}`) }],
+      tokens: { calls: 1, input: 2 },
+    })
+    // Any item name a rule file could give is kept; an odd status, an empty or over-long name, or __proto__ is not.
+    expect(a.drafts).toEqual([good, { at: 2, model: '', status: { Examples: 'present' }, rules: [], offered: [], added: 0, applied: false }])
     expect(a.tokens).toEqual({ calls: 1, input: 2, output: 0, cacheRead: 0, cacheWrite: 0 })
     expect(asAnalytics({ analyses: 80, gaps: { Goal: 3 }, rules: {}, recent: [] })).toEqual(NO_ANALYTICS)
     expect(asAnalytics(undefined)).toEqual(NO_ANALYTICS)
@@ -83,17 +88,32 @@ describe('recording', () => {
 })
 
 describe('figures', () => {
-  test('draftScore: a point per item present or n/a, half for vague, none for missing or unjudged', () => {
+  test('draftScore: the share of the draft\'s own checklist covered, a point per item present or n/a, half for vague, none for missing', () => {
     const d = recordDraft(NO_ANALYTICS, analysis({ Goal: 'present', Context: 'n/a', Constraints: 'partial', 'Done means': 'missing' }), '', 1).drafts[0]!
-    expect(draftScore(d)).toBe(2.5)
+    expect(draftScore(d)).toBe(2.5 / 4)
+    expect(draftScore(recordDraft(NO_ANALYTICS, analysis({}), '', 1).drafts[0]!)).toBeUndefined()
   })
 
-  test('scoreTrend compares the last 10 drafts with the 10 before, once the earlier window has 5', () => {
-    const weak = analysis({ Goal: 'present' })
+  test('draftScore: an item not on a draft\'s checklist counts neither way, so a five-item list covered in full scores like a six-item one', () => {
+    const { 'Stop rule': _, ...five } = ALL_PRESENT
+    const a = drafts([analysis(five, [], []), analysis(ALL_PRESENT)])
+    expect(a.drafts.map(draftScore)).toEqual([1, 1])
+    // Stop rule applied to one draft only, and is no gap in the other.
+    expect(itemStats(a).find(s => s.item === 'Stop rule')).toMatchObject({ applicable: 1, missing: 0 })
+  })
+
+  test('scoreTrend compares the last 10 drafts with the 10 before, once the earlier window has 5, in whole percent', () => {
+    const weak = analysis({ Goal: 'present', Context: 'missing', Constraints: 'missing', 'Done means': 'missing', 'Stop rule': 'missing', Output: 'missing' })
     // 4 earlier: too few to compare.
-    expect(scoreTrend(drafts([...Array(4).fill(weak), ...Array(10).fill(analysis(ALL_PRESENT))]))).toEqual({ recent: 6 })
-    expect(scoreTrend(drafts([...Array(10).fill(weak), ...Array(10).fill(analysis(ALL_PRESENT))]))).toEqual({ recent: 6, before: 1 })
+    expect(scoreTrend(drafts([...Array(4).fill(weak), ...Array(10).fill(analysis(ALL_PRESENT))]))).toEqual({ recent: 100 })
+    expect(scoreTrend(drafts([...Array(10).fill(weak), ...Array(10).fill(analysis(ALL_PRESENT))]))).toEqual({ recent: 100, before: 17 })
     expect(scoreTrend(NO_ANALYTICS)).toBeUndefined()
+  })
+
+  test('an item only some models\' checklists have is counted by its name, alongside the shared ones', () => {
+    const a = drafts([analysis({ Goal: 'present', Examples: 'missing' }), analysis({ Goal: 'present', Examples: 'missing' })])
+    expect(itemStats(a).map(s => s.item)).toEqual(['Examples', 'Goal'])
+    expect(focus(a)).toMatchObject({ item: 'Examples', gaps: 2, of: 2 })
   })
 
   test('itemStats splits left out from vague, worst first, and compares the last 10 with the 10 before', () => {

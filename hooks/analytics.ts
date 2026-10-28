@@ -8,17 +8,21 @@
 import type { Analysis, CheckStatus } from './lib.ts'
 
 /**
- * Statistics are off while the checklist's design changes (v0.14.0): nothing
- * is recorded and the Analytics tab says so. Stored records are kept as they are.
+ * Statistics were off from v0.14.0 while the checklist moved into the rule
+ * files, and are back since v0.36.0, matched by item name. False records
+ * nothing and the Analytics tab says so; stored records are kept either way.
  */
-export const STATS_ON = false
+export const STATS_ON = true
 
 /**
- * The six items the stored records were judged on, before the checklist moved
- * into the rule files. The statistics read only these, so old records stay readable.
+ * A checklist item's name, as the rule file for the draft's model gives it.
+ * Each record keeps the items its own checklist had, so an item missing from
+ * a draft's list doesn't count for or against it, and items with the same
+ * name are counted together across models.
  */
-export const CHECKLIST = ['Goal', 'Context', 'Constraints', 'Done means', 'Stop rule', 'Output'] as const
-export type CheckName = (typeof CHECKLIST)[number]
+export type CheckName = string
+/** The longest item name kept; anything longer isn't a checklist name. */
+const MAX_NAME = 40
 
 /** How many drafts are kept, newest first; older ones drop off. */
 export const MAX_DRAFTS = 200
@@ -51,7 +55,7 @@ export type Analytics = { drafts: DraftRecord[]; tokens: TokenCounts }
 export const NO_ANALYTICS: Analytics = { drafts: [], tokens: NO_TOKENS }
 
 const STATUSES: readonly CheckStatus[] = ['present', 'partial', 'missing', 'n/a']
-const isItem = (x: unknown): x is CheckName => (CHECKLIST as readonly unknown[]).includes(x)
+const isItem = (x: unknown): x is CheckName => typeof x === 'string' && x.trim() !== '' && x.length <= MAX_NAME && x !== '__proto__'
 
 /** Reads a stored value as Analytics, keeping only well-formed drafts. */
 export function asAnalytics(value: unknown): Analytics {
@@ -134,6 +138,11 @@ export function tokenSummary(a: Analytics): { total: number; input: number; outp
 const isGap = (s: CheckStatus | undefined) => s === 'missing' || s === 'partial'
 const counts = (s: CheckStatus | undefined) => s !== undefined && s !== 'n/a'
 
+/** Every item name in the kept drafts: the newest draft's in its order, then any older ones not in it. */
+export function itemNames(a: Analytics): CheckName[] {
+  return [...new Set(a.drafts.flatMap(d => Object.keys(d.status)))]
+}
+
 /** Gaps (missing or vague) in one item over some drafts, out of the drafts it applied to. */
 function gapsIn(drafts: DraftRecord[], item: CheckName): { gaps: number; of: number } {
   const applicable = drafts.filter(d => counts(d.status[item]))
@@ -155,7 +164,7 @@ export type ItemStat = {
 export function itemStats(a: Analytics): ItemStat[] {
   const recent = a.drafts.slice(0, RECENT)
   const earlier = a.drafts.slice(RECENT, RECENT * 2)
-  return CHECKLIST.map((item): ItemStat => {
+  return itemNames(a).map((item): ItemStat => {
     const of = (s: CheckStatus) => a.drafts.filter(d => d.status[item] === s).length
     const before = gapsIn(earlier, item)
     return {
@@ -173,23 +182,30 @@ export function itemStats(a: Analytics): ItemStat[] {
 }
 
 /**
- * A draft's score out of 6: a full point for each item present or not
- * needed (n/a), half for one that's there but vague, none when missing.
+ * A draft's score, as the share of its own checklist it covers (0 to 1): a
+ * full point for each item present or not needed (n/a), half for one that's
+ * there but vague, none when missing; undefined when it has no items. Items
+ * that weren't on the draft's checklist don't count, so drafts judged on
+ * lists of different lengths compare fairly.
  */
-export function draftScore(d: DraftRecord): number {
-  return CHECKLIST.reduce((sum, item) => {
-    const s = d.status[item]
-    return sum + (s === 'present' || s === 'n/a' ? 1 : s === 'partial' ? 0.5 : 0)
-  }, 0)
+export function draftScore(d: DraftRecord): number | undefined {
+  const statuses = Object.values(d.status)
+  if (!statuses.length) return undefined
+  const points = statuses.reduce((sum, s) => sum + (s === 'present' || s === 'n/a' ? 1 : s === 'partial' ? 0.5 : 0), 0)
+  return points / statuses.length
 }
 
-/** The average score of the last drafts, and of the ones before when there are enough to compare; one decimal. */
+/** The average score of the last drafts, and of the ones before when there are enough to compare; whole percent. */
 export function scoreTrend(a: Analytics): { recent: number; before?: number } | undefined {
-  const avg = (ds: DraftRecord[]) => Math.round((ds.reduce((s, d) => s + draftScore(d), 0) / ds.length) * 10) / 10
-  const recent = a.drafts.slice(0, RECENT)
-  if (!recent.length) return undefined
+  const avg = (ds: DraftRecord[]) => {
+    const scores = ds.map(draftScore).filter((x): x is number => x !== undefined)
+    return scores.length ? Math.round((scores.reduce((s, x) => s + x, 0) / scores.length) * 100) : undefined
+  }
+  const recent = avg(a.drafts.slice(0, RECENT))
+  if (recent === undefined) return undefined
   const earlier = a.drafts.slice(RECENT, RECENT * 2)
-  return { recent: avg(recent), ...(earlier.length >= MIN_BEFORE ? { before: avg(earlier) } : {}) }
+  const before = earlier.length >= MIN_BEFORE ? avg(earlier) : undefined
+  return { recent, ...(before !== undefined ? { before } : {}) }
 }
 
 /** What the drafts do well: up to three items present in at least 60% of the drafts they applied to, best first. */
@@ -207,7 +223,7 @@ export function strengths(a: Analytics): { item: CheckName; present: number; of:
  */
 export function focus(a: Analytics): { item: CheckName; gaps: number; of: number; example?: string } | undefined {
   const recent = a.drafts.slice(0, RECENT)
-  const worst = CHECKLIST.map(item => ({ item, ...gapsIn(recent, item) }))
+  const worst = itemNames(a).map(item => ({ item, ...gapsIn(recent, item) }))
     .filter(x => x.gaps > 0)
     .sort((x, y) => y.gaps / y.of - x.gaps / x.of)[0]
   if (!worst) return undefined

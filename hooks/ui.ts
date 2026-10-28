@@ -861,13 +861,13 @@ function barText(E: UI, n: number, of: number, count: string, width: number): Re
 function scoreLine(E: UI, an: Analytics): RenderElement {
   const t = scoreTrend(an)!
   const n = Math.min(an.drafts.length, RECENT)
-  const trend = t.before === undefined ? '' : t.recent > t.before ? `, up from ${t.before}` : t.recent < t.before ? `, down from ${t.before}` : ', the same as before'
+  const trend = t.before === undefined ? '' : t.recent > t.before ? `, up from ${t.before}%` : t.recent < t.before ? `, down from ${t.before}%` : ', the same as before'
   return E.Box({
     key: 'stats-score',
     flexDirection: 'column',
     children: [
-      text(E, `${plural(an.drafts.length, 'analysis', 'analyses')} · your last ${plural(n, 'draft scores', 'drafts score')} ${t.recent} of 6 on average${trend}.`, { wrap: 'wrap' }),
-      text(E, 'A point for each checklist item a draft covers (or doesn\'t need), half for a vague one.', { dimColor: true, wrap: 'wrap' }),
+      text(E, `${plural(an.drafts.length, 'analysis', 'analyses')} · your last ${plural(n, 'draft covers', 'drafts cover')} ${t.recent}% of the checklist on average${trend}.`, { wrap: 'wrap' }),
+      text(E, 'Each draft against its model\'s checklist: an item covered (or not needed) counts in full, a vague one half.', { dimColor: true, wrap: 'wrap' }),
     ],
   })
 }

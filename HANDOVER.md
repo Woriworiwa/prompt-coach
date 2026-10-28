@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.35.0
+# Handover: prompt-coach v0.36.0
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -37,12 +37,12 @@ Omar's own rules for the coach, chosen on 2026-10-18 so he can change them from 
 
 ## Statistics (Analytics tab)
 
-**Off since v0.14.0** (Omar, 2026-10-18), until the checklist design is agreed: `STATS_ON = false` in `analytics.ts` skips `addUsage`, `recordDraft` and `noteApplied`, `statistics` draws one dim line instead, and the statistics' pane tests run only when it is true (`statsTest`). The stored `analytics` is kept untouched, and it reads only the old six items (`CHECKLIST` now lives in `analytics.ts`). What follows is how they work when on; the v0.11.0 Desktop check waits until they are back.
+**On again since v0.36.0** (Omar's option A, 2026-10-28), after being off from v0.14.0. `STATS_ON` in `analytics.ts` still switches them: false skips `addUsage`, `recordDraft` and `noteApplied`, `statistics` draws one dim line, and `statsTest` skips the pane tests. **Matched by name:** `CheckName` is any string (≤40 characters, not `__proto__`), and each record keeps the statuses of exactly the items its model's checklist had (`parseAnalysis` fills unjudged ones as n/a). `itemNames` lists every name seen, newest draft's order first, so an item one model adds becomes its own row and items with the same name count together. An item missing from a draft's list counts neither way, so general.md's five-item drafts aren't marked down for Stop rule. The drafts stored before v0.14.0 (the old six names) read as they are. Every model's checklist uses the same six names today.
 
 The goal, set by Omar, is to help him write better prompts by showing what he does well and where he can improve. `hooks/analytics.ts` (pure) keeps one `DraftRecord` per analyzed draft, with no draft text: each checklist item's status, the rules behind the changes (each once), the suggestions offered (item and sentence), how many were added, whether the rewrite was applied, and the session's model label. Up to 200 drafts are kept (`MAX_DRAFTS`), newest first, under the store key `analytics`, together with `tokens`. Nothing here calls a model.
 
-- **Recording:** `analyze` calls `addUsage` before parsing, so an unreadable answer still counts its tokens, then `recordDraft`. Apply and Apply and send call `noteApplied` (`recordUse` with the number of suggestions added). Only Analyze and live mode are counted, not /improve; Omar chose that. Session start deletes the store keys `lessons` (statistics before v0.11.0, cleared at Omar's say) and `statsLayout`.
-- **Drawn by `statistics` in `ui.ts`, in this order:** `scoreLine` (the average `draftScore` of the last 10 drafts, `RECENT`, against the 10 before, once there are 5; a point per item present or n/a, half for vague, out of 6), `focusBlock` (the item most often missing or vague lately, with the newest sentence suggested for it), `gapBars` (a bar per item missing or vague, with left out vs vague and last 10 vs the 10 before), `strengthsBlock` (up to 3 items present in at least 60% of drafts), `changedBars` ("What the coach changed most", session model only, each rule once per draft, "x of y"), `adviceLine` (suggestions added of those offered, rewrites applied), `tokensLine` (last, dim), and Clear statistics (`clear-lessons`).
+- **Recording:** `analyze` calls `addUsage` before parsing, so an unreadable answer still counts its tokens, then `recordDraft`. Send calls `noteApplied` (`recordUse` with the number of suggestions added). Only Analyze and live mode are counted, not /improve; Omar chose that. Session start deletes the store keys `lessons` (statistics before v0.11.0, cleared at Omar's say) and `statsLayout`.
+- **Drawn by `statistics` in `ui.ts`, in this order:** `scoreLine` (the average `draftScore` of the last 10 drafts, `RECENT`, against the 10 before, once there are 5, in whole percent: a draft's points over its own item count, a point per item present or n/a, half for vague; a draft with no items is skipped), `focusBlock` (the item most often missing or vague lately, with the newest sentence suggested for it), `gapBars` (a bar per item missing or vague, with left out vs vague and last 10 vs the 10 before), `strengthsBlock` (up to 3 items present in at least 60% of drafts), `changedBars` ("What the coach changed most", session model only, each rule once per draft, "x of y"), `adviceLine` (suggestions added of those offered, rewrites applied), `tokensLine` (last, dim), and Clear statistics (`clear-lessons`).
 - **Bars** (`barRow`, `barText`): monospaced, both parts drawn with █ and the empty part dimmed, counts padded with no-break spaces. Omar picked Bars over three other layouts and confirmed in Desktop that they line up and both parts are the same height. In Desktop's fonts, ░ is shorter than █ and the proportional face gives each character a different width.
 
 ## Rules list (Analytics tab)
@@ -66,7 +66,7 @@ Omar chose option A for merging the Checklist and Why each change (v0.18.0) and 
 - **Format:** each `<changes>` line becomes `item | rule | why`, the item one of the session model's checklist names or Other, e.g. `Done means | Name the finish line | Naming the finish line tells it when the work is complete.` "None" for no changes stays. This changes the analysis format (see Decisions), so it is Omar's call.
 - **Prompt and parser (`lib.ts`):** `analysisSystem`'s `<changes>` instruction and example; `Change` gains `item?: string` like `Addition`; `parseAnalysis` splits on the first two bars and matches the item case-insensitively to the checklist names (as `parseAdditions` does), Other or unknown giving no item. A two-part line (an older reply, or the model ignoring the format) parses as today, falling back to A's name match. `checklistWithFixes` groups by `item`.
 - **Tests:** the `ANALYSIS` fixture in `coach.test.ts` gets three-part lines; `parseAnalysis` tests for tagged, Other, unknown-item and two-part lines; the `analysisSystem(...)` test that compares to the expected system prompt; the pane test "each change the rewrite made sits under the item it fixes" uses tags. `analytics.test.ts` builds changes as `{ rule, why }`, which still compiles with `item` optional.
-- **Statistics (`analytics.ts`):** a draft records `rules` (each change's rule once), which "What the coach changed most" counts. That keeps working if the rule stays the middle field. Tags would also allow counting which items the rewrite fixed most, per model, which fits the open Statistics decision. Statistics are off, so this would land with that redesign; old records simply have no items.
+- **Statistics (`analytics.ts`):** a draft records `rules` (each change's rule once), which "What the coach changed most" counts. That keeps working if the rule stays the middle field. Tags would also allow counting which items the rewrite fixed most, per model, which fits the open Statistics decision. Statistics are on again (v0.36.0, counted by item name), so tags could add a per-item count of fixes; old records simply have no items.
 
 ## Claude Week
 
@@ -93,12 +93,12 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | File | What it holds |
 | --- | --- |
 | `hooks/register.ts` | Every hook and every `$` call, plus the pane state |
-| `hooks/lib.ts` | Pure: prompts, `parseAnalysis`, placeholders, `parseAdditions`, `withAdditions`, `lastReply`, `CHECKLIST`, `dataDir` and the own-rules helpers |
-| `hooks/analytics.ts` | Pure: the statistics (`recordDraft`, `recordUse`, `addUsage`, `itemStats`, `scoreTrend`, `strengths`, `focus`, `rulesFor`, `advice`) |
+| `hooks/lib.ts` | Pure: prompts, `parseAnalysis`, placeholders, `parseAdditions`, `withAdditions`, `lastReply`, `checklistFor`, `dataDir` and the own-rules helpers |
+| `hooks/analytics.ts` | Pure: the statistics (`recordDraft`, `recordUse`, `addUsage`, `itemNames`, `itemStats`, `draftScore`, `scoreTrend`, `strengths`, `focus`, `rulesFor`, `advice`) |
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `analyticsTab`, `statistics`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `hooks/refresh.ts` | Pure: refresh |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 141 tests running, plus the statistics' pane tests (off with the statistics) and `editTest` (off with the editable rewrite). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
+| `hooks/*.test.ts` | 158 tests, the statistics' pane tests included (`statsTest`), plus `editTest` (off with the editable rewrite). `coach.test.ts` holds the pane tests; `analytics.test.ts` and `week.test.ts` hold the pure ones |
 | `rules/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
@@ -116,7 +116,7 @@ npx -y -p typescript@5.6.3 tsc -p . --noEmit --allowImportingTsExtensions
 claude plugin validate . --strict && claude plugin test .
 ```
 
-Run the second line again with Desktop's bundled binaries, `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`: 2.1.299 and, since Desktop v3.1623.0 (2026-10-20), 2.1.304. Desktop refuses the whole module if its version lacks an event. The terminal is on 2.1.303; 2.1.302 is still at `~/.local/share/claude/versions/2.1.302`.
+Run the second line again with Desktop's bundled binaries, `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`: whichever versions are there (`ls` the folder; on 2026-10-28 they were 2.1.308 and 2.1.309, and 2.1.299 and 2.1.304 were gone). Desktop refuses the whole module if its version lacks an event. The terminal is on 2.1.303; 2.1.302 is still at `~/.local/share/claude/versions/2.1.302`.
 
 ## Rules learned the hard way
 
@@ -152,11 +152,10 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 
 ## Left to do
 
-**Decide:** how Statistics come back now that each model has its own checklist (the stored records and the score assume the old six items), then turn them on and check them in Desktop.
-
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.36.0 Analytics: Statistics show again (score in percent, Work on next, Missing or vague bars, What you do well, What the coach changed most, Advice you took, tokens, Clear statistics); a Rewrite adds to them and Send counts as applied. This also covers the v0.11.0 statistics check.
 - v0.35.0 News: the Stitch look (cards, mono, colours, Top 3 strikethrough, bar and chips, story tag and badge, code chips, ask box, REF links, end line); after :rewrite Claude Week 43, stories gain tags and badges.
 - v0.34.0 News: after Rewrite Claude Week 43, each tip shows "From the story … in …" and its source link.
 - v0.33.4 News: Ask in side chat fills the box with no "Press Enter" toast.

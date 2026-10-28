@@ -525,12 +525,12 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.filled).toEqual([rewrite, ''])
   expect(s.submitted).toEqual([{ text: rewrite, origin: { kind: 'plugin', name: 'prompt-coach', asUser: true } }])
   expect(s.box).toBe('')
-  // Statistics are off (v0.14.0): nothing is recorded, and the Analytics tab says so instead of drawing them.
-  expect(saved.get('analytics')).toBeUndefined()
+  // Statistics are on again (v0.36.0): the analysis is recorded as sent, and the Analytics tab draws it.
+  expect((saved.get('analytics') as Analytics).drafts[0]).toMatchObject({ model: 'Opus 5.5', applied: true })
   await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Statistics are off while the checklist design changes.' })).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'stats-missing')).toBeUndefined()
-  expect(await ui.find({ key: 'clear-lessons' })).toBeUndefined()
+  expect(await ui.find({ text: /^1 analysis · your last 1 draft covers \d+% of the checklist on average\.$/ })).toBeDefined()
+  expect(boxNode(await ui.drawn(), 'stats-missing')).toBeDefined()
+  expect(await ui.find({ key: 'clear-lessons' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1985,8 +1985,8 @@ statsTest('Statistics: the eight parts, in order: score, work on next, missing o
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-analytics' })
-  // ANALYSIS scores 2.5: Output and Constraints (n/a) a point each, Goal (vague) half.
-  expect(await ui.find({ text: '2 analyses · your last 2 drafts score 2.5 of 6 on average.' })).toBeDefined()
+  // ANALYSIS scores 2.5 of its 6 items: Output and Constraints (n/a) a point each, Goal (vague) half.
+  expect(await ui.find({ text: '2 analyses · your last 2 drafts cover 42% of the checklist on average.' })).toBeDefined()
   // Goal, Context, Done means and Stop rule are all missing or vague in both; Goal comes first on the checklist.
   expect(await ui.find({ text: 'Work on next: Goal' })).toBeDefined()
   expect(await ui.find({ text: 'Missing or vague in 2 of your last 2 drafts.' })).toBeDefined()
@@ -2094,7 +2094,7 @@ test('Analytics: the statistics first, then a thin line and the rules, and nothi
   const text = JSON.stringify(tree)
   expect(boxNode(tree, 'group-statistics')).toBeDefined()
   expect(boxNode(tree, 'line-analytics')).toBeDefined()
-  expect(text.indexOf('Statistics are off')).toBeLessThan(text.indexOf('group-rule-list'))
+  expect(text.indexOf('No analyses yet')).toBeLessThan(text.indexOf('group-rule-list'))
   expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('group-rule-list'))
   const body = boxNode(tree, 'group-rule-list')
   expect(body).toBeDefined()
@@ -2246,7 +2246,8 @@ test('Checklist from the rule files: Analyze judges by the model\'s own list, wh
   // The rules go with the draft without their checklist: it is in the system prompt.
   expect(s.analyses[0]).toContain('Name the finish line.')
   expect(s.analyses[0]).not.toContain('## Checklist')
-  expect(saved.get('analytics')).toBeUndefined()
+  // The statistics record the draft against the model's own items, by name.
+  expect(Object.keys((saved.get('analytics') as Analytics).drafts[0]!.status)).toEqual(['Goal', 'Done means', 'Stop rule'])
 
   await ui.press({ key: 'tab-analytics' })
   // The model's rules start closed (v0.17.4); Show opens them.
