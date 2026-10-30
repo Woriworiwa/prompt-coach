@@ -6,7 +6,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 
 ## Start here
 
-1. In your first reply, give the current version and what's open (see "Left to do"), and ask Omar about "Option B, parked": whether he wants it built, kept, or the note removed.
+1. In your first reply, give the current version and what's open (see "Left to do").
 2. Don't change code until Omar asks for something. He often starts with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
 4. Open sessions in `~/projects/claude-mods/prompt-coach` so `.claude/CLAUDE.md` loads at launch. It sits in `.claude/` because a `CLAUDE.md` at the plugin root fails `validate --strict`. A session there loads the mod straight from this folder, not from the installed copy.
@@ -57,16 +57,6 @@ Since v0.14.0 the checklist an Analyze judges by comes from the rule files, not 
 - `rulesFor` borrows: a newer version than any file (Opus 6, Sonnet 6.1, Mythos 5.2) gets the newest older file of its family (`MODEL_FAMILIES`), `model` its own label and `isBorrowed`; the pane shows "No rules file for Opus 6 yet; it uses Opus 5.5's." Older models get general.md.
 - Refresh: each model target in `sources.json` also lists the general guide; `REFRESH_SYSTEM` asks for a complete checklist with the four general names kept exactly, a source on every line, and a quoted `<!-- Dropped … -->` comment for any general item dropped; general.md is refreshed first.
 - The model-guide lines it cites are written for system prompts in apps; applying them to prompts typed in Claude Code is a reading Omar accepted.
-
-## Option B, parked (ask Omar about it)
-
-Omar chose option A for merging the Checklist and Why each change (v0.18.0) and asked to keep this for if A doesn't work out. Ask him about it at the start of the next session, and whether to remove this note.
-
-- **Idea:** A groups a change under an item only when the model happens to name its rule like the item; anything else lands in Other changes. B asks the model to tag each change with the item it fixes, the way `<additions>` already are, so the grouping no longer depends on naming. The layout stays as in A, and the label under an item can show the rule's own name instead of "Rewrite".
-- **Format:** each `<changes>` line becomes `item | rule | why`, the item one of the session model's checklist names or Other, e.g. `Done means | Name the finish line | Naming the finish line tells it when the work is complete.` "None" for no changes stays. This changes the analysis format (see Decisions), so it is Omar's call.
-- **Prompt and parser (`lib.ts`):** `analysisSystem`'s `<changes>` instruction and example; `Change` gains `item?: string` like `Addition`; `parseAnalysis` splits on the first two bars and matches the item case-insensitively to the checklist names (as `parseAdditions` does), Other or unknown giving no item. A two-part line (an older reply, or the model ignoring the format) parses as today, falling back to A's name match. `checklistWithFixes` groups by `item`.
-- **Tests:** the `ANALYSIS` fixture in `coach.test.ts` gets three-part lines; `parseAnalysis` tests for tagged, Other, unknown-item and two-part lines; the `analysisSystem(...)` test that compares to the expected system prompt; the pane test "each change the rewrite made sits under the item it fixes" uses tags. `analytics.test.ts` builds changes as `{ rule, why }`, which still compiles with `item` optional.
-- **Statistics (`analytics.ts`):** a draft records `rules` (each change's rule once), which "What the coach changed most" counts. That keeps working if the rule stays the middle field. Tags would also allow counting which items the rewrite fixed most, per model, which fits the open Statistics decision. Statistics are on again (v0.36.0, counted by item name), so tags could add a per-item count of fixes; old records simply have no items.
 
 ## Claude Week
 
