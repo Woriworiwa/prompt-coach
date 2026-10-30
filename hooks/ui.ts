@@ -1281,7 +1281,7 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form, v?: View)
         flexDirection: 'column',
         flexShrink: 1,
         children: [
-          ...(s.tag ? [mono(E, s.tag, { color: 'warning', dimColor: true, size: 'footnote' })] : []),
+          ...(s.tag ? [mono(E, s.tag, { color: 'warning', size: 'footnote' })] : []),
           spans(E, [['> ', { color: 'claude' }], [s.title, {}]], { weight: 'bold', wrap: 'wrap' }),
         ],
       }),
@@ -1389,11 +1389,14 @@ function spans(E: UI, runs: [string, Record<string, unknown>][], props: Record<s
   return E.Text({ mono: true, ...props, children: runs.filter(([t]) => t).map(([t, p]) => (Object.keys(p).length ? E.Text({ ...p, children: [t] }) : t)) })
 }
 
-/** Monospaced text whose `backticked` parts are drawn as code chips: clay on the subtle background. */
+/**
+ * Monospaced text whose `backticked` parts are drawn as code: clay, with no
+ * background (v0.36.1: clay on Desktop's dark subtle fill was hard to read).
+ */
 function codeText(E: UI, value: string, props: Record<string, unknown> = {}): RenderElement {
   const parts = value.split('`')
   if (parts.length < 3) return mono(E, value, props)
-  return spans(E, parts.map((t, i) => [t, i % 2 ? { color: 'claude', backgroundColor: 'subtle' } : {}] as [string, Record<string, unknown>]), props)
+  return spans(E, parts.map((t, i) => [t, i % 2 ? { color: 'claude' } : {}] as [string, Record<string, unknown>]), props)
 }
 
 /**

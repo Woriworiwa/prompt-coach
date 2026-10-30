@@ -1662,7 +1662,11 @@ test('Week: the Stitch look: SYS line, header card, Top 3 and reading cards, tag
   const card = JSON.stringify(boxNode(tree, 'story-2026-W42-idle'))
   expect(card).toContain('NEW FEATURE // CLI-AGENT')
   expect(JSON.stringify(boxNode(tree, 'story-version-2026-W42-idle'))).toContain('v2.1.299')
-  expect(card).toContain('"backgroundColor":"subtle"},"children":["/compact"]')
+  // Code is clay with no background (v0.36.1), and the tag is plain amber, not dimmed.
+  expect(card).toContain('{"color":"claude"},"children":["/compact"]')
+  expect(card).not.toContain('"backgroundColor":"subtle"},"children":["/compact"]')
+  expect(card).toContain('"color":"warning","size":"footnote"')
+  expect(card).not.toMatch(/"color":"warning","dimColor":true,"size":"footnote"/)
   expect(card).toContain('CLAUDE_X')
   expect(JSON.stringify(boxNode(tree, 'ask-2026-W42-idle'))).toContain('? ASK YOURSELF:')
   expect(card).toContain('REF:')
