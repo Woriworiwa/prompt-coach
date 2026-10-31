@@ -1,6 +1,6 @@
 # Handover: prompt-coach v0.38.0
 
-prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/claude-mods/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
+prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
 This file is the only brief and describes the current state. `.claude/CLAUDE.md` imports it into every session and says to keep it current as you go. Version history lives in `TASKS.md` (one line per version) and in the commits. `README.md` describes the mod for Omar.
 
@@ -9,7 +9,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
 1. In your first reply, give the current version and what's open (see "Left to do").
 2. Don't change code until Omar asks for something. He often starts with `/coach` followed by a request.
 3. Every change ships the way "How every change ships" says, every time.
-4. Open sessions in `~/projects/claude-mods/prompt-coach` so `.claude/CLAUDE.md` loads at launch. It sits in `.claude/` because a `CLAUDE.md` at the plugin root fails `validate --strict`. A session there loads the mod straight from this folder, not from the installed copy.
+4. Open sessions in `~/projects/prompt-coach` (moved there from `~/projects/claude-mods/prompt-coach` on 2026-10-31; the business config's marketplace path was re-pointed) so `.claude/CLAUDE.md` loads at launch. It sits in `.claude/` because a `CLAUDE.md` at the plugin root fails `validate --strict`. A session there loads the mod straight from this folder, not from the installed copy.
 
 ## What it does now
 

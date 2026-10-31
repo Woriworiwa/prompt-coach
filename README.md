@@ -96,7 +96,7 @@ A model with no rules file, such as an older or newer model, gets the general ru
 Requires Claude Code 2.1.299 or later (`claude --version`). The pane's text styling needs that version.
 
 ```
-claude plugin marketplace add ~/projects/claude-mods/prompt-coach
+claude plugin marketplace add ~/projects/prompt-coach
 claude plugin install prompt-coach@prompt-coach
 ```
 
@@ -107,7 +107,7 @@ Then start a new session in the Desktop app's Code tab, or run `/reload-plugins`
 - A refresh you accept writes into the cached copy.
 - Settings → Your rules shows the path of your own rules file.
 
-The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLAUDE_CODE_PLUGIN_DIRS`, so there it always runs the cached copy. To run straight from this folder, with edits picked up as you save, use a terminal session: `claude --plugin-dir ~/projects/claude-mods/prompt-coach`.
+The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLAUDE_CODE_PLUGIN_DIRS`, so there it always runs the cached copy. To run straight from this folder, with edits picked up as you save, use a terminal session: `claude --plugin-dir ~/projects/prompt-coach`.
 
 ## Settings
 
