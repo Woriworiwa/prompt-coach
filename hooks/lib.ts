@@ -495,6 +495,22 @@ export function asOfDate(markdown: string): string | undefined {
   return /^As of:\s*(\S+)/m.exec(markdown)?.[1]
 }
 
+/** sources.json: each rules file with the pages it is rebuilt from. */
+export type Sources = { targets: Record<string, string[]> }
+
+/** Reads sources.json, keeping only targets under rules/ and https pages. */
+export function parseSources(json: string): Sources {
+  const raw = JSON.parse(json) as { targets?: Record<string, unknown> }
+  const targets: Record<string, string[]> = {}
+  for (const [target, urls] of Object.entries(raw.targets ?? {})) {
+    if (!/^rules\/[a-z0-9-]+\.md$/.test(target)) continue
+    if (!Array.isArray(urls)) continue
+    const https = urls.filter((u): u is string => typeof u === 'string' && u.startsWith('https://'))
+    if (https.length) targets[target] = https
+  }
+  return { targets }
+}
+
 // ---- Live mode ----
 
 export const LIVE_DEBOUNCE_MS = 1500

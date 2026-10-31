@@ -3,7 +3,6 @@
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type QuickInstruction, type RuleSection } from './lib.ts'
-import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts, versionsLine } from './week.ts'
 
 /** The elements every surface draws, so one tree fits the terminal, Desktop and mobile. */
@@ -52,9 +51,6 @@ export type View = {
   ownRules: OwnRules
   ruleList: RuleList
   sources: string[]
-  refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
-  /** The model that rewrites files on refresh (the refreshModel setting). */
-  refreshModel: string
   settings: Settings
   week: WeekView
 }
@@ -121,7 +117,6 @@ export type WeekJob =
 export type Settings = {
   rewriteModel: string
   rewriteChoices: readonly string[]
-  refreshChoices: readonly string[]
   weekChoices: readonly string[]
   /** Why the model settings can't be changed here, once a change was refused; undefined while they can. */
   readOnlyReason?: string
@@ -129,7 +124,7 @@ export type Settings = {
   note: string
 }
 
-export type ModelSetting = 'rewriteModel' | 'refreshModel' | 'weekModel'
+export type ModelSetting = 'rewriteModel' | 'weekModel'
 
 /** What the pane's controls do. Each may return the work it started, so a press can wait for it. */
 export type Actions = {
@@ -149,10 +144,6 @@ export type Actions = {
   setModel: (field: ModelSetting, value: string) => void
   addRule: (typed: string) => Promise<void>
   removeRule: (rule: string) => Promise<void>
-  refresh: () => Promise<void> | undefined
-  rewriteAll: () => Promise<void> | undefined
-  accept: () => Promise<void>
-  reject: () => Promise<void>
   week: WeekActions
 }
 
@@ -280,7 +271,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   if (!v.modelLabel) {
     out.push(text(E, "This session hasn't said which model it runs yet, so only the general rules apply. The coach picks it up after Claude's next reply.", { color: 'warning', wrap: 'wrap' }))
   } else if (!v.hasModelRules) {
-    out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Add its page to sources.json, then run /coach refresh.`, { color: 'warning' }))
+    out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Its rules come once its guide is added to sources.json and the weekly refresh runs.`, { color: 'warning' }))
   }
 
   // The draft box has no label since v0.26.0.
@@ -612,7 +603,6 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const general: RenderElement[] = [
     settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
     modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Rewrite, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
-    modelSetting(E, a, 'refreshModel', 'Refresh model', 'Rewrites the rules on /coach refresh.', v.refreshModel, st.refreshChoices, st.readOnlyReason, F),
   ]
   const generalNote = st.readOnlyReason
     ? [text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' })]
@@ -620,9 +610,9 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       ? [text(E, st.note, { dimColor: true, wrap: 'wrap' })]
       : []
 
-  // The source pages, always listed: where the rules come from, before the refresh that updates them.
+  // The source pages, always listed: where the rules come from.
   const sources: RenderElement[] = [
-    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules come from.', { dimColor: true, wrap: 'wrap' })] }),
+    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules come from. A weekly check rewrites the rules when one changes, and they arrive with the next plugin update.', { dimColor: true, wrap: 'wrap' })] }),
     ...v.sources.map(url => E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] })),
   ]
 
@@ -635,7 +625,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote, true),
         settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
-        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F)), block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))], [], true),
+        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F)), block(E, 'sources', sources)], [], true),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
       ],
     }),
@@ -814,55 +804,6 @@ function modelSetting(
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-/** /coach refresh: the check, its progress, and each changed file's diff to accept or reject. */
-function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {
-  const r = v.refresh
-  const out: RenderElement[] = [
-    text(
-      E,
-      `Checks the pages in sources.json for changes since your last refresh. Only files whose pages changed are rewritten, by ${v.refreshModel}. Nothing changes until you accept, and your own rules are never touched.`,
-      { wrap: 'wrap', dimColor: true },
-    ),
-  ]
-
-  if (r.isRunning) {
-    out.push(text(E, r.progress, { color: 'suggestion' }))
-    return out
-  }
-  if (r.results.length === 0) {
-    out.push(
-      row(E, [
-        E.Button({ key: 'refresh', label: 'Check sources for updates', variant: 'primary', onPress: a.refresh }),
-        E.Button({ key: 'rewrite-all', label: 'Rewrite all', plain: true, dimColor: true, onPress: a.rewriteAll }),
-      ]),
-    )
-    if (r.progress) out.push(text(E, r.progress, { wrap: 'wrap' }))
-    return out
-  }
-
-  const changed = r.results.filter(x => x.state === 'changed')
-  out.push(text(E, r.progress))
-  for (const x of r.results) {
-    if (x.state === 'same') out.push(text(E, `${x.target}: no change`, { dimColor: true }))
-    if (x.state === 'failed') out.push(text(E, `${x.target}: kept as is (${x.reason})`, { color: 'warning' }))
-  }
-  for (const x of changed) {
-    out.push(heading(E, x.target))
-    out.push(E.Box({ key: `diff-${x.target}`, children: [E.Code({ source: x.diff, format: 'diff', wrap: 'wrap' })] }))
-  }
-  out.push(
-    row(E, [
-      ...(changed.length
-        ? [
-            E.Button({ key: 'accept', label: `Accept ${changed.length} ${changed.length === 1 ? 'file' : 'files'}`, variant: 'primary', onPress: a.accept }),
-            E.Button({ key: 'reject', ...tinted(E, 'Reject', 'error'), onPress: a.reject }),
-          ]
-        : [E.Button({ key: 'reject', label: 'Done', onPress: a.reject })]),
-    ]),
-  )
-  return out
-}
 
 // ---- The Week tab (labelled News since v0.10.1; its key stays tab-week) ----
 

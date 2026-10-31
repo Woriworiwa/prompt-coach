@@ -18,8 +18,6 @@ Inside a conversation, both read your draft as a reply to Claude's last message,
 /coach            open or close the pane
 /coach live       open it in live mode
 /coach manual     open it in manual mode
-/coach refresh    check the source pages for changes and propose updated rules
-/coach refresh all  rewrite every rules file from today's pages
 ```
 
 The pane has three tabs: Coach (`1`) and News (`2`) on the left, and Settings (`3`) at the right end. (The Analytics tab and its statistics were removed in v0.39.0; its rules list moved to Settings.) In the terminal the open tab shows in clay brackets. In the Desktop app it shows as clay text, and the other tabs are dim buttons.
@@ -40,9 +38,9 @@ In order from the top:
 
 **Settings tab** (`3`), laid out like the Desktop app's own settings: four sections (General, Your rules, Rules, Claude Week), each in a bordered box, with a bold title (on no background) and rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual rewrites only when you press Rewrite. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
-- **Rewrite model** and **Refresh model:** two of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
+- **Rewrite model:** one of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
-- **Rules:** first **Rules in use**, what the coach checks drafts against, in two groups, each with its rule count and Show or Hide, both closed at first: **General**, then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead). Each file's checklist and quick instructions show as its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Then the source pages the rules come from, always listed, then the refresh (see "Keeping the rules current" below).
+- **Rules:** first **Rules in use**, what the coach checks drafts against, in two groups, each with its rule count and Show or Hide, both closed at first: **General**, then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead). Each file's checklist and quick instructions show as its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Then the source pages the rules come from, always listed (see "Keeping the rules current" below).
 - **Claude Week:** the **Week model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
 
 **News tab** (`2`): Claude Week.
@@ -61,7 +59,7 @@ In order from the top:
 | What | Where |
 | --- | --- |
 | Prompting rules | `rules/general.md`, plus the session model's file (`opus-5-5.md`, `sonnet-5-5.md`, `haiku-5-5.md`, `fable-5-1.md`, which also covers Mythos 5.1) |
-| Your own rules | `rules.md` in the mod's data folder, `plugins/data/prompt-coach-prompt-coach/` in your Claude config. Edited under Settings → Your rules or by hand. Loaded last, wins on conflict; neither refresh nor an update touches it. |
+| Your own rules | `rules.md` in the mod's data folder, `plugins/data/prompt-coach-prompt-coach/` in your Claude config. Edited under Settings → Your rules or by hand. Loaded last, wins on conflict; neither the weekly refresh nor an update touches it. |
 | Which model you're on | The live session |
 | Checklist, rewrite and reasons | One call to the rewrite model (default `sonnet`), given your draft and the rules above. It can be wrong, so treat it as a second opinion. |
 
@@ -71,11 +69,11 @@ A model with no rules file, such as an older or newer model, gets the general ru
 
 ## Keeping the rules current
 
-`/coach refresh` fetches every page in `sources.json` and compares each with its fingerprint from your last refresh. A file is rewritten only when one of its source pages has changed. That's done by the refresh model (Opus by default), which re-paraphrases the file and changes only what the sources changed. The Settings tab shows a diff per file, under Rules. Nothing is written until you press **Accept**, and **Reject** discards the proposal. Either way, the pages count as reviewed and aren't proposed again until they change. A page that fails to load keeps its file as it is, and it is retried next time.
+A weekly routine on the GitHub repo keeps the rules current (since v0.40.0; before, `/coach refresh` did it in the pane). It follows [`refresh/ROUTINE.md`](refresh/ROUTINE.md):
 
-- **The first refresh** only records the fingerprints and proposes nothing.
-- **No page changed:** the refresh makes no model calls and costs nothing beyond the downloads.
-- **Rewrite all** (or `/coach refresh all`) rewrites every file from today's pages, for when you want a fresh pass anyway. That's one model call per file, 10 today.
+- `scripts/check-sources.mjs` fetches every page in `sources.json` and compares it with its fingerprint in `refresh/fingerprints.json`. When no page changed, the routine stops there, with no model calls.
+- When a page changed, it rewrites only the rules files built from it. It keeps their structure, checklist and Quick instructions, checks each changed line against the page it cites, bumps the patch version and runs the tests.
+- It opens a PR, `Rules refresh YYYY-MM-DD`, with each change and its source. The new rules reach your installed copy after the PR is merged and you run `claude plugin update prompt-coach@prompt-coach`.
 
 ## Install
 
@@ -90,7 +88,6 @@ Then start a new session in the Desktop app's Code tab, or run `/reload-plugins`
 
 **An installed copy runs from Claude Code's plugin cache** (`~/.claude-personal/plugins/cache/prompt-coach/…`), not from this folder. Three things follow:
 - Your edits to the rules here don't reach it until you raise `version` in `.claude-plugin/plugin.json` and run `claude plugin update prompt-coach@prompt-coach`. Your own rules and reader profile aren't part of the install, so they apply at once.
-- A refresh you accept writes into the cached copy.
 - Settings → Your rules shows the path of your own rules file.
 
 The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLAUDE_CODE_PLUGIN_DIRS`, so there it always runs the cached copy. To run straight from this folder, with edits picked up as you save, use a terminal session: `claude --plugin-dir ~/projects/prompt-coach`.
@@ -98,15 +95,13 @@ The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLA
 ## Settings
 
 - `rewriteModel` (default `sonnet`): the model for Rewrite, live mode and `/improve`. `haiku` is faster and cheaper, and `opus` is slower and more careful.
-- `refreshModel` (default `opus`): the model that rewrites the rules on `/coach refresh`. Refresh is rare, and the job is to change only what the sources changed, which Opus does with fewer needless rewordings.
-
 - `weekModel` (default `opus`): the model that writes each Claude Week edition. Writing an edition means reading and checking many pages.
 
 Change them in the pane's Settings tab, in `/config`, or under `pluginConfigs` in your settings file.
 
 ## Cost and access
 
-Each Rewrite, each live analysis, each `/improve` and each file a refresh rewrites is one model request on your own login, counted against your plan or billed to your API key. Like every mod, it runs with your permissions. It reads your prompt box only while the pane is open, sends Claude's last reply with each analysis or `/improve`, reads its own files, and writes only its own `rules/` and `tips/` files, and only when you accept a refresh. It reaches the network only during `/coach refresh`, for the pages in `sources.json`, and when you press Write on the Week tab, for the pages in `week/sources.json`. Writing an edition is one Week model request of about 30,000 tokens in and up to 16,000 out. These fetches and requests are the mod's own, not tool calls, so they need no permission prompt and auto mode doesn't review them.
+Each Rewrite, each live analysis and each `/improve` is one model request on your own login, counted against your plan or billed to your API key. Like every mod, it runs with your permissions. It reads your prompt box only while the pane is open, sends Claude's last reply with each analysis or `/improve`, reads its own files, and writes only your own rules file. It reaches the network only when you press Write on the Week tab, for the pages in `week/sources.json`. Writing an edition is one Week model request of about 30,000 tokens in and up to 16,000 out. These fetches and requests are the mod's own, not tool calls, so they need no permission prompt and auto mode doesn't review them.
 
 ## Develop
 
@@ -115,4 +110,4 @@ claude plugin validate .
 claude plugin test .
 ```
 
-`hooks/lib.ts`, `hooks/refresh.ts` and `hooks/week.ts` hold the pure logic, `hooks/ui.ts` the pane's drawing, and `hooks/register.ts` the hooks and every mods API call.
+`hooks/lib.ts` and `hooks/week.ts` hold the pure logic, `hooks/ui.ts` the pane's drawing, and `hooks/register.ts` the hooks and every mods API call.

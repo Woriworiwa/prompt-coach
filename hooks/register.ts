@@ -29,24 +29,10 @@ import {
   analysisSystem,
   checklistFor,
   parseRuleFile,
+  parseSources,
   withoutChecklist,
   rulesFor,
 } from './lib.ts'
-import {
-  type Fingerprints,
-  REFRESH_SYSTEM,
-  type RefreshResult,
-  asFingerprints,
-  buildRefreshRequest,
-  changedUrls,
-  fingerprint,
-  lineDiff,
-  parseRefreshReply,
-  parseSources,
-  sameContent,
-  stampAsOf,
-  toFetchUrl,
-} from './refresh.ts'
 import { type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
@@ -80,16 +66,14 @@ import {
 // /coach: a pane that reads the draft in the prompt box, checks it against a
 // checklist, rewrites it with the reason for each change, and shows the rules
 // for the session's model under Settings.
-// /coach refresh: re-reads the pages in sources.json and proposes updated
-// rules, which change only when the person accepts them.
+// The rules are kept current by a weekly routine on the repo (refresh/ROUTINE.md),
+// which opens a PR when a source page changes; the mod only reads them.
 // The Week tab: Claude Week, a weekly digest the Week model writes from the
 // source pages the mod fetches; votes and takes on its stories steer the next.
 
 const PANE = 'prompt-coach'
 const STORE = {
   mode: 'mode',
-  pending: 'pendingRefresh',
-  seen: 'sourceFingerprints',
   weekEditions: 'weekEditions',
   weekFeedback: 'weekFeedback',
   weekRead: 'weekRead',
@@ -107,13 +91,10 @@ const DRAFT_POLL_MS = 1000
 let rewriteModel = 'sonnet'
 /** The choices plugin.json declares for the two model settings. */
 const REWRITE_CHOICES = ['haiku', 'sonnet', 'opus'] as const
-const REFRESH_CHOICES = ['sonnet', 'opus'] as const
 const WEEK_CHOICES = ['sonnet', 'opus'] as const
 /** Why the pane may not change the model settings, once a change was refused; then they show read-only. */
 let settingsReadOnly: string | undefined
 let settingsNote = ''
-/** Refresh is rare and is a judgment task (change only what the sources changed), so it defaults to Opus. */
-let refreshModel = 'opus'
 /** Writing an edition means reading and checking many pages, so it defaults to Opus too. */
 let weekModel = 'opus'
 
@@ -169,8 +150,6 @@ let rulesPick = ''
 /** The rules list's groups that are open; all start closed. */
 let rulesOpen: RuleGroup[] = []
 
-let refresh: { isRunning: boolean; progress: string; results: RefreshResult[] } = { isRunning: false, progress: '', results: [] }
-
 // Claude Week. Editions, feedback and read state come back from $.store.
 /** How long one source page may take before it counts as unreadable. */
 const WEEK_FETCH_MS = 20_000
@@ -208,7 +187,6 @@ const weekTimers = new Map<string, Timer>()
 
 export const register: Register = (on, options) => {
   rewriteModel = String(options.rewriteModel ?? 'sonnet')
-  refreshModel = String(options.refreshModel ?? 'opus')
   weekModel = String(options.weekModel ?? 'opus')
 
   on('session.start', async ($, e, next) => {
@@ -221,17 +199,14 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'coach',
       description: 'Open the prompt coach pane: checklist, rewrite, reasons and the rules for your model',
-      argumentHint: '[live | manual | refresh | refresh all]',
+      argumentHint: '[live | manual]',
       immediate: true,
     })
     mode = (await $.store.get(STORE.mode)) === 'live' ? 'live' : 'manual'
-    // Statistics were removed in v0.39.0 at Omar's say, so their stored drafts and token counts go too,
-    // with the keys of older statistics (before v0.11.0) and the v0.9.4 layout trial.
-    for (const key of ['analytics', 'lessons', 'statsLayout']) if ((await $.store.get(key)) !== undefined) await $.store.delete(key)
-    const pending = (await $.store.get(STORE.pending)) as { results?: unknown; seen?: unknown } | undefined
-    if (pending && Array.isArray(pending.results)) {
-      refresh = { isRunning: false, progress: 'Proposed updates from your last refresh, not yet accepted.', results: pending.results as RefreshResult[] }
-      pendingSeen = asFingerprints(pending.seen) ?? {}
+    // Keys of removed features: statistics (v0.39.0; before v0.11.0, `lessons`; the v0.9.4 layout trial)
+    // and the in-pane refresh (v0.40.0, replaced by the weekly routine on the repo).
+    for (const key of ['analytics', 'lessons', 'statsLayout', 'pendingRefresh', 'sourceFingerprints']) {
+      if ((await $.store.get(key)) !== undefined) await $.store.delete(key)
     }
     await loadWeek($)
     await loadOwnRules($)
@@ -289,20 +264,13 @@ export const register: Register = (on, options) => {
     }
     const arg = e.args.trim().toLowerCase()
 
-    if (arg === 'refresh' || arg === 'refresh all') {
-      tab = 'settings'
-      await openPane($)
-      const scope = arg === 'refresh all' ? 'all' : 'changed'
-      if (!refresh.isRunning) $.clock.after(0, () => void runRefresh($, scope))
-      return {}
-    }
     if (arg === 'live' || arg === 'manual') {
       await setMode($, arg)
       tab = 'coach'
       await openPane($)
       return {}
     }
-    if (arg) return { text: 'Usage: /coach, /coach live, /coach manual, /coach refresh, or /coach refresh all.' }
+    if (arg) return { text: 'Usage: /coach, /coach live, or /coach manual.' }
 
     if (isPaneOpen) {
       await $.ui.close({ id: PANE })
@@ -389,12 +357,9 @@ export const register: Register = (on, options) => {
       },
       liveCalls,
       sources,
-      refresh,
-      refreshModel,
       settings: {
         rewriteModel,
         rewriteChoices: REWRITE_CHOICES,
-        refreshChoices: REFRESH_CHOICES,
         weekChoices: WEEK_CHOICES,
         readOnlyReason: settingsReadOnly,
         note: settingsNote,
@@ -405,7 +370,7 @@ export const register: Register = (on, options) => {
       tab: t => {
         tab = t
         $.ui.invalidate('ui.render')
-        // Settings lists every rule file and Omar's own; a refresh or a hand edit may have changed them.
+        // Settings lists every rule file and Omar's own; an update or a hand edit may have changed them.
         if (t === 'settings') void Promise.all([loadRuleFiles($), loadOwnRules($)]).then(() => $.ui.invalidate('ui.render'))
       },
       pickRules: file => {
@@ -454,10 +419,6 @@ export const register: Register = (on, options) => {
       setModel: (field, value) => setModelSetting($, field, value),
       addRule: typed => addOwnRule($, typed),
       removeRule: rule => removeOwnRule($, rule),
-      refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
-      rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
-      accept: () => acceptRefresh($),
-      reject: () => rejectRefresh($),
       week: {
         write: () => (weekJob.state === 'running' ? undefined : writeEdition($)),
         redo: () => (weekJob.state === 'running' ? undefined : writeEdition($, true)),
@@ -741,7 +702,7 @@ async function setMode($: EngineInterface, next: Mode): Promise<void> {
  * model settings read-only in the pane, with the reason.
  */
 async function setModelSetting($: EngineInterface, field: ModelSetting, value: string): Promise<void> {
-  const label = { rewriteModel: 'Rewrite model', refreshModel: 'Refresh model', weekModel: 'Week model' }[field]
+  const label = { rewriteModel: 'Rewrite model', weekModel: 'Week model' }[field]
   try {
     const result = await $.config.set({ key: `prompt-coach.${field}`, value })
     if (result.deny !== undefined) {
@@ -749,7 +710,6 @@ async function setModelSetting($: EngineInterface, field: ModelSetting, value: s
     } else {
       // Also take it now, in case the reload that applies it comes later.
       if (field === 'rewriteModel') rewriteModel = String(result.value)
-      else if (field === 'refreshModel') refreshModel = String(result.value)
       else weekModel = String(result.value)
       settingsNote = `${label} set to ${String(result.value)}. Saved to your settings, like /config.`
     }
@@ -786,152 +746,6 @@ async function syncModel($: EngineInterface): Promise<boolean> {
     sources = []
   }
   return true
-}
-
-// ---- /coach refresh ----
-
-/** Fingerprints to record once Omar has reviewed the proposed updates. */
-let pendingSeen: Fingerprints = {}
-
-/**
- * Fetches every source page and compares each with its fingerprint from the
- * last reviewed refresh. Only files whose pages changed are rewritten, by the
- * refresh model; `all` rewrites every file. The first run records a baseline.
- */
-async function runRefresh($: EngineInterface, scope: 'changed' | 'all'): Promise<void> {
-  const root = $.plugin.root
-  refresh = { isRunning: true, progress: 'Reading sources.json…', results: [] }
-  $.ui.invalidate('ui.render')
-
-  let targets: [string, string[]][]
-  try {
-    // general.md first: the general checklist the model files repeat is settled before them.
-    targets = Object.entries(parseSources(await $.fs.read(`${root}/sources.json`)).targets).sort(([a], [b]) => Number(b === 'rules/general.md') - Number(a === 'rules/general.md'))
-  } catch (err) {
-    refresh = { isRunning: false, progress: `Could not read sources.json: ${message(err)}`, results: [] }
-    $.ui.invalidate('ui.render')
-    return
-  }
-
-  // Each page once, however many files it feeds.
-  const urls = [...new Set(targets.flatMap(([, u]) => u))]
-  const pages = new Map<string, string>()
-  const errors = new Map<string, string>()
-  for (const [i, url] of urls.entries()) {
-    refresh = { ...refresh, progress: `Fetching source pages (${i + 1} of ${urls.length})…` }
-    $.ui.invalidate('ui.render')
-    try {
-      pages.set(url, await fetchPage($, url))
-    } catch (err) {
-      errors.set(url, message(err))
-    }
-  }
-  const now: Fingerprints = Object.fromEntries([...pages].map(([url, text]) => [url, fingerprint(text)]))
-  const seen = asFingerprints(await $.store.get(STORE.seen))
-
-  if (!seen && scope === 'changed') {
-    await $.store.set(STORE.seen, now)
-    const missed = errors.size ? ` ${errors.size} could not be fetched and will be checked next time.` : ''
-    refresh = {
-      isRunning: false,
-      progress: `First refresh: recorded a fingerprint of ${pages.size} source pages.${missed} From now on, a refresh proposes changes only when a page changes. To rewrite every file from today's pages anyway, press Rewrite all.`,
-      results: [],
-    }
-    $.ui.invalidate('ui.render')
-    return
-  }
-
-  const today = new Date(await $.clock.now()).toISOString().slice(0, 10)
-  const results: RefreshResult[] = []
-  for (const [i, [target, targetUrls]] of targets.entries()) {
-    const unreachable = targetUrls.find(u => errors.has(u))
-    if (unreachable) {
-      results.push({ target, state: 'failed', reason: errors.get(unreachable)! })
-      continue
-    }
-    const changed = scope === 'all' ? targetUrls : changedUrls(targetUrls, seen ?? {}, now)
-    if (changed.length === 0) {
-      results.push({ target, state: 'same' })
-      continue
-    }
-    refresh = { ...refresh, progress: `Updating ${target} with ${refreshModel} (${i + 1} of ${targets.length})…` }
-    $.ui.invalidate('ui.render')
-    try {
-      const current = await $.fs.read(`${root}/${target}`)
-      const reply = await $.model.complete({
-        model: refreshModel,
-        system: REFRESH_SYSTEM,
-        prompt: buildRefreshRequest(target, current, targetUrls.map(url => ({ url, text: pages.get(url)! }))),
-        maxTokens: 4000,
-        timeoutMs: 180_000,
-      })
-      if (!reply.isAnswered) throw new Error(`the model did not answer (${reply.reason})`)
-      const updated = parseRefreshReply(reply.text)
-      if (!updated) throw new Error('the model replied in an unexpected format')
-      const next = stampAsOf(updated, today)
-      results.push(sameContent(current, next) ? { target, state: 'same' } : { target, state: 'changed', diff: lineDiff(current, next), next })
-    } catch (err) {
-      results.push({ target, state: 'failed', reason: message(err) })
-    }
-  }
-
-  // A file that failed keeps its pages' old fingerprints, so the next refresh tries it again.
-  const retry = new Set(targets.filter(([t]) => results.some(r => r.target === t && r.state === 'failed')).flatMap(([, u]) => u))
-  const toRecord: Fingerprints = { ...(seen ?? {}), ...Object.fromEntries(Object.entries(now).filter(([url]) => !retry.has(url))) }
-
-  const changed = results.filter(r => r.state === 'changed').length
-  const failed = results.filter(r => r.state === 'failed').length
-  refresh = {
-    isRunning: false,
-    progress:
-      changed || failed
-        ? `${changed} of ${results.length} files have updates${failed ? `, ${failed} could not be checked` : ''}.`
-        : `No source page has changed since the last refresh. Nothing to update.`,
-    results: changed || failed ? results : [],
-  }
-  if (changed) {
-    // Kept until accepted or rejected, so a reload or a new session still offers them.
-    pendingSeen = toRecord
-    await $.store.set(STORE.pending, { results, seen: toRecord })
-  } else {
-    await $.store.set(STORE.seen, toRecord)
-  }
-  $.ui.invalidate('ui.render')
-}
-
-async function fetchPage($: EngineInterface, url: string): Promise<string> {
-  const res = await $.http.fetch(toFetchUrl(url))
-  if (!res.ok) throw new Error(`${url} answered HTTP ${res.status}`)
-  return res.text
-}
-
-async function acceptRefresh($: EngineInterface): Promise<void> {
-  const root = $.plugin.root
-  let written = 0
-  for (const r of refresh.results) {
-    if (r.state !== 'changed') continue
-    await $.fs.write(`${root}/${r.target}`, r.next)
-    written += 1
-  }
-  await reviewed($)
-  refresh = { isRunning: false, progress: `Updated ${written} ${written === 1 ? 'file' : 'files'}.`, results: [] }
-  model = '' // Reload the rules and dates from the new files.
-  await syncModel($)
-  $.ui.toast(`prompt-coach: updated ${written} rules ${written === 1 ? 'file' : 'files'}.`)
-  $.ui.invalidate('ui.render')
-}
-
-async function rejectRefresh($: EngineInterface): Promise<void> {
-  await reviewed($)
-  refresh = { isRunning: false, progress: '', results: [] }
-  $.ui.invalidate('ui.render')
-}
-
-/** Omar has seen the proposal: record its pages as reviewed so they aren't proposed again until they change. */
-async function reviewed($: EngineInterface): Promise<void> {
-  if (Object.keys(pendingSeen).length) await $.store.set(STORE.seen, pendingSeen)
-  pendingSeen = {}
-  await $.store.delete(STORE.pending)
 }
 
 // ---- Claude Week ----
@@ -1058,7 +872,7 @@ function weekView($: EngineInterface, now: number): View['week'] {
 
 /**
  * Writes this week's edition: fetches every page in week/sources.json (as
- * /coach refresh does, so no tool call and no permission prompt), then one
+ * `$.http.fetch`, so no tool call and no permission prompt), then one
  * Week model request with week/edition-prompt.md as its system prompt and the
  * reader profile, the last four editions' feedback and the pages' text.
  */

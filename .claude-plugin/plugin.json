@@ -1,6 +1,6 @@
 {
   "name": "prompt-coach",
-  "version": "0.39.1",
+  "version": "0.40.0",
   "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with the rules for each model; /improve rewrites a draft straight into the prompt box; a Week tab with Claude Week, a weekly digest you vote on.",
   "author": {
     "name": "Omar"
@@ -16,16 +16,6 @@
         "opus"
       ],
       "default": "sonnet"
-    },
-    "refreshModel": {
-      "type": "string",
-      "title": "Refresh model",
-      "description": "The model that rewrites the rules on /coach refresh, only for files whose source pages changed. opus changes the least it needs to.",
-      "options": [
-        "sonnet",
-        "opus"
-      ],
-      "default": "opus"
     },
     "weekModel": {
       "type": "string",

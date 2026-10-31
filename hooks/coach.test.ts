@@ -29,10 +29,10 @@ import {
   parseQuick,
   quickFor,
   withSentence,
+  parseSources,
 } from './lib.ts'
 import { REWRITE_EDITABLE, rowsFor } from './ui.ts'
 import { type Edition, parseEdition } from './week.ts'
-import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
 const ANALYSIS = `<checklist>
 Goal | partial | "the login thing" is vague
@@ -218,7 +218,7 @@ describe('live mode', () => {
   })
 })
 
-describe('refresh helpers', () => {
+describe('sources', () => {
   test('parseSources keeps only https rules targets', () => {
     const s = parseSources(
       JSON.stringify({
@@ -231,25 +231,6 @@ describe('refresh helpers', () => {
       }),
     )
     expect(s.targets).toEqual({ 'rules/general.md': ['https://a.example/x'], 'rules/opus-5-5.md': ['https://b.example/'] })
-    expect(toFetchUrl('https://claude.dev/blog/post/')).toBe('https://claude.dev/blog/post.md')
-  })
-
-  test('fingerprint ignores trailing spaces and line endings, and changedUrls finds edited or new pages', () => {
-    expect(fingerprint('a  \r\nb\n')).toBe(fingerprint('a\nb'))
-    expect(fingerprint('a\nb')).not.toBe(fingerprint('a\nc'))
-    expect(changedUrls(['x', 'y', 'z'], { x: '1', y: '2' }, { x: '1', y: '3', z: '4' })).toEqual(['y', 'z'])
-  })
-
-  test('stampAsOf puts one As of line after the Source block', () => {
-    const md = '# Title\n\nSource: x\nhttps://x\nAs of: 2026-01\n\n- tip\n'
-    expect(stampAsOf(md, '2026-10-17')).toBe('# Title\n\nSource: x\nhttps://x\nAs of: 2026-10-17\n\n- tip\n')
-    expect(sameContent(md, stampAsOf(md, '2026-10-17'))).toBe(true)
-  })
-
-  test('lineDiff marks removed and added lines and folds unchanged runs', () => {
-    const before = ['a', 'b', 'c', 'd', 'e', 'f'].join('\n')
-    const after = ['a', 'b', 'c', 'D', 'e', 'f'].join('\n')
-    expect(lineDiff(before, after)).toBe('  ...\n  c\n- d\n+ D\n  e\n  ...')
   })
 })
 
@@ -305,12 +286,11 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; seen?: Record<string, string>; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string>; engine?: string; desktopEnv?: string } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string>; engine?: string; desktopEnv?: string } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
     ...(opts.mode ? [['mode', opts.mode] as [string, unknown]] : []),
-    ...(opts.seen ? [['sourceFingerprints', opts.seen] as [string, unknown]] : []),
     ...Object.entries(opts.saved ?? {}),
   ])
   const s = {
@@ -324,8 +304,6 @@ function world(
     analysisSystems: [] as string[],
     analysisModels: [] as string[],
     analysisCalls: [] as { effort?: string; blocks?: readonly { text: string; cache?: true }[] }[],
-    refreshes: [] as string[],
-    refreshModels: [] as string[],
     fetched: [] as string[],
     written: new Map<string, string>(),
     toasts: [] as string[],
@@ -376,11 +354,6 @@ function world(
       s.analysisCalls.push({ effort: e.effort, blocks: e.promptBlocks })
       s.analysisModels.push(e.model)
       return { value: { isAnswered: true as const, text: opts.analysis ?? ANALYSIS, usage } }
-    }
-    if (e.system === REFRESH_SYSTEM) {
-      s.refreshes.push(String(e.prompt))
-      s.refreshModels.push(e.model)
-      return { value: { isAnswered: true as const, text: '<file>\n# General\n\nSource: x\n\n- Be explicit, and say why.\n</file>', usage } }
     }
     if (String(e.system).includes('Claude Week')) {
       s.weekRequests.push({ prompt: String(e.prompt), system: String(e.system), model: e.model })
@@ -783,23 +756,23 @@ test('Settings: each section in a round bordered box with its title on no band, 
   expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
   // Statistics are gone (v0.39.0).
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
-  // Rules: the rules in use (moved from the Analytics tab in v0.39.0), then the sources, always listed (no Show sources button), then the refresh, a thin line between each.
+  // Rules: the rules in use (moved from the Analytics tab in v0.39.0), then the sources, always listed (no Show sources button), with a thin line between; the in-pane refresh is gone (v0.40.0).
   const rules = boxNode(tree, 'group-rules-box')!
-  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list', 'line-rules-1', 'block-sources', 'line-rules-2', 'block-refresh'])
+  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list', 'line-rules-1', 'block-sources'])
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
   expect(buttonProps(tree, 'sources')).toBeUndefined()
   expect(await ui.find({ text: /Show sources|Hide sources/ })).toBeUndefined()
-  // General's three rows have a 1-pixel Svg line between each two: two lines.
+  // General's two rows (Mode and Rewrite model; Refresh model went in v0.40.0) have a 1-pixel Svg line between them.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
-  expect(lines).toHaveLength(2)
+  expect(lines).toHaveLength(1)
   const svg = (lines[0] as { props?: { children?: unknown[] }; children?: unknown[] })
   const svgNode = [svg.children, svg.props?.children].flat().find(k => (k as { type?: string })?.type === 'Svg') as { props?: Record<string, unknown> }
   expect(svgNode?.props?.height).toBe(1)
   // Labels in the normal weight, as Desktop's are; descriptions dim.
   expect(textLook(tree, 'Mode')).toEqual({ found: true, color: undefined, weight: undefined })
   expect(textLook(tree, 'Rewrite model')).toEqual({ found: true, color: undefined, weight: undefined })
-  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['refreshModel', 'set-refreshModel'], ['weekModel', 'set-weekModel']] as const) {
+  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['weekModel', 'set-weekModel']] as const) {
     const r = boxNode(tree, `setting-${key}`)
     expect(r?.props.flexDirection).toBe('row')
     expect(r?.props.justifyContent).toBe('space-between')
@@ -863,7 +836,7 @@ test('a redraw (the pane taking focus) keeps each unchanged Button\'s press hand
   await ui.unmount()
 })
 
-test('Settings (tab 4) holds the mode, and the Coach tab only shows a dim Live label while live mode is on', async ($, on) => {
+test('Settings (tab 3) holds the mode, and the Coach tab only shows a dim Live label while live mode is on', async ($, on) => {
   const { s } = world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -875,7 +848,7 @@ test('Settings (tab 4) holds the mode, and the Coach tab only shows a dim Live l
   await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ text: 'Mode' })).toBeDefined()
   expect(await ui.find({ type: 'Select', key: 'set-rewriteModel' })).toBeDefined()
-  expect(await ui.find({ type: 'Select', key: 'set-refreshModel' })).toBeDefined()
+  expect(await ui.find({ type: 'Select', key: 'set-refreshModel' })).toBeUndefined()
   await ui.select({ key: 'mode', value: 'live' })
   await ui.press({ key: 'tab-coach' })
   expect(await ui.find({ text: 'Live 0/30' })).toBeDefined()
@@ -912,8 +885,8 @@ test('when a model setting change is refused, the model settings show read-only 
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
-  await ui.select({ key: 'set-refreshModel', value: 'sonnet' })
-  for (const key of ['set-rewriteModel', 'set-refreshModel', 'set-weekModel']) expect(await ui.find({ type: 'Select', key })).toBeUndefined()
+  await ui.select({ key: 'set-weekModel', value: 'sonnet' })
+  for (const key of ['set-rewriteModel', 'set-weekModel']) expect(await ui.find({ type: 'Select', key })).toBeUndefined()
   expect(await ui.find({ text: /can't be changed from the pane here \(a trusted policy owns it\)/ })).toBeDefined()
   expect(await ui.find({ text: 'opus' })).toBeDefined()
   // The mode still works: it isn't a model setting.
@@ -1354,89 +1327,13 @@ test('a model with no rules file gets a warning and the general rules', async ($
   await ui.unmount()
 })
 
-/** Fingerprints from an earlier refresh, before every page changed. */
-const STALE = { 'https://docs.example/general': 'old', 'https://docs.example/opus': 'old', 'https://docs.example/sonnet': 'old' }
-/** Fingerprints of the pages as the stub serves them now. */
-const CURRENT = Object.fromEntries(['general', 'opus', 'sonnet'].map(p => [`https://docs.example/${p}`, fingerprint(`PAGE https://docs.example/${p}.md`)]))
-
-test('/coach refresh proposes changes, and Reject leaves every file alone', async ($, on) => {
-  const { s, saved, clock } = world(on, { seen: STALE })
+test('/coach refresh is gone (v0.40.0): it answers with the usage, and its stored proposal and fingerprints are deleted', async ($, on) => {
+  const { s, saved } = world(on, { saved: { pendingRefresh: { results: [], seen: {} }, sourceFingerprints: { 'https://docs.example/general': 'x' } } })
   await $.session.start(START)
-  await $.command.run(coach('refresh'))
-  await clock.advance(1)
-
-  expect(s.fetched).toContain('https://docs.example/general.md')
-  const ui = await $.ui.mount(pane('desktop'))
-  expect(await ui.find({ type: 'Code', text: '+ - Be explicit, and say why.' })).toBeDefined()
-  expect(await ui.find({ text: /rules\/opus-5-5.md: kept as is \(https:\/\/docs.example\/broken answered HTTP 404\)/ })).toBeDefined()
-  expect(saved.has('pendingRefresh')).toBe(true)
-
-  await ui.press({ key: 'reject' })
-  expect(s.written.size).toBe(0)
   expect(saved.has('pendingRefresh')).toBe(false)
-  // Reviewed pages are recorded; the failed file's pages keep their old fingerprint, to be retried.
-  const seen = saved.get('sourceFingerprints') as Record<string, string>
-  expect(seen['https://docs.example/general']).toBe(CURRENT['https://docs.example/general'])
-  expect(seen['https://docs.example/opus']).toBe('old')
-  await ui.unmount()
-})
-
-test('/coach refresh writes only the changed rules files on Accept, with a date', async ($, on) => {
-  const { s, saved, clock } = world(on, { seen: STALE })
-  await $.session.start(START)
-  await $.command.run(coach('refresh'))
-  await clock.advance(1)
-  const ui = await $.ui.mount(pane('desktop'))
-  // /coach refresh opens Settings, where refresh now lives; there is no Refresh tab.
-  expect(textLook(await ui.drawn(), 'Settings').color).toBe('claude')
-  expect(textLook(await ui.drawn(), 'Rules').found).toBe(true)
-  expect(buttonProps(await ui.drawn(), 'tab-refresh')).toBeUndefined()
-  await ui.press({ key: 'accept' })
-
-  expect([...s.written.keys()]).toEqual(['rules/general.md', 'rules/sonnet-5-5.md'])
-  expect(s.written.get('rules/general.md')).toContain('As of: 2026-10-17')
-  expect(s.written.has(OWN_RULES)).toBe(false)
-  expect(saved.has('pendingRefresh')).toBe(false)
-  await ui.unmount()
-})
-
-test('the first /coach refresh records a baseline and proposes nothing', async ($, on) => {
-  const { s, saved, clock } = world(on)
-  await $.session.start(START)
-  await $.command.run(coach('refresh'))
-  await clock.advance(1)
-  expect(s.refreshes).toHaveLength(0)
-  expect(saved.has('pendingRefresh')).toBe(false)
-  expect(Object.keys(saved.get('sourceFingerprints') as object).sort()).toEqual(Object.keys(CURRENT).sort())
-  const ui = await $.ui.mount(pane('desktop'))
-  expect(await ui.find({ text: /First refresh: recorded a fingerprint of 3 source pages/ })).toBeDefined()
-  await ui.unmount()
-})
-
-test('a refresh with no changed pages makes no model calls', async ($, on) => {
-  const { s, clock } = world(on, { seen: { ...CURRENT, 'https://docs.example/broken': 'x' } })
-  await $.session.start(START)
-  await $.command.run(coach('refresh'))
-  await clock.advance(1)
-  expect(s.refreshes).toHaveLength(0)
-})
-
-test('only files whose pages changed are rewritten, by the refresh model (Opus by default)', async ($, on) => {
-  const { s, clock } = world(on, { seen: { ...CURRENT, 'https://docs.example/sonnet': 'old' } })
-  await $.session.start(START)
-  await $.command.run(coach('refresh'))
-  await clock.advance(1)
-  expect(s.refreshes).toHaveLength(1)
-  expect(s.refreshes[0]).toContain('path="rules/sonnet-5-5.md"')
-  expect(s.refreshModels).toEqual(['opus'])
-})
-
-test('Rewrite all rewrites every reachable file even when no page changed', async ($, on) => {
-  const { s, clock } = world(on, { seen: CURRENT })
-  await $.session.start(START)
-  await $.command.run(coach('refresh all'))
-  await clock.advance(1)
-  expect(s.refreshes.map(r => /path="([^"]+)"/.exec(r)?.[1])).toEqual(['rules/general.md', 'rules/sonnet-5-5.md'])
+  expect(saved.has('sourceFingerprints')).toBe(false)
+  expect(await $.command.run(coach('refresh'))).toMatchObject({ text: 'Usage: /coach, /coach live, or /coach manual.' })
+  expect(s.fetched).toHaveLength(0)
 })
 
 test('/coach opens in Desktop, which attaches its surface after the session starts', async ($, on) => {
