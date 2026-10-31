@@ -1949,6 +1949,26 @@ test('Rules in Settings: General, then the model with its name a dropdown, both 
   await ui.unmount()
 })
 
+test('Sources in Settings follow the model dropdown: the general guide\'s pages plus the picked model\'s (v0.40.1)', async ($, on) => {
+  world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'tab-settings' })
+  // The session's model (Opus 5.5) to start.
+  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: 'docs.example/opus' })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: 'docs.example/sonnet' })).toBeUndefined()
+  await ui.select({ key: 'rules-model-opus-5-5.md', value: 'sonnet-5-5.md' })
+  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: 'docs.example/sonnet' })).toBeDefined()
+  expect(await ui.find({ type: 'Link', text: 'docs.example/opus' })).toBeUndefined()
+  // A model with no sources.json entry lists the general guide only.
+  await ui.select({ key: 'rules-model-sonnet-5-5.md', value: 'haiku-5-5.md' })
+  expect((await ui.findAll({ type: 'Link' })).map(l => l.text).filter(t => t?.startsWith('docs.example/'))).toEqual(['docs.example/general'])
+  await ui.unmount()
+})
+
 test('Rules in Settings: the mobile app picks the model with buttons; a model with no rule file says so', async ($, on) => {
   world(on, { model: 'claude-opus-4-1', surfaces: ['mobile'] })
   await $.session.start(START)

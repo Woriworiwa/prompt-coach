@@ -1,4 +1,4 @@
-# Handover: prompt-coach v0.40.0
+# Handover: prompt-coach v0.40.1
 
 prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/prompt-coach`, made for Omar. It's a public git repo on his personal GitHub (made public by Omar on 2026-10-31): https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
@@ -24,7 +24,7 @@ This file is the only brief and describes the current state. `.claude/CLAUDE.md`
   - **Settings** is laid out like Desktop's own settings page, with four sections (`settingsGroup`): General, Your rules, Rules, and Claude Week. Since v0.20.0 (Omar) each sits in a box (`group` with `band: false, titlePad: false`: round subtle border and padding, the title with no background and, since v0.20.1, no padding; `settingsGroup(..., boxed)`). Inside: the bold title, then rows, which sit a cell in (`paddingLeft: 1` on `group-<key>-box`, v0.20.1) (`settingRow`: label and dim help on the left, control on the right, wrapping when narrow), with a 1-pixel `Svg` hairline between rows (`hairline`: translucent gray, Desktop and mobile only). Sections sit in `settings-sections` with `gap: 'xl'`. Mods have no toggle element and no one-sided border, so Omar chose a Select for Mode and the Svg line.
     - **General:** Mode (Manual or Live; live is capped at 30 analyses a session) and Rewrite model (Refresh model went in v0.40.0). Model changes are saved with `$.config.set`. A refused change makes them read-only, with the reason.
     - **Your rules** (`ownRulesSettings`): the rules file's path, each rule with Remove (`remove-rule-<rule>`), and an Add a rule field (`add-rule-<gen>`, emptied after each add; none on mobile). A note says Added, Removed, already there, or Not saved.
-    - **Rules** (titled "Rules and tips" until v0.17.0): first the rules list (`block-rule-list`, see below), then the source pages, always listed. The in-pane refresh under it went in v0.40.0.
+    - **Rules** (titled "Rules and tips" until v0.17.0): first the rules list (`block-rule-list`, see below), then the source pages, always listed: the general guide's plus those of the model picked in the dropdown above (v0.40.1, Omar; before, always the session model's), from `sourcesByFile`. The in-pane refresh under it went in v0.40.0.
     - **Claude Week:** Week model, Reader profile (its path, plus a note when the mod just created it or couldn't), and Sources (the pages in `week/sources.json` as links, `Tier N · label`).
   - **News:** Claude Week (below).
 
@@ -79,7 +79,7 @@ Omar's weekly digest; his spec is the source of `week/edition-prompt.md` and the
 | `hooks/ui.ts` | Pure: the pane's tree (`tabs`, `coachTab`, `ruleList`, `settingsTab`, `weekTab`, `weekArchive`, `storyCard`, `withStableButtons`, `withStableForm`) |
 | `refresh/ROUTINE.md`, `refresh/fingerprints.json`, `scripts/check-sources.mjs` | The weekly rules refresh the cloud routine runs (see What it does now) |
 | `hooks/week.ts` | Pure: Claude Week (`parseEdition`, `buildWeekRequest`, `pageText`, `releasesText`, `profilePath`, `archiveRows`, …) |
-| `hooks/*.test.ts` | 137 tests, plus `editTest` (off with the editable rewrite). `coach.test.ts` holds the pane tests; `week.test.ts` the pure Week ones |
+| `hooks/*.test.ts` | 138 tests, plus `editTest` (off with the editable rewrite). `coach.test.ts` holds the pane tests; `week.test.ts` the pure Week ones |
 | `rules/*.md`, `sources.json` | Content, all refreshed from the source pages. Omar's own rules aren't here (see Your rules) |
 | `week/edition-prompt.md`, `week/profile.example.yaml`, `week/sources.json` | The writer's system prompt, the blank profile a new user starts from, and the pages Write fetches (Classmethod times out from here) |
 
@@ -136,6 +136,7 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 **Decide:** the fix for an empty Sources list after `/reload-plugins` with the pane open (see "Rules learned the hard way").
 
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
+- v0.40.1: picking another model in Settings → Rules changes the Sources links under it to that model's pages plus the general guide.
 - v0.40.0: Settings has no Refresh model and no refresh under Rules (Rules in use, then Sources); `/coach refresh` answers with the usage.
 - v0.39.0: the pane shows three tabs, Coach (1), News (2) and Settings (3), with no Analytics; Settings → Rules starts with Rules in use (General and the model, Show/Hide, the model dropdown), then Sources and the refresh; the plugin loads after `/reload-plugins`.
 - v0.38.0 Coach: Rewrite answers noticeably sooner, and a second Rewrite within five minutes sooner still; the rewrite's quality holds at low effort.

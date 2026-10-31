@@ -140,7 +140,8 @@ let isSynced = false
 let answeredModel = ''
 let modelLabel = ''
 let hasModelRules = false
-let sources: string[] = []
+/** sources.json's pages, by rules file (`rules/<file>`); Settings lists general.md's plus the picked model's. */
+let sourcesByFile: Record<string, string[]> = {}
 /** The shipped rule files as sections, by file name (general.md and each model's), for the rules list under Settings. */
 let ruleFiles: Record<string, RuleSection[]> = {}
 /** The same files as read, by file name, for the checklist each model gets. */
@@ -326,6 +327,8 @@ export const register: Register = (on, options) => {
     const F = e.surface === 'mobile' ? undefined : withStableForm(R as unknown as Form, cache)
 
     const now = await $.clock.now()
+    // The model whose rules Settings shows: the dropdown's pick, else the session's own file.
+    const pickedRules = rulesPick || (rulesFor(model)?.file ?? '')
     const view: View = {
       surface: e.surface,
       columns: e.viewport?.columns,
@@ -351,12 +354,13 @@ export const register: Register = (on, options) => {
       ruleList: {
         general: ruleFiles['general.md'] ?? [],
         models: MODEL_RULES.map(m => ({ ...m, sections: ruleFiles[m.file] ?? [] })),
-        picked: rulesPick || (rulesFor(model)?.file ?? ''),
+        picked: pickedRules,
         borrowed: borrowedNote(),
         open: rulesOpen,
       },
       liveCalls,
-      sources,
+      // The pages behind the rules shown above them: the general guide's and the picked model's (v0.40.1).
+      sources: [...new Set([...(sourcesByFile['rules/general.md'] ?? []), ...(pickedRules ? (sourcesByFile[`rules/${pickedRules}`] ?? []) : [])])],
       settings: {
         rewriteModel,
         rewriteChoices: REWRITE_CHOICES,
@@ -737,13 +741,9 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   await loadRuleFiles($)
 
   try {
-    const all = parseSources(await $.fs.read(`${root}/sources.json`)).targets
-    const mine = Object.entries(all)
-      .filter(([t]) => t === 'rules/general.md' || (target && t === `rules/${target.file}`))
-      .flatMap(([, urls]) => urls)
-    sources = [...new Set(mine)]
+    sourcesByFile = parseSources(await $.fs.read(`${root}/sources.json`)).targets
   } catch {
-    sources = []
+    sourcesByFile = {}
   }
   return true
 }
