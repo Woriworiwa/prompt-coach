@@ -40,7 +40,7 @@ In order from the top:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual rewrites only when you press Rewrite. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model:** one of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
 - **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
-- **Rules:** first **Rules in use**, what the coach checks drafts against, in two groups, each with its rule count and Show or Hide, both closed at first: **General**, then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead). Each file's checklist and quick instructions show as its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Then the source pages the rules come from: the general guide's, plus those of the model picked in the dropdown (see "Keeping the rules current" below).
+- **Rules:** first **Rules in use**, what the coach checks drafts against, in two groups, each with its rule count and Show or Hide, both closed at first: **General**, then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead). Each file's checklist and quick instructions show as its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Each file starts with the pages it comes from, as its first lines (see "Keeping the rules current" below).
 - **Claude Week:** the **Week model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
 
 **News tab** (`2`): Claude Week.
@@ -63,7 +63,7 @@ In order from the top:
 | Which model you're on | The live session |
 | Checklist, rewrite and reasons | One call to the rewrite model (default `sonnet`), given your draft and the rules above. It can be wrong, so treat it as a second opinion. |
 
-The rules are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date. Settings lists the source pages under **Rules**.
+The rules are paraphrased from Anthropic's docs, and each file names its sources and an `As of` date, shown as its first lines under Settings → **Rules**.
 
 A model with no rules file, such as an older or newer model, gets the general rules and a note in the pane. To support it, add its page to `sources.json`, add a rules file, add it to `MODEL_RULES` and `MODEL_FAMILIES` in `hooks/lib.ts`, and add a test.
 

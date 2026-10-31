@@ -1,8 +1,7 @@
 # General prompting rules (all current Claude models)
 
-Source: Anthropic, "Prompting best practices"
-https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
-Paraphrased. Recheck when Anthropic updates the guide.
+Source, paraphrased:
+- Anthropic, "Prompting best practices": https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
 As of: 2026-10-21
 
 ## Clarity

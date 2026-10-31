@@ -29,7 +29,6 @@ import {
   parseQuick,
   quickFor,
   withSentence,
-  parseSources,
 } from './lib.ts'
 import { REWRITE_EDITABLE, rowsFor } from './ui.ts'
 import { type Edition, parseEdition } from './week.ts'
@@ -215,22 +214,6 @@ describe('live mode', () => {
     const parsed = parseAnalysis(reply, ['Goal', 'Stop rule'])!
     expect(parsed.checklist.map(c => [c.item, c.status])).toEqual([['Goal', 'present'], ['Stop rule', 'missing']])
     expect(parsed.additions[0]?.item).toBe('Stop rule')
-  })
-})
-
-describe('sources', () => {
-  test('parseSources keeps only https rules targets', () => {
-    const s = parseSources(
-      JSON.stringify({
-        targets: {
-          'rules/general.md': ['https://a.example/x'],
-          'hooks/register.ts': ['https://a.example/z'],
-          'rules/opus-5-5.md': ['http://insecure.example', 'https://b.example/'],
-          'tips/opus-5-5.md': ['https://c.example/'],
-        },
-      }),
-    )
-    expect(s.targets).toEqual({ 'rules/general.md': ['https://a.example/x'], 'rules/opus-5-5.md': ['https://b.example/'] })
   })
 })
 
@@ -756,12 +739,10 @@ test('Settings: each section in a round bordered box with its title on no band, 
   expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
   // Statistics are gone (v0.39.0).
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
-  // Rules: the rules in use (moved from the Analytics tab in v0.39.0), then the sources, always listed (no Show sources button), with a thin line between; the in-pane refresh is gone (v0.40.0).
+  // Rules: the rules in use (moved from the Analytics tab in v0.39.0), and nothing else: the in-pane refresh went in v0.40.0 and the Sources list in v0.40.2, since each rules file lists its own pages.
   const rules = boxNode(tree, 'group-rules-box')!
-  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list', 'line-rules-1', 'block-sources'])
-  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
-  expect(buttonProps(tree, 'sources')).toBeUndefined()
-  expect(await ui.find({ text: /Show sources|Hide sources/ })).toBeUndefined()
+  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list'])
+  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeUndefined()
   // General's two rows (Mode and Rewrite model; Refresh model went in v0.40.0) have a 1-pixel Svg line between them.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
@@ -913,8 +894,8 @@ test('on mobile the model choices are buttons, and Sources lists the pages under
   expect(set).toEqual(['haiku'])
   expect(await ui.find({ key: 'set-rewriteModel-haiku', text: '[haiku]' })).toBeDefined()
 
-  // The sources are always listed, with no button to show them.
-  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
+  // No separate Sources list since v0.40.2: each rules file lists its own pages.
+  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -1946,26 +1927,6 @@ test('Rules in Settings: General, then the model with its name a dropdown, both 
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   expect(await ui.find({ key: 'rules-toggle-own' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-edit-own' })).toBeUndefined()
-  await ui.unmount()
-})
-
-test('Sources in Settings follow the model dropdown: the general guide\'s pages plus the picked model\'s (v0.40.1)', async ($, on) => {
-  world(on)
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-settings' })
-  // The session's model (Opus 5.5) to start.
-  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
-  expect(await ui.find({ type: 'Link', text: 'docs.example/opus' })).toBeDefined()
-  expect(await ui.find({ type: 'Link', text: 'docs.example/sonnet' })).toBeUndefined()
-  await ui.select({ key: 'rules-model-opus-5-5.md', value: 'sonnet-5-5.md' })
-  expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
-  expect(await ui.find({ type: 'Link', text: 'docs.example/sonnet' })).toBeDefined()
-  expect(await ui.find({ type: 'Link', text: 'docs.example/opus' })).toBeUndefined()
-  // A model with no sources.json entry lists the general guide only.
-  await ui.select({ key: 'rules-model-sonnet-5-5.md', value: 'haiku-5-5.md' })
-  expect((await ui.findAll({ type: 'Link' })).map(l => l.text).filter(t => t?.startsWith('docs.example/'))).toEqual(['docs.example/general'])
   await ui.unmount()
 })
 

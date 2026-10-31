@@ -50,7 +50,6 @@ export type View = {
   liveCalls: number
   ownRules: OwnRules
   ruleList: RuleList
-  sources: string[]
   settings: Settings
   week: WeekView
 }
@@ -359,7 +358,7 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       flexDirection: 'column',
       children: [
         text(E, 'Rules in use'),
-        text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours (above), which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
+        text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours (above), which win when they conflict. Each file starts with the pages it comes from; a weekly check rewrites it when one changes, and the update brings it.', { dimColor: true, wrap: 'wrap' }),
       ],
     }),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
@@ -610,12 +609,6 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       ? [text(E, st.note, { dimColor: true, wrap: 'wrap' })]
       : []
 
-  // The source pages, always listed: where the rules come from.
-  const sources: RenderElement[] = [
-    E.Box({ flexDirection: 'column', children: [text(E, 'Sources'), text(E, 'The pages the rules come from. A weekly check rewrites the rules when one changes, and they arrive with the next plugin update.', { dimColor: true, wrap: 'wrap' })] }),
-    ...v.sources.map(url => E.Box({ key: `source-${url}`, children: [E.Link({ href: url, label: url.replace(/^https:\/\//, '') })] })),
-  ]
-
   // More space between sections than between rows: the largest spacing step, which Desktop sizes with its own scale.
   return [
     E.Box({
@@ -625,7 +618,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote, true),
         settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
-        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F)), block(E, 'sources', sources)], [], true),
+        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F))], [], true),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
       ],
     }),

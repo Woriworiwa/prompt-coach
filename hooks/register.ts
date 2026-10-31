@@ -29,7 +29,6 @@ import {
   analysisSystem,
   checklistFor,
   parseRuleFile,
-  parseSources,
   withoutChecklist,
   rulesFor,
 } from './lib.ts'
@@ -140,8 +139,6 @@ let isSynced = false
 let answeredModel = ''
 let modelLabel = ''
 let hasModelRules = false
-/** sources.json's pages, by rules file (`rules/<file>`); Settings lists general.md's plus the picked model's. */
-let sourcesByFile: Record<string, string[]> = {}
 /** The shipped rule files as sections, by file name (general.md and each model's), for the rules list under Settings. */
 let ruleFiles: Record<string, RuleSection[]> = {}
 /** The same files as read, by file name, for the checklist each model gets. */
@@ -359,8 +356,6 @@ export const register: Register = (on, options) => {
         open: rulesOpen,
       },
       liveCalls,
-      // The pages behind the rules shown above them: the general guide's and the picked model's (v0.40.1).
-      sources: [...new Set([...(sourcesByFile['rules/general.md'] ?? []), ...(pickedRules ? (sourcesByFile[`rules/${pickedRules}`] ?? []) : [])])],
       settings: {
         rewriteModel,
         rewriteChoices: REWRITE_CHOICES,
@@ -736,15 +731,7 @@ async function syncModel($: EngineInterface): Promise<boolean> {
   const target = rulesFor(current)
   modelLabel = target?.model ?? current
   hasModelRules = !!target
-
-  const root = $.plugin.root
   await loadRuleFiles($)
-
-  try {
-    sourcesByFile = parseSources(await $.fs.read(`${root}/sources.json`)).targets
-  } catch {
-    sourcesByFile = {}
-  }
   return true
 }
 
