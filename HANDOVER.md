@@ -148,18 +148,9 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 **Check in Desktop** (Omar clicks; `/reload-plugins` first):
 - v0.37.0 Coach: the quick instruction buttons for your model show above Rewrite; a press adds its line to the prompt box and a second press takes it out; after a Rewrite, a press adds it to the rewrite and Send sends it; Analytics Rules lists the Quick instructions section.
 - v0.36.1 News: backticked code in stories reads clearly (clay, no tan highlight), and the tag line above each title is plain amber.
+- The News changes of v0.30.0–v0.35.0 (versions line, story boxes and padding, Ask in side chat on every story with no toast and paragraphs apart, Rewrite with no confirm that only adds stories, tip sources, the Stitch look): check them together in one pass over the News tab, each in TASKS.md.
 - v0.36.0 Analytics: Statistics show again (score in percent, Work on next, Missing or vague bars, What you do well, What the coach changed most, Advice you took, tokens, Clear statistics); a Rewrite adds to them and Send counts as applied. This also covers the v0.11.0 statistics check.
-- v0.35.0 News: the Stitch look (cards, mono, colours, Top 3 strikethrough, bar and chips, story tag and badge, code chips, ask box, REF links, end line); after :rewrite Claude Week 43, stories gain tags and badges.
-- v0.34.0 News: after Rewrite Claude Week 43, each tip shows "From the story … in …" and its source link.
-- v0.33.4 News: Ask in side chat fills the box with no "Press Enter" toast.
-- v0.33.3 News: every story, tips included, has Ask in side chat.
-- v0.33.2 News: more room inside each story box (padding, space between its parts) and between stories.
-- v0.33.1 News: Rewrite Claude Week 43 runs at once, no confirm. v0.33.0: every story, vote and read mark stays, and only new stories appear (for W43, Desktop v3.1623.0); a toast says how many.
-- v0.32.0 News: a box around each story (read ones too), none around a section; section titles still on their grey band.
 - v0.31.0 Coach: the rewrite shows as a read-only full-width text block again (no editable field); Send sends it as shown.
-- v0.31.2 News: the side-chat text's paragraphs (prompt, story title, summary, detail, sources) are separated by blank lines in the box.
-- v0.31.1 News: Ask in side chat puts "/btw …" in the box and doesn't send it; Enter opens the side chat. If Desktop sends it at once, the mod isn't the cause (it never submits).
-- v0.30.0 News: the top line reads "Claude Code 2.1.304 · Claude Desktop 3.1623.0".
 - The Coach and Settings layout changes of v0.18.0–v0.29.0 (14 items, each in TASKS.md): check them together, in one pass over the Coach and Settings tabs.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
 - Coach: Send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
