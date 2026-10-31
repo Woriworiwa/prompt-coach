@@ -81,8 +81,11 @@ const STORE = {
   weekJob: 'weekJob',
 } as const
 /** How long the draft preview waits after typing stops, outside live mode. */
-/** How hard the rewrite model thinks about a draft (v0.38.0): low, since a short draft needs little, and it answers sooner. */
-const ANALYSIS_EFFORT = 'low' as const
+/** How hard the rewrite model thinks about a draft: the rewriteEffort setting (v0.42.0, Omar), low by default since v0.38.0, as a short draft needs little and low answers sooner. */
+let rewriteEffort: Effort = 'low'
+const EFFORT_CHOICES = ['low', 'medium', 'high'] as const
+type Effort = (typeof EFFORT_CHOICES)[number]
+const asEffort = (v: unknown): Effort => (EFFORT_CHOICES as readonly unknown[]).includes(v) ? (v as Effort) : 'low'
 const PREVIEW_DEBOUNCE_MS = 400
 /** How often an open pane checks whether the session's model changed. */
 const MODEL_POLL_MS = 5000
@@ -188,6 +191,7 @@ const weekTimers = new Map<string, Timer>()
 export const register: Register = (on, options) => {
   rewriteModel = String(options.rewriteModel ?? 'sonnet')
   weekModel = String(options.weekModel ?? 'opus')
+  rewriteEffort = asEffort(options.rewriteEffort)
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -362,6 +366,8 @@ export const register: Register = (on, options) => {
         rewriteModel,
         rewriteChoices: REWRITE_CHOICES,
         weekChoices: WEEK_CHOICES,
+        rewriteEffort,
+        effortChoices: EFFORT_CHOICES,
         readOnlyReason: settingsReadOnly,
         note: settingsNote,
       },
@@ -555,7 +561,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
       system: analysisSystem(items),
       prompt: analysisBlocks(text, rules, modelLabel || 'Claude', previous.text),
       // Judging and rewriting a short draft needs little thinking; low effort answers sooner (v0.38.0).
-      effort: ANALYSIS_EFFORT,
+      effort: rewriteEffort,
       maxTokens: 3000,
       timeoutMs: 90_000,
     })
@@ -703,7 +709,7 @@ async function setMode($: EngineInterface, next: Mode): Promise<void> {
  * model settings read-only in the pane, with the reason.
  */
 async function setModelSetting($: EngineInterface, field: ModelSetting, value: string): Promise<void> {
-  const label = { rewriteModel: 'Rewrite model', weekModel: 'News model' }[field]
+  const label = { rewriteModel: 'Rewrite model', rewriteEffort: 'Rewrite effort', weekModel: 'News model' }[field]
   try {
     const result = await $.config.set({ key: `prompt-coach.${field}`, value })
     if (result.deny !== undefined) {
@@ -711,6 +717,7 @@ async function setModelSetting($: EngineInterface, field: ModelSetting, value: s
     } else {
       // Also take it now, in case the reload that applies it comes later.
       if (field === 'rewriteModel') rewriteModel = String(result.value)
+      else if (field === 'rewriteEffort') rewriteEffort = asEffort(result.value)
       else weekModel = String(result.value)
       settingsNote = `${label} set to ${String(result.value)}. Saved to your settings, like /config.`
     }

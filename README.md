@@ -39,6 +39,7 @@ In order from the top:
 **Settings tab** (`3`), laid out like the Desktop app's own settings: four sections (General, Rules, Your rules, News), each in a bordered box, with a bold title (on no background) and rows under it, each row's label and dim description on the left and its control on the right, with a thin line between rows in Desktop and the mobile app:
 - **Mode** (a Manual / Live dropdown; buttons on mobile): Manual rewrites only when you press Rewrite. Live analyzes about 1.5 seconds after you stop typing, once per new draft of 15 characters or more, up to 30 times a session.
 - **Rewrite model:** one of the settings below, as a dropdown (buttons on mobile). A change is saved to your settings, the same as `/config`, and Claude Code reloads the mod to apply it. If Claude Code refuses the change, the pane shows them read-only with the reason.
+- **Rewrite effort** (Low, Medium or High; low by default): how hard the rewrite model thinks on Rewrite and in live mode. Low answers soonest; High takes longer and may catch more. `/improve` doesn't use it.
 - **Rules:** first **Rules in use**, what the coach checks drafts against, in two groups, each with its rule count and Show or Hide, both closed at first: **General**, then your session's model, whose name is a dropdown of every model so you can read another's rules (the mobile app shows buttons instead). Each file's checklist and quick instructions show as its sections, each item with its source. If your model borrows an older model's file, a line under it says so. Each file starts with the pages it comes from, as its first lines (see "Keeping the rules current" below).
 - **Your rules:** your own rules, one line each, sent with every analysis and `/improve` after the general and model rules; yours win when they conflict. Each rule has **Remove**, and **Add a rule** takes a new one (Enter adds it). They're kept in `rules.md` in the mod's data folder (the path is shown), next to your reader profile, so installing or updating the mod never touches them, and you can edit the file by hand too. The file is created with your first rule; until then there are none. The mobile app lists them and has Remove, but no Add field.
 - **News** (titled Claude Week until v0.40.4): the **News model** (a dropdown like the other models), the path to your **Reader profile** (in the mod's data folder; see below), and the **Sources** Write reads each week (`week/sources.json`), as links with their tier.
@@ -95,6 +96,7 @@ The Desktop app loads only installed plugins. It ignores `--plugin-dir` and `CLA
 ## Settings
 
 - `rewriteModel` (default `sonnet`): the model for Rewrite, live mode and `/improve`. `haiku` is faster and cheaper, and `opus` is slower and more careful.
+- `rewriteEffort` (default `low`; `low`, `medium` or `high`): how hard the rewrite model thinks on Rewrite and in live mode.
 - `weekModel` (default `opus`): the model that writes each News edition. Writing an edition means reading and checking many pages.
 
 Change them in the pane's Settings tab, in `/config`, or under `pluginConfigs` in your settings file.

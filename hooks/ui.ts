@@ -117,13 +117,16 @@ export type Settings = {
   rewriteModel: string
   rewriteChoices: readonly string[]
   weekChoices: readonly string[]
+  /** How hard the rewrite model thinks (the rewriteEffort setting). */
+  rewriteEffort: string
+  effortChoices: readonly string[]
   /** Why the model settings can't be changed here, once a change was refused; undefined while they can. */
   readOnlyReason?: string
   /** What the last change did, shown under the controls. */
   note: string
 }
 
-export type ModelSetting = 'rewriteModel' | 'weekModel'
+export type ModelSetting = 'rewriteModel' | 'rewriteEffort' | 'weekModel'
 
 /** What the pane's controls do. Each may return the work it started, so a press can wait for it. */
 export type Actions = {
@@ -602,6 +605,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const general: RenderElement[] = [
     settingRow(E, 'mode', 'Mode', modeHelp, modeControl),
     modelSetting(E, a, 'rewriteModel', 'Rewrite model', 'Used for Rewrite, live mode and /improve.', st.rewriteModel, st.rewriteChoices, st.readOnlyReason, F),
+    modelSetting(E, a, 'rewriteEffort', 'Rewrite effort', 'How hard the model thinks on Rewrite and in live mode. Low answers soonest; high takes longer and may catch more.', st.rewriteEffort, st.effortChoices, st.readOnlyReason, F),
   ]
   const generalNote = st.readOnlyReason
     ? [text(E, `These can't be changed from the pane here (${st.readOnlyReason}). Change them under /config in a terminal session.`, { color: 'warning', wrap: 'wrap' })]

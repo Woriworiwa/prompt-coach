@@ -1,6 +1,6 @@
 {
   "name": "prompt-coach",
-  "version": "0.41.1",
+  "version": "0.42.0",
   "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with the rules for each model; /improve rewrites a draft straight into the prompt box; a News tab with a weekly digest you vote on.",
   "author": {
     "name": "Omar"
@@ -16,6 +16,17 @@
         "opus"
       ],
       "default": "sonnet"
+    },
+    "rewriteEffort": {
+      "type": "string",
+      "title": "Rewrite effort",
+      "description": "How hard the rewrite model thinks on Rewrite and in live mode. low answers soonest; high takes longer and may catch more.",
+      "options": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "low"
     },
     "weekModel": {
       "type": "string",

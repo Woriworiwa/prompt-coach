@@ -743,17 +743,17 @@ test('Settings: each section in a round bordered box with its title on no band, 
   const rules = boxNode(tree, 'group-rules-box')!
   expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list'])
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeUndefined()
-  // General's two rows (Mode and Rewrite model; Refresh model went in v0.40.0) have a 1-pixel Svg line between them.
+  // General's three rows (Mode, Rewrite model and, since v0.42.0, Rewrite effort) have a 1-pixel Svg line between each two.
   const general = boxNode(tree, 'group-general-box')!
   const lines = general.kids.filter(k => (k as { props?: { key?: string } }).props?.key?.startsWith('line-general-'))
-  expect(lines).toHaveLength(1)
+  expect(lines).toHaveLength(2)
   const svg = (lines[0] as { props?: { children?: unknown[] }; children?: unknown[] })
   const svgNode = [svg.children, svg.props?.children].flat().find(k => (k as { type?: string })?.type === 'Svg') as { props?: Record<string, unknown> }
   expect(svgNode?.props?.height).toBe(1)
   // Labels in the normal weight, as Desktop's are; descriptions dim.
   expect(textLook(tree, 'Mode')).toEqual({ found: true, color: undefined, weight: undefined })
   expect(textLook(tree, 'Rewrite model')).toEqual({ found: true, color: undefined, weight: undefined })
-  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['weekModel', 'set-weekModel']] as const) {
+  for (const [key, control] of [['mode', 'mode'], ['rewriteModel', 'set-rewriteModel'], ['rewriteEffort', 'set-rewriteEffort'], ['weekModel', 'set-weekModel']] as const) {
     const r = boxNode(tree, `setting-${key}`)
     expect(r?.props.flexDirection).toBe('row')
     expect(r?.props.justifyContent).toBe('space-between')
@@ -859,6 +859,30 @@ test('a model setting changes through config.set, and the next Analyze uses it',
   await ui.unmount()
 })
 
+test('Rewrite effort is a setting (v0.42.0): low by default, changed through config.set, and the next Rewrite uses it', async ($, on) => {
+  const { s } = world(on)
+  const set: { key: string; value: unknown }[] = []
+  on('config.set', async ($, e) => {
+    set.push({ key: e.key, value: e.value })
+    return { value: e.value }
+  })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect(s.analysisCalls.at(-1)?.effort).toBe('low')
+  await ui.press({ key: 'tab-settings' })
+  expect((await ui.find({ type: 'Select', key: 'set-rewriteEffort' }))?.props?.value).toBe('low')
+  await ui.select({ key: 'set-rewriteEffort', value: 'high' })
+  expect(set).toEqual([{ key: 'prompt-coach.rewriteEffort', value: 'high' }])
+  expect(await ui.find({ text: /Rewrite effort set to high/ })).toBeDefined()
+  await ui.press({ key: 'tab-coach' })
+  await ui.press({ key: 'analyze' })
+  expect(s.analysisCalls.at(-1)?.effort).toBe('high')
+  await ui.unmount()
+})
+
 test('when a model setting change is refused, the model settings show read-only with the reason', async ($, on) => {
   world(on)
   on('config.set', async () => ({ deny: 'a trusted policy owns it' }))
@@ -867,7 +891,7 @@ test('when a model setting change is refused, the model settings show read-only 
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
   await ui.select({ key: 'set-weekModel', value: 'sonnet' })
-  for (const key of ['set-rewriteModel', 'set-weekModel']) expect(await ui.find({ type: 'Select', key })).toBeUndefined()
+  for (const key of ['set-rewriteModel', 'set-rewriteEffort', 'set-weekModel']) expect(await ui.find({ type: 'Select', key })).toBeUndefined()
   expect(await ui.find({ text: /can't be changed from the pane here \(a trusted policy owns it\)/ })).toBeDefined()
   expect(await ui.find({ text: 'opus' })).toBeDefined()
   // The mode still works: it isn't a model setting.
