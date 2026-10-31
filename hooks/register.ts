@@ -66,7 +66,7 @@ import {
 // /coach: a pane that reads the draft in the prompt box, checks it against a
 // checklist, rewrites it with the reason for each change, and shows the rules
 // for the session's model under Settings.
-// The rules are kept current by a weekly routine on the repo (refresh/ROUTINE.md),
+// The rules are kept current by a weekly task on Omar's Mac (refresh/ROUTINE.md),
 // which opens a PR when a source page changes; the mod only reads them.
 // The Week tab: Claude Week, a weekly digest the Week model writes from the
 // source pages the mod fetches; votes and takes on its stories steer the next.

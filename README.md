@@ -69,7 +69,7 @@ A model with no rules file, such as an older or newer model, gets the general ru
 
 ## Keeping the rules current
 
-A weekly routine on the GitHub repo keeps the rules current (since v0.40.0; before, `/coach refresh` did it in the pane). It follows [`refresh/ROUTINE.md`](refresh/ROUTINE.md):
+A weekly scheduled task on Omar's Mac keeps the rules current (since v0.40.0; before, `/coach refresh` did it in the pane). It follows [`refresh/ROUTINE.md`](refresh/ROUTINE.md):
 
 - `scripts/check-sources.mjs` fetches every page in `sources.json` and compares it with its fingerprint in `refresh/fingerprints.json`. When no page changed, the routine stops there, with no model calls.
 - When a page changed, it rewrites only the rules files built from it. It keeps their structure, checklist and Quick instructions, checks each changed line against the page it cites, bumps the patch version and runs the tests.
