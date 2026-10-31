@@ -341,7 +341,7 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
  * model's (the session's to start, its name a dropdown of every model), each
  * opened and closed on its own and closed to start. Each file's Checklist and
  * Quick instructions show as its sections. Omar's own rules have their own
- * section above, so they aren't repeated here.
+ * section below, so they aren't repeated here.
  */
 function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const r = v.ruleList
@@ -358,7 +358,7 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       flexDirection: 'column',
       children: [
         text(E, 'Rules in use'),
-        text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours (above), which win when they conflict. Each file starts with the pages it comes from; a weekly check rewrites it when one changes, and the update brings it.', { dimColor: true, wrap: 'wrap' }),
+        text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours (below), which win when they conflict. Each file starts with the pages it comes from; a weekly check rewrites it when one changes, and the update brings it.', { dimColor: true, wrap: 'wrap' }),
       ],
     }),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
@@ -617,8 +617,9 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       gap: 'xl',
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote, true),
-        settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
+        // Your rules under Rules since v0.40.3 (Omar): the shipped rules first, then his own, which win.
         settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F))], [], true),
+        settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
       ],
     }),

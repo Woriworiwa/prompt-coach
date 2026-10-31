@@ -719,7 +719,7 @@ test('Settings: each section in a round bordered box with its title on no band, 
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
   const boxLook = { flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1 }
-  for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules'], ['week', 'Claude Week']] as const) {
+  for (const [key, title] of [['general', 'General'], ['rules', 'Rules'], ['own-rules', 'Your rules'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)!
     const { key: _gk, children: _gc, ...look } = g.props
     expect(look).toEqual(boxLook)
@@ -736,7 +736,7 @@ test('Settings: each section in a round bordered box with its title on no band, 
   expect(JSON.stringify(tree)).not.toContain('"backgroundColor":"subtle"')
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
-  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
+  expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-rules', 'group-own-rules', 'group-week'])
   // Statistics are gone (v0.39.0).
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
   // Rules: the rules in use (moved from the Analytics tab in v0.39.0), and nothing else: the in-pane refresh went in v0.40.0 and the Sources list in v0.40.2, since each rules file lists its own pages.
@@ -1895,7 +1895,7 @@ test('Rules in Settings: General, then the model with its name a dropdown, both 
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
   await ui.press({ key: 'rules-toggle-model' })
-  // The first row of Settings' Rules section since v0.39.0 (on the Analytics tab before); Your rules has its own section above.
+  // The first row of Settings' Rules section since v0.39.0 (on the Analytics tab before); Your rules has its own section (below Rules since v0.40.3).
   const items = boxNode(await ui.drawn(), 'block-rule-list')!
   expect(await ui.find({ text: 'Rules in use' })).toBeDefined()
   const groups = items.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
