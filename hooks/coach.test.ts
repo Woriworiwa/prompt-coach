@@ -30,8 +30,7 @@ import {
   quickFor,
   withSentence,
 } from './lib.ts'
-import { BAR_CELLS, REWRITE_EDITABLE, barCount, barRuns, rowsFor } from './ui.ts'
-import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
+import { REWRITE_EDITABLE, rowsFor } from './ui.ts'
 import { type Edition, parseEdition } from './week.ts'
 import { REFRESH_SYSTEM, changedUrls, fingerprint, lineDiff, parseSources, sameContent, stampAsOf, toFetchUrl } from './refresh.ts'
 
@@ -143,27 +142,7 @@ describe('suggestions', () => {
   })
 })
 
-describe('bars and live mode', () => {
-  test('barRuns splits BAR_CELLS of █ into filled and empty, in proportion and never past either end', () => {
-    const cells = (n: number, of: number) => barRuns(n, of).map(r => r.length)
-    expect(cells(1, 1)).toEqual([BAR_CELLS, 0])
-    expect(cells(0, 4)).toEqual([0, BAR_CELLS])
-    expect(cells(2, 4)).toEqual([8, 7])
-    expect(cells(3, 0)).toEqual([0, BAR_CELLS])
-    expect(cells(9, 4)).toEqual([BAR_CELLS, 0])
-    // One character for both runs, so they're the same height; only the dim tells them apart.
-    expect(barRuns(2, 4).join('')).toBe('█'.repeat(BAR_CELLS))
-  })
-
-  test('barCount pads the count to a fixed width with no-break spaces, so every line is as long', () => {
-    const a = barCount('5 of 80', 8)
-    const b = barCount('54 of 80', 8)
-    expect(a).toHaveLength(b.length)
-    expect(a.endsWith('\u00A0\u00A0\u00A05 of 80')).toBe(true)
-    // Only the count keeps its own single spaces; the gap and the padding never fold.
-    expect(a.slice(0, -'5 of 80'.length).includes(' ')).toBe(false)
-  })
-
+describe('live mode', () => {
   test('liveSkipReason waits for enough text, a new draft, no running analysis, and the cap', () => {
     const base = { text: 'fix the login bug please', lastAnalyzed: '', isRunning: false, liveCalls: 0 }
     expect(liveSkipReason(base)).toBeUndefined()
@@ -446,8 +425,6 @@ function world(
 }
 
 const START = { cwd: '/tmp', surface: 'desktop', isInteractive: true } as const
-/** The statistics' pane tests, which run only while statistics are on (STATS_ON in analytics.ts). */
-const statsTest: typeof test = STATS_ON ? test : (() => {}) as unknown as typeof test
 // The rewrite is a Code block until the editable field is back on (REWRITE_EDITABLE); its editing tests run only then.
 const REWRITE = REWRITE_EDITABLE ? 'Input' : 'Code'
 const editTest: typeof test = REWRITE_EDITABLE ? test : (() => {}) as unknown as typeof test
@@ -487,12 +464,9 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(await ui.find({ type: 'Code', text: 'think step by step' })).toBeDefined()
   // No rules-date line since v0.23.0.
   expect(await ui.find({ text: /Rules as of/ })).toBeUndefined()
-  // Tips are gone (v0.17.0): the Analytics tab has no tips section.
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Using Opus 5.5 well' })).toBeUndefined()
+  // Tips (v0.17.0) and the Analytics tab (v0.39.0) are gone.
+  expect(buttonProps(await ui.drawn(), 'tab-analytics')).toBeUndefined()
   expect(await ui.find({ key: 'tips' })).toBeUndefined()
-  expect(await ui.find({ key: 'analyze' })).toBeUndefined()
-  await ui.press({ key: 'tab-coach' })
 
   await ui.press({ key: 'analyze' })
   expect(s.analyses).toHaveLength(1)
@@ -530,12 +504,8 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(s.filled).toEqual([rewrite, ''])
   expect(s.submitted).toEqual([{ text: rewrite, origin: { kind: 'plugin', name: 'prompt-coach', asUser: true } }])
   expect(s.box).toBe('')
-  // Statistics are on again (v0.36.0): the analysis is recorded as sent, and the Analytics tab draws it.
-  expect((saved.get('analytics') as Analytics).drafts[0]).toMatchObject({ model: 'Opus 5.5', applied: true })
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: /^1 analysis · your last 1 draft covers \d+% of the checklist on average\.$/ })).toBeDefined()
-  expect(boxNode(await ui.drawn(), 'stats-missing')).toBeDefined()
-  expect(await ui.find({ key: 'clear-lessons' })).toBeDefined()
+  // Statistics are gone (v0.39.0): nothing is recorded.
+  expect(saved.has('analytics')).toBe(false)
   await ui.unmount()
 })
 
@@ -651,7 +621,7 @@ test('when the session reports no model, the pane still loads the rules, then ta
   expect(await ui.find({ text: /hasn't said which model/ })).toBeDefined()
   expect(await ui.find({ text: /No rules for/ })).toBeUndefined()
   expect(await ui.find({ text: /Rules as of/ })).toBeUndefined()
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
@@ -661,7 +631,7 @@ test('when the session reports no model, the pane still loads the rules, then ta
 
   const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, model: 'claude-opus-5-5' }
   await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', usage })
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
   expect(s.model).toBe('')
   await ui.unmount()
@@ -728,7 +698,7 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   expect(buttonProps(await ui.drawn(), 'tab-coach')).toBeUndefined()
   expect(textLook(await ui.drawn(), 'Coach')).toEqual({ found: true, color: 'claude', weight: 'semibold' })
   expect(await ui.find({ text: '[Coach]' })).toBeUndefined()
-  for (const [key, hotkey] of [['tab-analytics', '2'], ['tab-week', '3'], ['tab-settings', '4']] as const) {
+  for (const [key, hotkey] of [['tab-week', '2'], ['tab-settings', '3']] as const) {
     const props = buttonProps(await ui.drawn(), key)
     expect(props?.hotkey).toBe(hotkey)
     expect(props?.dimColor).toBe(true)
@@ -741,11 +711,11 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   expect(buttonProps(await ui.drawn(), 'tab-coach')?.hotkey).toBe('1')
   await ui.press({ key: 'tab-coach' })
   expect(textLook(await ui.drawn(), 'Coach').color).toBe('claude')
-  // Settings stands alone at the right end; Coach, Analytics and Week sit together on the left.
+  // Settings stands alone at the right end; Coach and Week sit together on the left, with no Analytics tab (v0.39.0).
   const row = boxNode(await ui.drawn(), 'tabs')!
   expect(row.props.justifyContent).toBe('space-between')
   expect(row.kids).toHaveLength(2)
-  expect(buttonProps(row.kids[0], 'tab-analytics')).toBeDefined()
+  expect(buttonProps(await ui.drawn(), 'tab-analytics')).toBeUndefined()
   // The Week tab is labelled News (v0.10.1); its key is still tab-week.
   expect(buttonProps(row.kids[0], 'tab-week')?.label).toBe('News')
   expect(buttonProps(row.kids[0], 'tab-settings')).toBeUndefined()
@@ -753,7 +723,7 @@ test('Desktop tabs: the open one is clay semibold Text, the others dim Buttons t
   await ui.unmount()
 })
 
-test('terminal tabs: plain Buttons with keys 1-4, the open one in clay brackets', async ($, on) => {
+test('terminal tabs: plain Buttons with keys 1-3, the open one in clay brackets', async ($, on) => {
   world(on)
   await $.session.start({ ...START, surface: 'terminal' })
   await $.command.run(coach())
@@ -763,7 +733,7 @@ test('terminal tabs: plain Buttons with keys 1-4, the open one in clay brackets'
   expect(open?.plain).toBe(true)
   expect(open?.hotkey).toBe('1')
   expect(buttonLook(await ui.drawn(), 'tab-coach')?.color).toBe('claude')
-  for (const [key, hotkey] of [['tab-analytics', '2'], ['tab-week', '3'], ['tab-settings', '4']] as const) {
+  for (const [key, hotkey] of [['tab-week', '2'], ['tab-settings', '3']] as const) {
     const props = buttonProps(await ui.drawn(), key)
     expect(props?.hotkey).toBe(hotkey)
     expect(props?.plain).toBe(true)
@@ -785,21 +755,14 @@ function boxNode(node: unknown, key: string): { props: Record<string, unknown>; 
   return undefined
 }
 
-test('Settings: each section in the Analytics group\'s bordered box with its title on no band, plain labels, a thin line between rows', async ($, on) => {
+test('Settings: each section in a round bordered box with its title on no band, plain labels, a thin line between rows', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  // The Analytics tab's Rules group is the model for the box; its title has no band (v0.20.2) but keeps its padding.
-  await ui.press({ key: 'tab-analytics' })
-  const model = boxNode(await ui.drawn(), 'group-rule-list')!
-  const { key: _k, children: _c, ...boxLook } = model.props
-  expect((model.kids[0] as { props: Record<string, unknown> }).props.backgroundColor).toBeUndefined()
-  expect((model.kids[0] as { props: Record<string, unknown> }).props.paddingX).toBe(1)
-  expect(boxLook.borderStyle).toBe('round')
-
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
+  const boxLook = { flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1 }
   for (const [key, title] of [['general', 'General'], ['own-rules', 'Your rules'], ['rules', 'Rules'], ['week', 'Claude Week']] as const) {
     const g = boxNode(tree, `group-${key}`)!
     const { key: _gk, children: _gc, ...look } = g.props
@@ -818,11 +781,11 @@ test('Settings: each section in the Analytics group\'s bordered box with its tit
   // More space between sections (the xl step) than between rows (1).
   expect(boxNode(tree, 'settings-sections')?.props.gap).toBe('xl')
   expect(boxNode(tree, 'settings-sections')?.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['group-general', 'group-own-rules', 'group-rules', 'group-week'])
-  // Statistics moved to the Analytics tab in v0.10.0.
+  // Statistics are gone (v0.39.0).
   expect(boxNode(tree, 'group-statistics')).toBeUndefined()
-  // Rules: the sources first, always listed (no Show sources button), a thin line, then the refresh.
+  // Rules: the rules in use (moved from the Analytics tab in v0.39.0), then the sources, always listed (no Show sources button), then the refresh, a thin line between each.
   const rules = boxNode(tree, 'group-rules-box')!
-  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-sources', 'line-rules-1', 'block-refresh'])
+  expect(rules.kids.map(k => (k as { props?: { key?: string } }).props?.key)).toEqual(['block-rule-list', 'line-rules-1', 'block-sources', 'line-rules-2', 'block-refresh'])
   expect(await ui.find({ type: 'Link', text: 'docs.example/general' })).toBeDefined()
   expect(buttonProps(tree, 'sources')).toBeUndefined()
   expect(await ui.find({ text: /Show sources|Hide sources/ })).toBeUndefined()
@@ -1373,7 +1336,7 @@ test('switching model changes the label and rules while the pane is open', async
   s.model = 'sonnet'
   await clock.advance(5000)
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
@@ -1978,137 +1941,14 @@ test('Week: when the prompt box can\'t take the side question, it goes on the cl
   await ui.unmount()
 })
 
-// ---- Statistics: tokens and the layout trial (v0.9.4) ----
+// ---- Statistics, removed in v0.39.0 ----
 
-/** Two drafts of ANALYSIS written for Opus 5.5, with some tokens counted. */
-function stats(model = 'Opus 5.5'): Analytics {
-  const a = parseAnalysis(ANALYSIS)!
-  const two = recordDraft(recordDraft(NO_ANALYTICS, a, 'Opus 5.5', 1), a, model, 2)
-  return { ...two, tokens: { calls: 2, input: 1000, output: 500, cacheRead: 200, cacheWrite: 0 } }
-}
-const STATS = stats()
-
-statsTest('Statistics: the eight parts, in order: score, work on next, missing or vague, strengths, changes, advice, tokens, clear', async ($, on) => {
-  world(on, { saved: { analytics: STATS } })
+test('Statistics: the stored statistics, current and before v0.11.0, are deleted when a session starts', async ($, on) => {
+  const { saved } = world(on, { saved: { analytics: { drafts: [], tokens: {} }, lessons: { analyses: 80, gaps: { Goal: 3 }, rules: {}, recent: [] }, statsLayout: 'side' } })
   await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  // ANALYSIS scores 2.5 of its 6 items: Output and Constraints (n/a) a point each, Goal (vague) half.
-  expect(await ui.find({ text: '2 analyses · your last 2 drafts cover 42% of the checklist on average.' })).toBeDefined()
-  // Goal, Context, Done means and Stop rule are all missing or vague in both; Goal comes first on the checklist.
-  expect(await ui.find({ text: 'Work on next: Goal' })).toBeDefined()
-  expect(await ui.find({ text: 'Missing or vague in 2 of your last 2 drafts.' })).toBeDefined()
-  expect(barsIn(boxNode(await ui.drawn(), 'bars-missing-Goal'))).toEqual(['15+0d 2 of 2'])
-  expect(await ui.find({ text: '0 left out · 2 vague · last 2: 2' })).toBeDefined()
-  // Constraints was n/a and Output present, so neither is missing or vague.
-  expect(boxNode(await ui.drawn(), 'bars-missing-Output')).toBeUndefined()
-  expect(await ui.find({ text: 'Output: in 2 of 2 drafts' })).toBeDefined()
-  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 2 of 2'])
-  expect(await ui.find({ text: 'Added 0 of 0 suggestions · applied 0 of 2 rewrites' })).toBeDefined()
-  expect(await ui.find({ text: '1,700 tokens used by analyses (\u2248850 each).' })).toBeDefined()
-
-  const keys = boxNode(await ui.drawn(), 'block-statistics')!.kids.map(k => (k as { props?: { key?: string } }).props?.key ?? (k as { type?: string }).type)
-  expect(keys).toEqual(['stats-score', 'stats-focus', 'stats-missing', 'stats-strengths', 'stats-rules', 'stats-advice', 'Text', 'clear-lessons'])
-  await ui.unmount()
-})
-
-statsTest('Statistics: what the coach changed most counts only drafts for the session\'s model', async ($, on) => {
-  world(on, { saved: { analytics: stats('Sonnet 5.5') } })
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  // One of the two drafts was for Opus 5.5, the session's model.
-  expect(await ui.find({ text: 'What the coach changed most · Opus 5.5' })).toBeDefined()
-  expect(barsIn(boxNode(await ui.drawn(), 'bars-rules-0'))).toEqual(['15+0d 1 of 1'])
-  await ui.unmount()
-})
-
-statsTest('Statistics: Add and Apply are counted as advice taken, with the suggestion offered as the example to work on', async ($, on) => {
-  const { s, saved } = world(on, { analysis: MERGED })
-  s.box = 'fix the login thing'
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'analyze' })
-  await ui.press({ key: 'add-1-0' })
-  await ui.press({ key: 'apply' })
-  const d = (saved.get('analytics') as Analytics).drafts[0]!
-  expect(d).toMatchObject({ applied: true, added: 1 })
-  expect(d.offered).toHaveLength(3)
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Added 1 of 3 suggestions · applied 1 of 1 rewrite' })).toBeDefined()
-  await ui.unmount()
-})
-
-statsTest('Statistics: each Analyze adds its tokens, an unreadable answer too, and Clear statistics resets them', async ($, on) => {
-  const { s, saved } = world(on)
-  s.box = 'fix the login thing so it works'
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'analyze' })
-  await ui.press({ key: 'tab-analytics' })
-  // The stub's usage is 1 input and 1 output token.
-  expect(await ui.find({ text: '2 tokens used by analyses (\u22482 each).' })).toBeDefined()
-  await ui.press({ key: 'clear-lessons' })
-  expect(await ui.find({ text: /tokens/ })).toBeUndefined()
-  expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
   expect(saved.has('analytics')).toBe(false)
-  await ui.unmount()
-})
-
-statsTest('Statistics: an answer that is not an analysis still counts its tokens, but adds no draft', async ($, on) => {
-  const { s, saved } = world(on, { analysis: 'no tags here' })
-  s.box = 'fix the login thing so it works'
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'analyze' })
-  const a = saved.get('analytics') as Analytics
-  expect(a.drafts).toHaveLength(0)
-  expect(a.tokens.calls).toBe(1)
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: '2 tokens used by analyses (\u22482 each).' })).toBeDefined()
-  await ui.unmount()
-})
-
-test('Statistics: the statistics kept before v0.11.0 are deleted when a session starts', async ($, on) => {
-  const { saved } = world(on, { saved: { lessons: { analyses: 80, gaps: { Goal: 3 }, rules: {}, recent: [] }, statsLayout: 'side' } })
-  await $.session.start(START)
   expect(saved.has('lessons')).toBe(false)
   expect(saved.has('statsLayout')).toBe(false)
-})
-
-statsTest('Statistics: on mobile the statistics show too, and Clear statistics empties them', async ($, on) => {
-  world(on, { saved: { analytics: STATS }, surfaces: ['mobile'] })
-  await $.session.start({ ...START, surface: 'mobile' })
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('mobile'))
-  await ui.press({ key: 'tab-analytics' })
-  expect(await ui.find({ text: 'Work on next: Goal' })).toBeDefined()
-  await ui.press({ key: 'clear-lessons' })
-  expect(await ui.find({ text: /No analyses yet/ })).toBeDefined()
-  await ui.unmount()
-})
-
-test('Analytics: the statistics first, then a thin line and the rules, and nothing after them', async ($, on) => {
-  world(on, { saved: { lessons: STATS } })
-  await $.session.start(START)
-  await $.command.run(coach())
-  const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
-  const tree = await ui.drawn()
-  const text = JSON.stringify(tree)
-  expect(boxNode(tree, 'group-statistics')).toBeDefined()
-  expect(boxNode(tree, 'line-analytics')).toBeDefined()
-  expect(text.indexOf('No analyses yet')).toBeLessThan(text.indexOf('group-rule-list'))
-  expect(text.indexOf('line-analytics')).toBeLessThan(text.indexOf('group-rule-list'))
-  const body = boxNode(tree, 'group-rule-list')
-  expect(body).toBeDefined()
-  expect(await ui.find({ text: /^Using .* well$/ })).toBeUndefined()
-  await ui.unmount()
 })
 
 test('Your rules: Settings lists the rules file in the data folder, and Remove takes a rule out of it and out of the analysis', async ($, on) => {
@@ -2167,26 +2007,21 @@ test('Your rules: the mobile app lists the rules with no field to add one', asyn
   await ui.unmount()
 })
 
-test('Rules on the Analytics tab: General, then the model with its name a dropdown, then Your rules, all closed at first; no separate Checklist', async ($, on) => {
+test('Rules in Settings: General, then the model with its name a dropdown, both closed at first; no separate Checklist and no Your rules group', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
   await ui.press({ key: 'rules-toggle-model' })
-  // Rules sits in a box like the Week tab's sections: a round subtle border; its title on no band since v0.20.2, still padded.
-  const box = boxNode(await ui.drawn(), 'group-rule-list')!
-  expect(box.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
-  expect(textLook(box.kids[0], 'Rules').found).toBe(true)
-  expect((box.kids[0] as { props?: { backgroundColor?: string; paddingX?: number } }).props).toEqual({ paddingX: 1 })
-  // Its items sit a cell in from the title (v0.20.1).
-  const items = boxNode(await ui.drawn(), 'group-rule-list-items')!
-  expect(items.props.paddingLeft).toBe(1)
+  // The first row of Settings' Rules section since v0.39.0 (on the Analytics tab before); Your rules has its own section above.
+  const items = boxNode(await ui.drawn(), 'block-rule-list')!
+  expect(await ui.find({ text: 'Rules in use' })).toBeDefined()
   const groups = items.kids.map(k => (k as { props?: { key?: string } }).props?.key).filter(Boolean)
-  expect(groups.filter(k => k!.startsWith('block-rules-'))).toEqual(['block-rules-general', 'block-rules-model', 'block-rules-own'])
+  expect(groups.filter(k => k!.startsWith('block-rules-'))).toEqual(['block-rules-general', 'block-rules-model'])
   expect(await ui.find({ key: 'rules-toggle-checklist' })).toBeUndefined()
   expect(await ui.find({ text: /^Checklist$/ })).toBeUndefined()
   // General starts closed; the session's model is picked in the dropdown and its rules are open.
@@ -2212,21 +2047,17 @@ test('Rules on the Analytics tab: General, then the model with its name a dropdo
   await ui.select({ key: 'rules-model-fable-5-1.md', value: 'opus-5-5.md' })
   expect((await ui.find({ type: 'Select', key: 'rules-model-opus-5-5.md' }))?.props?.value).toBe('opus-5-5.md')
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
-  // Your rules as before: hidden at first, Edit in Settings opens Settings.
-  expect(await ui.find({ key: 'rules-own-list' })).toBeUndefined()
-  await ui.press({ key: 'rules-toggle-own' })
-  expect(await ui.find({ key: 'rules-own-list', text: 'End with a recap.' })).toBeDefined()
-  await ui.press({ key: 'rules-edit-own' })
-  expect(boxNode(await ui.drawn(), 'group-own-rules')).toBeDefined()
+  expect(await ui.find({ key: 'rules-toggle-own' })).toBeUndefined()
+  expect(await ui.find({ key: 'rules-edit-own' })).toBeUndefined()
   await ui.unmount()
 })
 
-test('Rules on the Analytics tab: the mobile app picks the model with buttons; a model with no rule file says so', async ($, on) => {
+test('Rules in Settings: the mobile app picks the model with buttons; a model with no rule file says so', async ($, on) => {
   world(on, { model: 'claude-opus-4-1', surfaces: ['mobile'] })
   await $.session.start(START)
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('mobile'))
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
@@ -2373,10 +2204,8 @@ test('Checklist from the rule files: Analyze judges by the model\'s own list, wh
   // The rules go with the draft without their checklist: it is in the system prompt.
   expect(s.analyses[0]).toContain('Name the finish line.')
   expect(s.analyses[0]).not.toContain('## Checklist')
-  // The statistics record the draft against the model's own items, by name.
-  expect(Object.keys((saved.get('analytics') as Analytics).drafts[0]!.status)).toEqual(['Goal', 'Done means', 'Stop rule'])
 
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   // The model's rules start closed (v0.17.4); Show opens them.
   expect(await ui.find({ key: 'rules-model-list' })).toBeUndefined()
   expect(await ui.find({ key: 'rules-toggle-model', text: 'Show' })).toBeDefined()
@@ -2396,7 +2225,7 @@ test('A newer model borrows the newest older file of its family, and the pane sa
   await ui.press({ key: 'analyze' })
   expect(s.analyses[0]).toContain('Name the finish line.') // the Opus 5.5 file
   expect(s.analyses[0]).toContain('The prompt will be sent to: Opus 6')
-  await ui.press({ key: 'tab-analytics' })
+  await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ text: "No rules file for Opus 6 yet; it uses Opus 5.5's." })).toBeDefined()
   expect((await ui.find({ type: 'Select', key: 'rules-model-opus-5-5.md' }))?.props?.value).toBe('opus-5-5.md')
   await ui.unmount()

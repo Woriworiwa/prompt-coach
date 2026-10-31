@@ -30,7 +30,7 @@ export function rulesFor(model: string): (ModelRules & { model: string; isBorrow
   return { file: file.rules.file, label: file.rules.label, model: isBorrowed ? label : file.rules.label, isBorrowed }
 }
 
-/** Every model with its own rule file, in the order the Analytics tab's picker shows them. */
+/** Every model with its own rule file, in the order the rules list's picker under Settings shows them. */
 export const MODEL_RULES: readonly ModelRules[] = [
   { file: 'opus-5-5.md', label: 'Opus 5.5' },
   { file: 'sonnet-5-5.md', label: 'Sonnet 5.5' },
@@ -494,8 +494,6 @@ export function fillPlaceholders(rewrite: string, answers: Record<string, string
 export function asOfDate(markdown: string): string | undefined {
   return /^As of:\s*(\S+)/m.exec(markdown)?.[1]
 }
-
-// The person's statistics live in analytics.ts since v0.11.0.
 
 // ---- Live mode ----
 

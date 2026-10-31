@@ -2,7 +2,6 @@
 // element tree. No `$`; the hooks module hands in the elements and actions.
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
-import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, STATS_ON, scoreTrend, strengths, tokenSummary } from './analytics.ts'
 import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type QuickInstruction, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts, versionsLine } from './week.ts'
@@ -12,10 +11,10 @@ export type UI = Pick<Elements['mobile'], 'Box' | 'Text' | 'Button' | 'Link' | '
 /** The form fields the terminal, Desktop and VS Code draw; the mobile app has none. */
 export type Form = Pick<Elements['desktop'], 'Input' | 'Select'>
 
-export type Tab = 'coach' | 'analytics' | 'settings' | 'week'
+export type Tab = 'coach' | 'settings' | 'week'
 export type Mode = 'manual' | 'live'
-/** The groups in the Analytics tab's rules list, each opened and closed on its own. */
-export type RuleGroup = 'general' | 'model' | 'own'
+/** The groups in the rules list under Settings, each opened and closed on its own. */
+export type RuleGroup = 'general' | 'model'
 /** Which part of the analysis shows below the buttons. */
 
 export type View = {
@@ -53,7 +52,6 @@ export type View = {
   ownRules: OwnRules
   ruleList: RuleList
   sources: string[]
-  analytics: Analytics
   refresh: { isRunning: boolean; progress: string; results: RefreshResult[] }
   /** The model that rewrites files on refresh (the refreshModel setting). */
   refreshModel: string
@@ -72,7 +70,7 @@ export type OwnRules = {
   gen: number
 }
 
-/** The rules list on the Analytics tab: the shipped files as sections, the model picked, and which groups are open. */
+/** The rules list under Settings: the shipped files as sections, the model picked, and which groups are open. */
 export type RuleList = {
   general: RuleSection[]
   models: (ModelRules & { sections: RuleSection[] })[]
@@ -151,7 +149,6 @@ export type Actions = {
   setModel: (field: ModelSetting, value: string) => void
   addRule: (typed: string) => Promise<void>
   removeRule: (rule: string) => Promise<void>
-  clearAnalytics: () => Promise<void>
   refresh: () => Promise<void> | undefined
   rewriteAll: () => Promise<void> | undefined
   accept: () => Promise<void>
@@ -247,7 +244,7 @@ const MARK: Record<CheckStatus, { mark: string; color: string }> = {
 
 export function coachPane(E: UI, v: View, a: Actions, F?: Form): RenderElement {
   const body =
-    v.tab === 'analytics' ? analyticsTab(E, v, a, F) : v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
+    v.tab === 'settings' ? settingsTab(E, v, a, F) : v.tab === 'week' ? weekTab(E, v, a, F) : coachTab(E, v, a, F)
   return E.Box({ flexDirection: 'column', gap: 1, children: [tabs(E, v, a), ...body] })
 }
 
@@ -271,7 +268,7 @@ function tabs(E: UI, v: View, a: Actions): RenderElement {
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     columnGap: 2,
-    children: [row(E, [tab('coach', 'Coach', '1'), tab('analytics', 'Analytics', '2'), tab('week', 'News', '3')]), tab('settings', 'Settings', '4')],
+    children: [row(E, [tab('coach', 'Coach', '1'), tab('week', 'News', '2')]), tab('settings', 'Settings', '3')],
   })
 }
 
@@ -348,26 +345,17 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
   })
 }
 
-/** The Analytics tab: the statistics first, as Settings drew them, then a thin line and the rules. */
-function analyticsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
-  return [
-    settingsGroup(E, v, 'statistics', 'Statistics', [block(E, 'statistics', statistics(E, v, a))]),
-    ...hairline(E, v, 'analytics'),
-    ruleList(E, v, a, F),
-  ]
-}
-
 /**
- * The rules the coach checks drafts against, to read beside the statistics:
- * the general rules (closed to start), the picked model's (the session's to
- * start, its name a dropdown of every model) and Omar's own, each opened and
- * closed on its own. Each file's Checklist shows as one of its sections.
- * Edit in Settings goes to where his own rules are changed.
+ * The rules the coach checks drafts against, first in Settings' Rules section
+ * (v0.39.0; on the Analytics tab before): the general rules and the picked
+ * model's (the session's to start, its name a dropdown of every model), each
+ * opened and closed on its own and closed to start. Each file's Checklist and
+ * Quick instructions show as its sections. Omar's own rules have their own
+ * section above, so they aren't repeated here.
  */
-function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
+function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   const r = v.ruleList
   const picked = r.models.find(m => m.file === r.picked)
-  const own: RuleSection[] = v.ownRules.rules.length ? [{ section: '', rules: v.ownRules.rules }] : []
   // The mobile app has no fields, so there the models are buttons, the picked one in brackets.
   const none = r.picked ? [] : [{ value: '', label: `${v.modelLabel || 'This model'} (no rules file)` }]
   const modelName = F
@@ -375,9 +363,14 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
       // same and leaves `value` out of the comparison, so with one key the list kept showing the first pick.
       F.Select({ key: `rules-model-${r.picked || 'none'}`, options: [...none, ...r.models.map(m => ({ value: m.file, label: m.label }))], value: r.picked, onSelect: file => a.pickRules(file) })
     : row(E, r.models.map(m => E.Button({ key: `rules-pick-${m.file}`, ...tabLabel(E, m.label, m.file === r.picked), plain: true, onPress: () => a.pickRules(m.file) })))
-  // Boxed like the Week tab's sections (`group`), the last section on the tab.
-  return group(E, 'rule-list', 'Rules', [
-    text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours, which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
+  return [
+    E.Box({
+      flexDirection: 'column',
+      children: [
+        text(E, 'Rules in use'),
+        text(E, 'What the coach checks your drafts against: the general rules, then the model\'s, then yours (above), which win when they conflict.', { dimColor: true, wrap: 'wrap' }),
+      ],
+    }),
     ruleGroup(E, v, a, 'general', 'General', r.general, 'No general rules found.'),
     ruleGroup(
       E,
@@ -390,8 +383,7 @@ function ruleList(E: UI, v: View, a: Actions, F?: Form): RenderElement {
       [],
       r.borrowed ? [text(E, r.borrowed, { color: 'warning', wrap: 'wrap' })] : [],
     ),
-    ruleGroup(E, v, a, 'own', 'Your rules', own, 'No rules yet.', [E.Button({ key: 'rules-edit-own', label: 'Edit in Settings', onPress: () => a.tab('settings') })]),
-  ], { band: false, indent: true })
+  ]
 }
 
 /**
@@ -643,7 +635,7 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: [
         settingsGroup(E, v, 'general', 'General', general, generalNote, true),
         settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
-        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))], [], true),
+        settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F)), block(E, 'sources', sources), block(E, 'refresh', refreshSection(E, v, a))], [], true),
         settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
       ],
     }),
@@ -725,8 +717,7 @@ function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
  * rows with a thin line between each two. `after` follows the last row with
  * no line, as a note under the section. The rows sit a cell in from the
  * title (v0.20.1). With `boxed` (the Settings tab, since v0.20.0) it sits in
- * the same bordered box as the Analytics tab's Rules, its title with no band
- * and no padding; without it (Statistics), in no box.
+ * a bordered box, its title with no band and no padding; without it, in no box.
  */
 function settingsGroup(E: UI, v: View, key: string, title: string, rows: RenderElement[], after: RenderElement[] = [], boxed = false): RenderElement {
   const lined = rows.flatMap((r, i) => (i === 0 ? [r] : [...hairline(E, v, `${key}-${i}`), r]))
@@ -756,14 +747,12 @@ function block(E: UI, key: string, children: RenderElement[]): RenderElement {
 
 /**
  * A bordered group, its title on a subtle band (the Week tab's sections), or
- * with `band` false on no band (the Analytics tab's Rules, v0.20.2). With
- * `titlePad` false the title has no padding either (the Settings tab's). With
- * `indent`, its items sit a cell in from the title (the Analytics tab's Rules).
- * Theme keys only, so it follows light and dark.
+ * with `band` false on no band. With `titlePad` false the title has no padding
+ * either (the Settings tab's). Theme keys only, so it follows light and dark.
  */
-function group(E: UI, key: string, title: string, children: RenderElement[], { band = true, titlePad = true, indent = false } = {}): RenderElement {
+function group(E: UI, key: string, title: string, children: RenderElement[], { band = true, titlePad = true } = {}): RenderElement {
   const head = E.Box({ ...(band ? { backgroundColor: 'subtle' as const } : {}), ...(titlePad ? { paddingX: 1 } : {}), children: [heading(E, title)] })
-  const items = indent ? [E.Box({ key: `group-${key}-items`, flexDirection: 'column', gap: 1, paddingLeft: 1, children })] : children
+
   return E.Box({
     key: `group-${key}`,
     flexDirection: 'column',
@@ -771,7 +760,7 @@ function group(E: UI, key: string, title: string, children: RenderElement[], { b
     borderColor: 'subtle',
     paddingX: 1,
     gap: 1,
-    children: [head, ...items],
+    children: [head, ...children],
   })
 }
 
@@ -824,153 +813,7 @@ function modelSetting(
   return settingRow(E, field, label, help, control)
 }
 
-/**
- * What the analyses add up to, in the order that helps most (v0.11.0): the
- * score and its trend, the one item to work on next with an example from the
- * person's own drafts, each item missing or vague (left out against vague,
- * the last drafts against the ones before), what the drafts do well, what the
- * coach changed most for this model, how much advice was taken, then tokens.
- */
-function statistics(E: UI, v: View, a: Actions): RenderElement[] {
-  if (!STATS_ON) return [text(E, 'Statistics are off while the checklist design changes.', { dimColor: true, wrap: 'wrap' })]
-  const an = v.analytics
-  if (!an.drafts.length && !tokenSummary(an)) return [text(E, 'No analyses yet. Each Rewrite adds to these statistics.', { dimColor: true })]
-  return [
-    ...(an.drafts.length
-      ? [scoreLine(E, an), ...focusBlock(E, an), gapBars(E, an), strengthsBlock(E, an), changedBars(E, an, v.modelLabel), adviceLine(E, an)]
-      : []),
-    ...tokensLine(E, an),
-    E.Button({ key: 'clear-lessons', ...tinted(E, 'Clear statistics', 'error'), plain: true, dimColor: true, onPress: a.clearAnalytics }),
-  ]
-}
-
-const fmt = (n: number) => n.toLocaleString('en-US')
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-/** A semibold section title with lines under it, keyed `key`. */
-function statBlock(E: UI, key: string, title: string, children: RenderElement[]): RenderElement {
-  return E.Box({ key: `stats-${key}`, flexDirection: 'column', children: [text(E, title, { weight: 'semibold' }), ...children] })
-}
-
-/** How many cells a bar has. */
-export const BAR_CELLS = 15
-
-/**
- * A bar's filled and empty runs: `n` of `of` cells, always BAR_CELLS in all.
- * Both are █, the empty run drawn dim, so the two parts are the same height
- * (Desktop's monospaced face draws ░ shorter than █).
- */
-export function barRuns(n: number, of: number): [string, string] {
-  const filled = of > 0 ? Math.max(0, Math.min(BAR_CELLS, Math.round((BAR_CELLS * n) / of))) : 0
-  return ['█'.repeat(filled), '█'.repeat(BAR_CELLS - filled)]
-}
-
-/** A no-break space: Desktop keeps it, where it would fold ordinary spaces together. */
-const NBSP = '\u00A0'
-
-/**
- * The count after a bar: two spaces, then the count padded on the left to
- * `width` characters, so in the monospaced face every line is as wide and
- * the bars line up (Desktop's own face is proportional).
- */
-export function barCount(count: string, width: number): string {
-  return `${NBSP}${NBSP}${count.padStart(width, NBSP)}`
-}
-
-/** One bar line's right-hand side, monospaced: the filled run, the empty run dimmed, then the count. */
-function barText(E: UI, n: number, of: number, count: string, width: number): RenderElement {
-  const [filled, empty] = barRuns(n, of)
-  return E.Text({ mono: true, children: [filled, E.Text({ dimColor: true, children: [empty] }), barCount(count, width)] })
-}
-
-/** The count of drafts and the average score of the last ones, up or down from the ones before. */
-function scoreLine(E: UI, an: Analytics): RenderElement {
-  const t = scoreTrend(an)!
-  const n = Math.min(an.drafts.length, RECENT)
-  const trend = t.before === undefined ? '' : t.recent > t.before ? `, up from ${t.before}%` : t.recent < t.before ? `, down from ${t.before}%` : ', the same as before'
-  return E.Box({
-    key: 'stats-score',
-    flexDirection: 'column',
-    children: [
-      text(E, `${plural(an.drafts.length, 'analysis', 'analyses')} · your last ${plural(n, 'draft covers', 'drafts cover')} ${t.recent}% of the checklist on average${trend}.`, { wrap: 'wrap' }),
-      text(E, 'Each draft against its model\'s checklist: an item covered (or not needed) counts in full, a vague one half.', { dimColor: true, wrap: 'wrap' }),
-    ],
-  })
-}
-
-/** The one item to work on next, with the newest sentence the coach suggested for it. */
-function focusBlock(E: UI, an: Analytics): RenderElement[] {
-  const f = focus(an)
-  if (!f) return []
-  return [
-    statBlock(E, 'focus', `Work on next: ${f.item}`, [
-      text(E, `Missing or vague in ${f.gaps} of your last ${plural(f.of, 'draft', 'drafts')}.`, { wrap: 'wrap' }),
-      ...(f.example ? [text(E, `For example: “${f.example}”`, { dimColor: true, wrap: 'wrap' })] : []),
-    ]),
-  ]
-}
-
-/** One bar line: the name with a dim note under it on the left, the bar and its count on the right. */
-function barRow(E: UI, key: string, name: string, note: string, n: number, of: number, width: number): RenderElement {
-  return E.Box({
-    key,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    columnGap: 2,
-    children: [
-      E.Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [text(E, name, { wrap: 'wrap' }), ...(note ? [text(E, note, { dimColor: true, wrap: 'wrap' })] : [])] }),
-      barText(E, n, of, `${n} of ${of}`, width),
-    ],
-  })
-}
-
-/** Each item missing or vague, worst first: how often it was left out against vague, and the last drafts against the ones before. */
-function gapBars(E: UI, an: Analytics): RenderElement {
-  const stats = itemStats(an).filter(s => s.missing + s.vague > 0)
-  const width = Math.max(0, ...stats.map(s => `${s.missing + s.vague} of ${s.applicable}`.length))
-  const rows = stats.map(s => {
-    const last = `last ${s.recent.of}: ${s.recent.gaps}${s.before ? `, the ${s.before.of} before: ${s.before.gaps}` : ''}`
-    return barRow(E, `bars-missing-${s.item}`, s.item, `${s.missing} left out · ${s.vague} vague · ${last}`, s.missing + s.vague, s.applicable, width)
-  })
-  return statBlock(E, 'missing', 'Missing or vague', rows.length ? rows : [text(E, 'Nothing yet. Your drafts have covered the checklist.', { dimColor: true, wrap: 'wrap' })])
-}
-
-/** What the drafts do well: items present in most of them. */
-function strengthsBlock(E: UI, an: Analytics): RenderElement {
-  const good = strengths(an)
-  return statBlock(
-    E,
-    'strengths',
-    'What you do well',
-    good.length
-      ? good.map(g => text(E, `${g.item}: in ${g.present} of ${plural(g.of, 'draft', 'drafts')}`, { wrap: 'wrap' }))
-      : [text(E, 'Nothing stands out yet. Items your drafts cover most of the time show here.', { dimColor: true, wrap: 'wrap' })],
-  )
-}
-
-/** The rules behind the most changes, for the session's model when it's known. */
-function changedBars(E: UI, an: Analytics, model: string): RenderElement {
-  const { rules, of } = rulesFor(an, model)
-  const width = `${of} of ${of}`.length
-  const title = model ? `What the coach changed most · ${model}` : 'What the coach changed most'
-  const rows = rules.map(([rule, n], i) => barRow(E, `bars-rules-${i}`, rule, '', Math.min(n, of), of, width))
-  const empty = of ? 'None yet.' : `No analyses with ${model} yet.`
-  return statBlock(E, 'rules', title, rows.length ? rows : [text(E, empty, { dimColor: true, wrap: 'wrap' })])
-}
-
-/** How much of the coach's advice was taken. */
-function adviceLine(E: UI, an: Analytics): RenderElement {
-  const t = advice(an)
-  return statBlock(E, 'advice', 'Advice you took', [
-    text(E, `Added ${t.added} of ${plural(t.offered, 'suggestion', 'suggestions')} · applied ${t.applied} of ${plural(t.drafts, 'rewrite', 'rewrites')}`, { wrap: 'wrap' }),
-  ])
-}
-
-/** The tokens the analyses used, last and dim: they say what the coaching costs, not how to prompt. */
-function tokensLine(E: UI, an: Analytics): RenderElement[] {
-  const t = tokenSummary(an)
-  return t ? [text(E, `${fmt(t.total)} tokens used by analyses (≈${fmt(t.perCall)} each).`, { dimColor: true, wrap: 'wrap' })] : []
-}
 
 /** /coach refresh: the check, its progress, and each changed file's diff to accept or reject. */
 function refreshSection(E: UI, v: View, a: Actions): RenderElement[] {

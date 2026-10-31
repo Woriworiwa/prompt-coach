@@ -47,7 +47,6 @@ import {
   stampAsOf,
   toFetchUrl,
 } from './refresh.ts'
-import { type Analytics, NO_ANALYTICS, STATS_ON, addUsage, asAnalytics, recordDraft, recordUse } from './analytics.ts'
 import { type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
@@ -80,7 +79,7 @@ import {
 //
 // /coach: a pane that reads the draft in the prompt box, checks it against a
 // checklist, rewrites it with the reason for each change, and shows the rules
-// for the session's model on the Analytics tab.
+// for the session's model under Settings.
 // /coach refresh: re-reads the pages in sources.json and proposes updated
 // rules, which change only when the person accepts them.
 // The Week tab: Claude Week, a weekly digest the Week model writes from the
@@ -89,7 +88,6 @@ import {
 const PANE = 'prompt-coach'
 const STORE = {
   mode: 'mode',
-  analytics: 'analytics',
   pending: 'pendingRefresh',
   seen: 'sourceFingerprints',
   weekEditions: 'weekEditions',
@@ -120,7 +118,7 @@ let refreshModel = 'opus'
 let weekModel = 'opus'
 
 // The pane's state, shared by the hooks below. A reload starts it afresh;
-// mode and analytics come back from $.store.
+// mode comes back from $.store.
 let isPaneOpen = false
 let tab: Tab = 'coach'
 let mode: Mode = 'manual'
@@ -146,9 +144,6 @@ let rewriteGen = 0
 let isRunning = false
 let status = ''
 let liveCalls = 0
-let analytics: Analytics = NO_ANALYTICS
-/** When the analysis on screen was recorded, so an Apply marks that draft. */
-let analyzedAt = 0
 let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
 const buttons = new Map<string, ElementCache>()
@@ -165,7 +160,7 @@ let answeredModel = ''
 let modelLabel = ''
 let hasModelRules = false
 let sources: string[] = []
-/** The shipped rule files as sections, by file name (general.md and each model's), for the Analytics tab's rules list. */
+/** The shipped rule files as sections, by file name (general.md and each model's), for the rules list under Settings. */
 let ruleFiles: Record<string, RuleSection[]> = {}
 /** The same files as read, by file name, for the checklist each model gets. */
 let ruleTexts: Record<string, string> = {}
@@ -230,11 +225,9 @@ export const register: Register = (on, options) => {
       immediate: true,
     })
     mode = (await $.store.get(STORE.mode)) === 'live' ? 'live' : 'manual'
-    analytics = asAnalytics(await $.store.get(STORE.analytics))
-    // The statistics kept before v0.11.0: Omar chose to start fresh, so they're deleted.
-    if ((await $.store.get('lessons')) !== undefined) await $.store.delete('lessons')
-    // The v0.9.4 layout trial's choice; Bars is the only layout since v0.9.6.
-    if ((await $.store.get('statsLayout')) !== undefined) await $.store.delete('statsLayout')
+    // Statistics were removed in v0.39.0 at Omar's say, so their stored drafts and token counts go too,
+    // with the keys of older statistics (before v0.11.0) and the v0.9.4 layout trial.
+    for (const key of ['analytics', 'lessons', 'statsLayout']) if ((await $.store.get(key)) !== undefined) await $.store.delete(key)
     const pending = (await $.store.get(STORE.pending)) as { results?: unknown; seen?: unknown } | undefined
     if (pending && Array.isArray(pending.results)) {
       refresh = { isRunning: false, progress: 'Proposed updates from your last refresh, not yet accepted.', results: pending.results as RefreshResult[] }
@@ -396,7 +389,6 @@ export const register: Register = (on, options) => {
       },
       liveCalls,
       sources,
-      analytics,
       refresh,
       refreshModel,
       settings: {
@@ -413,10 +405,8 @@ export const register: Register = (on, options) => {
       tab: t => {
         tab = t
         $.ui.invalidate('ui.render')
-        // The file may have been edited by hand since it was last read.
-        if (t === 'settings') void loadOwnRules($).then(() => $.ui.invalidate('ui.render'))
-        // The Analytics tab lists every rule file; a refresh or a hand edit may have changed them.
-        if (t === 'analytics') void Promise.all([loadRuleFiles($), loadOwnRules($)]).then(() => $.ui.invalidate('ui.render'))
+        // Settings lists every rule file and Omar's own; a refresh or a hand edit may have changed them.
+        if (t === 'settings') void Promise.all([loadRuleFiles($), loadOwnRules($)]).then(() => $.ui.invalidate('ui.render'))
       },
       pickRules: file => {
         rulesPick = file
@@ -464,7 +454,6 @@ export const register: Register = (on, options) => {
       setModel: (field, value) => setModelSetting($, field, value),
       addRule: typed => addOwnRule($, typed),
       removeRule: rule => removeOwnRule($, rule),
-      clearAnalytics: () => clearAnalytics($),
       refresh: () => (refresh.isRunning ? undefined : runRefresh($, 'changed')),
       rewriteAll: () => (refresh.isRunning ? undefined : runRefresh($, 'all')),
       accept: () => acceptRefresh($),
@@ -612,11 +601,6 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
       status = `Analysis failed: ${reply.reason}. Try again.`
       return
     }
-    // Counted before parsing: an answer that can't be read still cost its tokens.
-    if (STATS_ON) {
-      analytics = addUsage(analytics, reply.usage)
-      await $.store.set(STORE.analytics, analytics)
-    }
     const parsed = parseAnalysis(reply.text, names)
     if (!parsed) {
       status = 'The analysis came back in an unexpected format. Try again.'
@@ -632,11 +616,6 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     quickOn = []
     formGen += 1
     status = ''
-    analyzedAt = await $.clock.now()
-    if (STATS_ON) {
-      analytics = recordDraft(analytics, parsed, modelLabel, analyzedAt)
-      await $.store.set(STORE.analytics, analytics)
-    }
   } catch (err) {
     status = `Analysis failed: ${err instanceof Error ? err.message : String(err)}`
   } finally {
@@ -723,16 +702,8 @@ function droppedGaps(): string[] {
   return removed.filter(t => !answers[t])
 }
 
-/** Records for Analytics that the analysis on screen was applied, with the suggestions added to it. */
-async function noteApplied($: EngineInterface): Promise<void> {
-  if (!STATS_ON || !analysis || !analyzedAt) return
-  analytics = recordUse(analytics, analyzedAt, added.length)
-  await $.store.set(STORE.analytics, analytics)
-}
-
 /** Puts the rewrite in the prompt box, then sends it as Omar's own prompt, as Enter would. */
 async function applyRewrite($: EngineInterface, rewrite: string): Promise<void> {
-  await noteApplied($)
   analyzedText = rewrite
   draft = rewrite
   const filled = await $.prompt.fill({ text: rewrite, mode: 'replace' })
@@ -785,12 +756,6 @@ async function setModelSetting($: EngineInterface, field: ModelSetting, value: s
   } catch (err) {
     settingsReadOnly = err instanceof Error ? err.message : String(err)
   }
-  $.ui.invalidate('ui.render')
-}
-
-async function clearAnalytics($: EngineInterface): Promise<void> {
-  analytics = NO_ANALYTICS
-  await $.store.delete(STORE.analytics)
   $.ui.invalidate('ui.render')
 }
 
