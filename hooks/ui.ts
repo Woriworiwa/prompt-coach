@@ -804,7 +804,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /**
  * The Week tab: one Claude Week edition. The title, range, intro and what
- * changed from feedback; the Top 3; how much is read; then each section in a
+ * changed from feedback; how much is read; then each section in a
  * bordered group, the questions and the sources. Older and Newer step through
  * the stored editions, Archive lists them all; the write button starts this
  * week's edition.
@@ -876,47 +876,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     }),
   )
 
-  const all = ed.sections.flatMap(s => s.stories)
-  const top = ed.top3.map(id => all.find(s => s.id === id)).filter((s): s is Story => !!s)
-  if (top.length) {
-    out.push(
-      E.Box({
-        key: 'week-top3',
-        ...CARD,
-        borderColor: 'claude',
-        children: [
-          E.Box({
-            key: 'week-top3-head',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            children: [mono(E, '[▲] TOP 3 STORIES', { color: 'warning', weight: 'bold' }), mono(E, 'PRIORITY_QUEUE', { dimColor: true })],
-          }),
-          ...top.map((s, n) => {
-            const section = ed.sections.find(x => x.stories.includes(s))?.title ?? ''
-            const done = !!w.read[s.id]
-            return E.Box({
-              key: `week-top3-${n}`,
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              columnGap: 1,
-              children: [
-                mono(E, done ? '✓' : `${n + 1}.`, done ? { color: 'success' } : { color: 'warning', weight: 'bold' }),
-                E.Box({
-                  flexDirection: 'column',
-                  flexShrink: 1,
-                  children: [
-                    mono(E, s.title, { wrap: 'wrap', ...(done ? { dimColor: true, strikethrough: true } : {}) }),
-                    ...(section ? [mono(E, `— ${section}`, { dimColor: true, wrap: 'wrap', ...(done ? { strikethrough: true } : {}) })] : []),
-                  ],
-                }),
-              ],
-            })
-          }),
-        ],
-      }),
-    )
-  }
+  // No Top 3 card since v0.41.1 (Omar: it took up space); the writer still ranks a Top 3, which keeps those stories when it trims.
 
   // Reading status: the count, a bar, and a chip per section (orange while reading, green when done).
   const counts = readCounts(ed, w.read)
@@ -1178,7 +1138,7 @@ function storyCard(E: UI, w: WeekView, a: Actions, s: Story, F?: Form, v?: View)
   return E.Box({ key: `story-${s.id}`, ...STORY_BOX, flexDirection: 'column', gap: 'sm', children })
 }
 
-/** A card on the News tab (v0.35.0): the header, Top 3, reading status and questions. */
+/** A card on the News tab (v0.35.0): the header, reading status and questions. */
 const CARD = { flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 'md', paddingY: 'sm', gap: 'sm' } as const
 
 /** The clay orange inside the reading bar's Svg, which can't use theme colors. */

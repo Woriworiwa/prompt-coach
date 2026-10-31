@@ -1413,8 +1413,9 @@ test('Week: Write reads the source pages, asks the Week model once, and its answ
   // The header card's title, as the Stitch design draws it (v0.35.0).
   expect(await ui.find({ text: '> News 42 · Oct 10 – Oct 17' })).toBeDefined()
   expect(await ui.find({ text: /From your feedback: Shortened release stories/ })).toBeDefined()
-  const top1 = JSON.stringify(boxNode(await ui.drawn(), 'week-top3-0'))
-  for (const part of ['1.', 'Idle compaction', '— Claude Code']) expect(top1).toContain(part)
+  // No Top 3 card since v0.41.1.
+  expect(boxNode(await ui.drawn(), 'week-top3')).toBeUndefined()
+  expect(await ui.find({ text: /TOP 3/ })).toBeUndefined()
   expect(await ui.find({ text: '0 / 2 stories read (0%)' })).toBeDefined()
   expect(await ui.find({ text: /Nothing new for Claude Desktop/ })).toBeDefined()
   expect(await ui.find({ type: 'Link', text: 'Claude Code v2.1.299 release notes' })).toBeDefined()
@@ -1492,7 +1493,7 @@ test('Week: a tip says which story it comes from and links that story\'s source 
   await ui.unmount()
 })
 
-test('Week: the Stitch look: SYS line, header card, Top 3 and reading cards, tag and version, code chips, ask box, REF links, end line (v0.35.0)', async ($, on) => {
+test('Week: the Stitch look: SYS line, header card, reading card (no Top 3 since v0.41.1), tag and version, code chips, ask box, REF links, end line (v0.35.0)', async ($, on) => {
   const e = JSON.parse(WEEK_ANSWER)
   const idle = e.sections.find((x: { id: string }) => x.id === 'code').stories[0]
   Object.assign(idle, { tag: 'new feature // cli-agent', version: 'v2.1.299', summary: 'v2.1.299 (Oct 14) adds `/compact` when idle.\n\nv2.1.298 set `CLAUDE_X`.', ask: 'Would you want it?' })
@@ -1503,15 +1504,8 @@ test('Week: the Stitch look: SYS line, header card, Top 3 and reading cards, tag
   const head = JSON.stringify(boxNode(tree, 'week-head'))
   for (const part of ['SYS: ', 'Claude Code 2.1.304 · Claude Desktop 3.1623.0', '> ', 'Idle compaction lands.']) expect(head).toContain(part)
   expect(boxNode(tree, 'week-head')?.props.borderStyle).toBe('round')
-  // Top 3: amber head, and a read story struck through.
-  const top = JSON.stringify(boxNode(tree, 'week-top3'))
-  expect(top).toContain('[▲] TOP 3 STORIES')
-  expect(top).toContain('PRIORITY_QUEUE')
-  const read = JSON.stringify(boxNode(tree, 'week-top3-1'))
-  expect(read).toContain('Haiku default')
-  expect(read).toContain('"strikethrough":true')
-  expect(read).toContain('✓')
-  expect(boxNode(tree, 'week-top3')?.props.borderColor).toBe('claude')
+  // The Top 3 card was removed in v0.41.1.
+  expect(boxNode(tree, 'week-top3')).toBeUndefined()
   expect(JSON.stringify(boxNode(tree, 'week-progress'))).toContain('1 / 2 stories read (50%)')
   // The story: its tag uppercased, the version badge, paragraphs, code chips, the ask box and REF links.
   const card = JSON.stringify(boxNode(tree, 'story-2026-W42-idle'))
