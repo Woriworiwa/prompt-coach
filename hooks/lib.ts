@@ -112,12 +112,55 @@ export function checklistFor(generalMd: string, modelMd = ''): { items: Checklis
 
 /** A file's `## Checklist` section, without its heading; '' when it has none. */
 function checklistSection(md: string): string {
-  return /^##\s+Checklist\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m.exec(md)?.[1] ?? ''
+  return sectionBody(md, 'Checklist')
 }
 
-/** A rules file without its `## Checklist` section: the checklist goes in the system prompt, not with the rules. */
+/** A file's `## <name>` section, without its heading; '' when it has none. */
+function sectionBody(md: string, name: string): string {
+  return new RegExp(`^##\\s+${name}\\s*$([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`, 'm').exec(md)?.[1] ?? ''
+}
+
+/**
+ * A rules file without its `## Checklist` and `## Quick instructions`
+ * sections: the checklist goes in the system prompt, and the quick
+ * instructions are buttons for the person, not rules for the rewrite.
+ */
 export function withoutChecklist(md: string): string {
-  return md.replace(/^##\s+Checklist\s*$[\s\S]*?(?=^##\s|(?![\s\S]))/m, '').trimEnd() + (md.endsWith('\n') ? '\n' : '')
+  const cut = (text: string, name: string) => text.replace(new RegExp(`^##\\s+${name}\\s*$[\\s\\S]*?(?=^##\\s|(?![\\s\\S]))`, 'm'), '')
+  return cut(cut(md, 'Checklist'), 'Quick instructions').trimEnd() + (md.endsWith('\n') ? '\n' : '')
+}
+
+// ---- Quick instructions, from the rule files ----
+
+/** One quick instruction: the button's label, the sentence it adds to the prompt, and the part of the guides it comes from. */
+export type QuickInstruction = { label: string; text: string; source: string }
+
+/** The lines of a file's `## Quick instructions` section, each "- Label: sentence. Source: …". */
+export function parseQuick(md: string): QuickInstruction[] {
+  const out: QuickInstruction[] = []
+  for (const line of sectionBody(md, 'Quick instructions').split('\n')) {
+    const body = /^\s*-\s+(.+?)\s*$/.exec(line)?.[1]
+    if (!body) continue
+    const at = body.search(/\sSource:\s/)
+    const head = (at < 0 ? body : body.slice(0, at)).trim()
+    const colon = head.indexOf(':')
+    const label = colon < 0 ? '' : head.slice(0, colon).trim()
+    const text = colon < 0 ? '' : head.slice(colon + 1).trim()
+    if (label && text) out.push({ label, text, source: at < 0 ? '' : body.slice(at).replace(/^\s*Source:\s*/, '').trim() })
+  }
+  return out
+}
+
+/** The session model's quick instructions: its file's own list, which inherits nothing, else general.md's. */
+export function quickFor(generalMd: string, modelMd = ''): QuickInstruction[] {
+  const own = parseQuick(modelMd)
+  return own.length ? own : parseQuick(generalMd)
+}
+
+/** `text` with `sentence` added at the end: after a space, or a new line when the text has several lines. */
+export function withSentence(text: string, sentence: string): string {
+  const body = text.trimEnd()
+  return body ? body + (body.includes('\n') ? '\n' : ' ') + sentence : sentence
 }
 
 const SHARED_RULES = `- Keep the person's intent exactly. Do not add requirements, features, tests, constraints, or scope they did not ask for. If an addition would clearly help, leave it out of the rewrite and mention it in your notes as a suggestion ("Consider: ...").

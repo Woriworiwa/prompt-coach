@@ -3,7 +3,7 @@
 import type { Elements, RenderElement, UiPressArgument } from 'claude-code'
 
 import { type Analytics, advice, focus, itemStats, RECENT, rulesFor, STATS_ON, scoreTrend, strengths, tokenSummary } from './analytics.ts'
-import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type RuleSection } from './lib.ts'
+import { type Addition, type Analysis, type CheckStatus, LIVE_CAP, type ModelRules, NO_PICK, type Placeholder, type QuickInstruction, type RuleSection } from './lib.ts'
 import type { RefreshResult } from './refresh.ts'
 import { type ArchiveRow, type Edition, type FeedbackStore, type ReadState, type Story, type WeekSource, asideAboutQuestion, asideAboutStory, dateRange, readCounts, versionsLine } from './week.ts'
 
@@ -31,6 +31,8 @@ export type View = {
   analysis?: Analysis
   /** The rewrite with the answers filled in so far. */
   filledRewrite: string
+  /** The session model's quick instructions, as buttons under the draft. */
+  quick: QuickInstruction[]
   /** The surface's width in cells, when it has said; sizes the rewrite field. */
   columns?: number
   /** The rewrite field's key; it changes whenever the field's text changed since it was drawn. */
@@ -140,6 +142,7 @@ export type Actions = {
   analyze: () => Promise<void>
   apply: () => Promise<void> | undefined
   toggleAddition: (index: number) => void
+  toggleQuick: (index: number) => Promise<void>
   editRewrite: (value: string) => void
   submitRewrite: (value: string) => void
   pick: (token: string, value: string) => void
@@ -285,6 +288,9 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   // The draft box has no label since v0.26.0.
   out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
+  // Quick instructions (v0.37.0): the model's own short lines, added to the prompt box (or, with a rewrite on screen, to the
+  // rewrite) with one press and taken out with another, no analysis needed. Plain buttons whose look never changes.
+  if (v.quick.length) out.push(quickRow(E, v, a))
   // Rewrite (the analyze button) sits under the draft it reads, always active and always the primary style: it used to
   // drop to the plain style once a rewrite existed, which read as grayed out in Desktop (v0.25.3).
   out.push(
@@ -320,6 +326,26 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   }
 
   return out
+}
+
+/** The quick instruction buttons, wrapping when narrow, with a dim line saying where a press puts the sentence. */
+function quickRow(E: UI, v: View, a: Actions): RenderElement {
+  const where = v.analysis ? 'the rewrite' : 'your prompt'
+  return E.Box({
+    key: 'quick',
+    flexDirection: 'column',
+    gap: 'xs',
+    children: [
+      E.Box({
+        key: 'quick-buttons',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 'sm',
+        children: v.quick.map((q, i) => E.Button({ key: `quick-${i}-${q.label}`, label: q.label, onPress: () => void a.toggleQuick(i) })),
+      }),
+      text(E, `Adds the line to ${where}; press again to take it out.`, { dimColor: true, wrap: 'wrap' }),
+    ],
+  })
 }
 
 /** The Analytics tab: the statistics first, as Settings drew them, then a thin line and the rules. */

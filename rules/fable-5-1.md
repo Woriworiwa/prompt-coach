@@ -25,6 +25,14 @@ As of: 2026-10
 - Remove requests to write out its reasoning; ask for a short explanation or a summary of actions instead.
 - Remove "hold all findings until the end".
 
+## Quick instructions
+- Assessment only: Assessment only; don't apply a fix. Source: "Scope" (say whether you want an assessment or a fix)
+- Stay in scope: Keep to what I asked; report other issues as follow-ups instead of fixing them. Source: "Keep changes and tests to what the task asks for"
+- Targeted edits: Make targeted edits, not whole-file rewrites. Source: "Scope" (small file changes)
+- Work without checking in: Proceed on reversible steps, stop only for destructive actions or real scope changes, and finish the work rather than describe the next step. Source: "Finish the whole task"
+- Recap: Say what you're about to do before starting, and end with what you found, did, and what's next. Source: "Working style" (progress updates)
+- Plain prose: Answer in plain, direct prose. Source: "Wording"
+
 ## Checklist
 - Goal: what outcome they want, said explicitly. Source: general guide, "Be clear and direct"
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"

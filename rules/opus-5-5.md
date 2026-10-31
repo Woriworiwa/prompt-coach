@@ -22,6 +22,14 @@ As of: 2026-10
 - When pasting text from elsewhere (an email, a web page, a log), wrap it in a tag such as <pasted_content> so it is treated as material, not as instructions.
 - For code review, ask for only the problems that would block a merge, each with file and line, why it is wrong, and how to show it fails.
 
+## Quick instructions
+- Answer directly: Answer directly. Source: "Add when relevant" (for a quick, simple question)
+- Keep going: Keep going without checking in; stop and ask only before anything destructive or if a test fails for a reason you can't explain. Source: claude.dev blog, "say when you want it to stop and ask"
+- Short why: Explain why you chose this in three sentences. Source: "Remove" (ask for a short explanation instead of written-out reasoning)
+- Mark unconfirmed: Mark anything you couldn't confirm, and say where you looked. Source: "Add when relevant" (research or analysis)
+- Blocking issues only: Report only problems that would block a merge, each with file and line, why it is wrong, and how to show it fails. Source: "Add when relevant" (code review)
+- Use subagents: Split this across subagents and check each one's evidence before accepting it. Source: "Task framing" (large audit, migration, or review)
+
 ## Checklist
 - Goal: the whole task in one message, not one step at a time. Source: claude.dev blog, "give the whole task in one message"
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"

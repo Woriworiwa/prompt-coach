@@ -29,6 +29,12 @@ As of: 2026-10
 ## Verification
 - For tasks where correctness matters, say how to check the result (the tests pass, the command runs, the numbers add up).
 
+## Quick instructions
+- Make the change: Make the change rather than suggesting one. Source: "Be clear and direct" (action verbs get edits; "can you suggest" gets suggestions)
+- Check it: Before you finish, check the result works (run the tests or the command) and say how you checked it. Source: "Ask Claude to self-check"
+- Say why: If you leave something out or make a trade-off, say why in one line. Source: "Add context to improve performance" (Claude generalizes from the reason)
+- Plain prose: Answer in short, plain paragraphs. Source: "Control the format of responses" (say what you want, not what to avoid)
+
 ## Checklist
 - Goal: what outcome they want, said explicitly. Source: "Be clear and direct" (be explicit; Claude won't infer "above and beyond" from a vague request)
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: "Be clear and direct" (a brilliant new employee with no context on your norms) and "Add context to improve performance"

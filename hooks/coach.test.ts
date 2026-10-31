@@ -26,6 +26,9 @@ import {
   checklistFor,
   parseChecklist,
   withoutChecklist,
+  parseQuick,
+  quickFor,
+  withSentence,
 } from './lib.ts'
 import { BAR_CELLS, REWRITE_EDITABLE, barCount, barRuns, rowsFor } from './ui.ts'
 import { type Analytics, NO_ANALYTICS, STATS_ON, recordDraft } from './analytics.ts'
@@ -2232,6 +2235,103 @@ test('Rules on the Analytics tab: the mobile app picks the model with buttons; a
   await ui.press({ key: 'rules-pick-opus-5-5.md' })
   expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
+  await ui.unmount()
+})
+
+// ---- Quick instructions (v0.37.0) ----
+
+const QUICK_GENERAL = '# General\n\n- Be explicit.\n\n## Quick instructions\n- Check it: Check the result works. Source: "Ask Claude to self-check"\n\n## Checklist\n- Goal: what outcome they want. Source: x\n'
+const QUICK_OPUS = '# Opus\n\n- Name the finish line.\n\n## Quick instructions\n- Answer directly: Answer directly. Source: "Add when relevant"\n- Short why: Explain why you chose this in three sentences. Source: "Remove"\n- no colon here Source: x\n\n## Checklist\n- Goal: the whole task. Source: blog\n'
+
+describe('quick instructions', () => {
+  test('parseQuick reads "- Label: sentence. Source: …" lines; a line with no label is skipped', () => {
+    expect(parseQuick(QUICK_OPUS)).toEqual([
+      { label: 'Answer directly', text: 'Answer directly.', source: '"Add when relevant"' },
+      { label: 'Short why', text: 'Explain why you chose this in three sentences.', source: '"Remove"' },
+    ])
+    expect(parseQuick('# None\n\n- A rule.\n')).toEqual([])
+  })
+
+  test('quickFor: the model file\'s own list, inheriting nothing, else general.md\'s', () => {
+    expect(quickFor(QUICK_GENERAL, QUICK_OPUS).map(q => q.label)).toEqual(['Answer directly', 'Short why'])
+    expect(quickFor(QUICK_GENERAL, '# Haiku\n\n- A rule.\n').map(q => q.label)).toEqual(['Check it'])
+    expect(quickFor(QUICK_GENERAL).map(q => q.label)).toEqual(['Check it'])
+  })
+
+  test('withoutChecklist also leaves the quick instructions out of the rules sent with the draft', () => {
+    const rules = withoutChecklist(QUICK_OPUS)
+    expect(rules).toContain('Name the finish line.')
+    expect(rules).not.toContain('Quick instructions')
+    expect(rules).not.toContain('Answer directly')
+    expect(rules).not.toContain('## Checklist')
+  })
+
+  test('withSentence adds after a space, after a new line in a text of several lines, or alone in an empty one', () => {
+    expect(withSentence('fix the bug  ', 'Answer directly.')).toBe('fix the bug Answer directly.')
+    expect(withSentence('fix\nthe bug', 'Answer directly.')).toBe('fix\nthe bug\nAnswer directly.')
+    expect(withSentence('', 'Answer directly.')).toBe('Answer directly.')
+  })
+})
+
+test('Quick instructions: the session model\'s buttons sit above Rewrite; a press adds the line to the prompt box, another takes it out, with no analysis', async ($, on) => {
+  const { s } = world(on, { files: { 'rules/general.md': QUICK_GENERAL, 'rules/opus-5-5.md': QUICK_OPUS } })
+  s.box = 'why does the login fail?'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  const text = JSON.stringify(await ui.drawn())
+  expect(text.indexOf('quick-0-Answer directly')).toBeGreaterThan(-1)
+  expect(text.indexOf('quick-0-Answer directly')).toBeLessThan(text.indexOf('"analyze"'))
+  expect(await ui.find({ key: 'quick-2-Check it' })).toBeUndefined()
+  expect(await ui.find({ text: 'Adds the line to your prompt; press again to take it out.' })).toBeDefined()
+
+  await ui.press({ key: 'quick-0-Answer directly' })
+  expect(s.box).toBe('why does the login fail? Answer directly.')
+  expect(s.analyses).toHaveLength(0)
+  expect(await ui.find({ text: 'why does the login fail? Answer directly.' })).toBeDefined()
+  await ui.press({ key: 'quick-0-Answer directly' })
+  expect(s.box).toBe('why does the login fail?')
+  await ui.unmount()
+})
+
+test('Quick instructions: with a rewrite on screen a press adds the line to the rewrite, which Send sends; a new Rewrite clears it', async ($, on) => {
+  const { s } = world(on, { files: { 'rules/general.md': QUICK_GENERAL, 'rules/opus-5-5.md': QUICK_OPUS } })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const rewrite = parseAnalysis(ANALYSIS)!.rewrite
+  expect(await ui.find({ text: 'Adds the line to the rewrite; press again to take it out.' })).toBeDefined()
+  await ui.press({ key: 'quick-1-Short why' })
+  // The box is untouched; the rewrite carries the line.
+  expect(s.box).toBe('fix the login thing')
+  expect(JSON.stringify(await ui.drawn())).toContain(JSON.stringify(withSentence(rewrite, 'Explain why you chose this in three sentences.')).slice(1, -1))
+  await ui.press({ key: 'apply' })
+  expect(s.submitted[0]!.text).toBe(withSentence(rewrite, 'Explain why you chose this in three sentences.'))
+
+  s.box = 'fix the login thing again'
+  await ui.press({ key: 'analyze' })
+  await ui.press({ key: 'apply' })
+  expect(s.submitted[1]!.text).toBe(rewrite)
+  await ui.unmount()
+})
+
+test('Quick instructions: a model with no list of its own gets general.md\'s; none at all draws no row', async ($, on) => {
+  world(on, { model: 'claude-sonnet-5-5', files: { 'rules/general.md': QUICK_GENERAL } })
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  expect(await ui.find({ key: 'quick-0-Check it' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Quick instructions: none in the rule files, no row', async ($, on) => {
+  world(on)
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  expect(boxNode(await ui.drawn(), 'quick')).toBeUndefined()
   await ui.unmount()
 })
 

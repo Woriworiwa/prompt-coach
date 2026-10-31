@@ -17,6 +17,8 @@ import {
   removeSentences,
   withAdditions,
   withoutAddition,
+  quickFor,
+  withSentence,
   isPersonPrompt,
   lastReply,
   liveSkipReason,
@@ -133,6 +135,8 @@ let removed: string[] = []
 let formGen = 0
 /** The rewrite as the person edited it in the pane; undefined until they type in it. */
 let edited: string | undefined
+/** Quick instructions added to the rewrite on screen, by sentence; a new analysis clears them (they're in the draft it read, if added before). */
+let quickOn: string[] = []
 /** The rewrite field's text as last drawn, and a count that changes its key whenever the code changes that text. */
 let rewriteShown = ''
 let rewriteGen = 0
@@ -371,6 +375,7 @@ export const register: Register = (on, options) => {
       isRunning,
       analysis,
       filledRewrite: filled(),
+      quick: quickList(),
       rewriteKey: rewriteKey(),
       typed,
       picked,
@@ -422,6 +427,7 @@ export const register: Register = (on, options) => {
       mode: m => setMode($, m),
       analyze: () => analyzeNow($),
       apply: () => (analysis ? applyRewrite($, filled()) : undefined),
+      toggleQuick: index => toggleQuick($, index),
       toggleAddition: index => {
         const isAdded = added.includes(index)
         const s = analysis?.additions[index]
@@ -619,6 +625,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     added = []
     removed = []
     edited = undefined
+    quickOn = []
     formGen += 1
     status = ''
     analyzedAt = await $.clock.now()
@@ -642,7 +649,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
 function filled(): string {
   if (!analysis) return ''
   const answers = answersFor(analysis.placeholders, typed, picked)
-  const base = edited ?? withAdditions(analysis.rewrite, analysis.additions, added)
+  const base = edited ?? quickOn.reduce(withSentence, withAdditions(analysis.rewrite, analysis.additions, added))
   return fillPlaceholders(removeSentences(base, droppedGaps()), answers)
 }
 
@@ -670,6 +677,39 @@ function rewriteKey(): string {
     rewriteGen += 1
   }
   return `rewrite-${formGen}-${rewriteGen}`
+}
+
+/** The session model's quick instructions, from its rule file, else general.md's (read with the other rule files). */
+function quickList() {
+  const file = rulesFor(model)?.file
+  return quickFor(ruleTexts['general.md'] ?? '', file ? ruleTexts[file] : '')
+}
+
+/**
+ * A quick instruction pressed: with a rewrite on screen it goes into (or comes
+ * out of) the rewrite, which Send sends; otherwise into (or out of) the prompt
+ * box itself, so the next Rewrite reads it as part of the draft. Pressing it
+ * again takes it out.
+ */
+async function toggleQuick($: EngineInterface, index: number): Promise<void> {
+  const item = quickList()[index]
+  if (!item) return
+  if (analysis) {
+    const isOn = edited !== undefined ? edited.includes(item.text) : quickOn.includes(item.text)
+    if (edited !== undefined) edited = isOn ? withoutAddition(edited, item.text) : withSentence(edited, item.text)
+    else quickOn = isOn ? quickOn.filter(t => t !== item.text) : [...quickOn, item.text]
+    $.ui.invalidate('ui.render')
+    return
+  }
+  const box = (await $.prompt.read()).text
+  const next = box.includes(item.text) ? withoutAddition(box, item.text) : withSentence(box, item.text)
+  const result = await $.prompt.fill({ text: next, mode: 'replace' })
+  if (!result.isFilled) {
+    await copyText($, item.text, 'Instruction')
+    return
+  }
+  noteDraft(next)
+  $.ui.invalidate('ui.render')
 }
 
 /** The gaps to drop: chosen with an empty Enter and still without an answer (an answer typed since wins). */

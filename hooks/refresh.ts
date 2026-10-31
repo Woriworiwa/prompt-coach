@@ -72,6 +72,7 @@ Rules:
 - Keep exact command names, model names and settings as the sources give them.
 - Do not add an "As of" line; it is added for you.
 - A "## Checklist" section lists what drafts are judged on, one line each: "- Name: definition. Source: <the section of the sources that supports it>". Every line needs a Source. A model's rules file always has its own complete checklist and inherits nothing: Goal, Context, Constraints and Output come from the general prompting guide (keep those four names exactly), and you judge from the model's own sources which other items apply (such as Done means or Stop rule) and how each one reads for this model. Drop one of the four general items only when a source line says it does not apply to this model; then put a comment in its place, <!-- Dropped Constraints: "the quoted source line" -->, so the reviewer sees why.
+- A "## Quick instructions" section lists short lines the person can add to a prompt with one press, one line each: "- Label: the sentence to add. Source: <the section of the sources that supports it>". Keep each label to one to four words and each sentence a complete instruction written as the person, with no square brackets and no "Source:" inside it. A model's file has its own complete list and inherits nothing; keep a line only while its model's sources support it, and add one only for guidance the sources give for this model.
 
 Reply with the complete updated file inside <file></file> and nothing else.`
 

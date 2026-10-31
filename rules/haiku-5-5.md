@@ -19,6 +19,13 @@ As of: 2026-10
 ## Remove
 - Remove "answer directly" if it is meant to stop thinking; it does not.
 
+## Quick instructions
+- Run to completion: Keep working until everything is done; stop only when blocked or before a risky step. Source: "Prevent early stopping in long agent prompts"
+- Stop when checked: Once it's done and checked, stop and report, with no extra features, docs or refactors. Source: "Scope"
+- Real check: Run a real check (tests, type-checker or build) before reporting success; if you can't, say which you skipped and why. Source: "Tell coding agents to verify their changes"
+- Search current facts: Search for current facts rather than relying on your training data. Source: "Facts and search"
+- JSON at the end: Only the final answer is JSON. Source: "Facts and search" (JSON output)
+
 ## Checklist
 - Goal: what outcome they want, said explicitly. Source: general guide, "Be clear and direct"
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"
