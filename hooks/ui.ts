@@ -620,7 +620,8 @@ function settingsTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
         // Your rules under Rules since v0.40.3 (Omar): the shipped rules first, then his own, which win.
         settingsGroup(E, v, 'rules', 'Rules', [block(E, 'rule-list', ruleList(E, v, a, F))], [], true),
         settingsGroup(E, v, 'own-rules', 'Your rules', ownRulesSettings(E, v, a, F), [], true),
-        settingsGroup(E, v, 'week', 'Claude Week', weekSettings(E, v, a, F), [], true),
+        // Titled News since v0.40.4 (Omar: the term Week is gone); its key stays `week`.
+        settingsGroup(E, v, 'week', 'News', weekSettings(E, v, a, F), [], true),
       ],
     }),
   ]
@@ -686,7 +687,7 @@ function weekSettings(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     ? w.sources.map(s => E.Box({ key: `week-source-${s.url}`, children: [E.Link({ href: s.link ?? s.url, label: `Tier ${s.tier} · ${s.label}` })] }))
     : [text(E, "Couldn't read week/sources.json.", { color: 'warning', wrap: 'wrap' })]
   return [
-    modelSetting(E, a, 'weekModel', 'Week model', 'Writes each Claude Week edition from the fetched pages.', w.weekModel, st.weekChoices, st.readOnlyReason, F),
+    modelSetting(E, a, 'weekModel', 'News model', 'Writes each News edition from the fetched pages.', w.weekModel, st.weekChoices, st.readOnlyReason, F),
     block(E, 'week-profile', [
       labelled('Reader profile', 'What the writer knows about you. Edit this file to steer future editions; installing or updating the mod leaves it alone.'),
       code(E, w.profilePath),
@@ -852,7 +853,7 @@ function weekTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 
   if (!ed) {
     out.push(versions, ...status)
-    out.push(mono(E, "No edition yet. Write reads the pages listed under Settings → Claude Week, then the Week model writes the week's stories.", { dimColor: true, wrap: 'wrap' }))
+    out.push(mono(E, "No edition yet. Write reads the pages listed under Settings → News, then the News model writes the week's stories.", { dimColor: true, wrap: 'wrap' }))
     if (nav.length) out.push(row(E, nav))
     return out
   }

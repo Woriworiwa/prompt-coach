@@ -719,7 +719,7 @@ test('Settings: each section in a round bordered box with its title on no band, 
   await ui.press({ key: 'tab-settings' })
   const tree = await ui.drawn()
   const boxLook = { flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1 }
-  for (const [key, title] of [['general', 'General'], ['rules', 'Rules'], ['own-rules', 'Your rules'], ['week', 'Claude Week']] as const) {
+  for (const [key, title] of [['general', 'General'], ['rules', 'Rules'], ['own-rules', 'Your rules'], ['week', 'News']] as const) {
     const g = boxNode(tree, `group-${key}`)!
     const { key: _gk, children: _gc, ...look } = g.props
     expect(look).toEqual(boxLook)
@@ -1400,7 +1400,7 @@ test('Week: Write reads the source pages, asks the Week model once, and its answ
 
   expect(Object.keys(saved.get('weekEditions') as object)).toEqual(['2026-W42'])
   expect(saved.has('weekJob')).toBe(false)
-  expect(s.toasts.at(-1)).toContain('Claude Week 42 is ready')
+  expect(s.toasts.at(-1)).toContain('Claude Week 42 is ready in the coach pane\'s News tab')
   // The header card's title, as the Stitch design draws it (v0.35.0).
   expect(await ui.find({ text: '> Claude Week 42 · Oct 10 – Oct 17' })).toBeDefined()
   expect(await ui.find({ text: /From your feedback: Shortened release stories/ })).toBeDefined()
@@ -1702,7 +1702,7 @@ test('Week: Older and Newer step through the stored editions', async ($, on) => 
   await ui.unmount()
 })
 
-test('Settings: Claude Week holds the Week model, the reader profile and the pages Write reads; the Week tab has no footer', async ($, on) => {
+test('Settings: News (titled Claude Week until v0.40.4) holds the News model, the reader profile and the pages Write reads; the News tab has no footer', async ($, on) => {
   world(on)
   await $.session.start(START)
   await $.command.run(coach())
@@ -1711,6 +1711,8 @@ test('Settings: Claude Week holds the Week model, the reader profile and the pag
   const tree = await ui.drawn()
   const week = JSON.stringify(boxNode(tree, 'group-week'))
   expect(week).toContain('"set-weekModel"')
+  expect(week).toContain('News model')
+  expect(week).not.toContain('Claude Week')
   expect(JSON.stringify(boxNode(tree, 'group-general'))).not.toContain('set-weekModel')
   expect(week).toContain('Reader profile')
   expect(week).toContain(PROFILE)
@@ -1718,7 +1720,7 @@ test('Settings: Claude Week holds the Week model, the reader profile and the pag
   expect(await ui.find({ type: 'Link', text: 'Tier 2 · Tracker' })).toBeDefined()
   await ui.press({ key: 'tab-week' })
   expect(await ui.find({ text: /Written by/ })).toBeUndefined()
-  expect(await ui.find({ text: /Settings → Claude Week/ })).toBeDefined()
+  expect(await ui.find({ text: /Settings → News/ })).toBeDefined()
   await ui.unmount()
 })
 

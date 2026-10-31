@@ -701,7 +701,7 @@ async function setMode($: EngineInterface, next: Mode): Promise<void> {
  * model settings read-only in the pane, with the reason.
  */
 async function setModelSetting($: EngineInterface, field: ModelSetting, value: string): Promise<void> {
-  const label = { rewriteModel: 'Rewrite model', weekModel: 'Week model' }[field]
+  const label = { rewriteModel: 'Rewrite model', weekModel: 'News model' }[field]
   try {
     const result = await $.config.set({ key: `prompt-coach.${field}`, value })
     if (result.deny !== undefined) {
@@ -937,7 +937,7 @@ async function writeEdition($: EngineInterface, update = false): Promise<void> {
       weekJob = { state: 'idle' }
       $.ui.toast(
         !old
-          ? `${parsed.edition.title} is ready in the coach pane's Week tab.`
+          ? `${parsed.edition.title} is ready in the coach pane's News tab.`
           : merged.added
             ? `Added ${merged.added} new ${merged.added === 1 ? 'story' : 'stories'} to ${old.title}.`
             : merged.filled

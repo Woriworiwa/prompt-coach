@@ -1,6 +1,6 @@
 {
   "name": "prompt-coach",
-  "version": "0.40.3",
+  "version": "0.40.4",
   "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with the rules for each model; /improve rewrites a draft straight into the prompt box; a Week tab with Claude Week, a weekly digest you vote on.",
   "author": {
     "name": "Omar"
@@ -19,8 +19,8 @@
     },
     "weekModel": {
       "type": "string",
-      "title": "Week model",
-      "description": "The model that writes each Claude Week edition in the coach pane's Week tab, from the source pages the mod fetches. opus sticks to its sources more closely.",
+      "title": "News model",
+      "description": "The model that writes each edition in the coach pane's News tab, from the source pages the mod fetches. opus sticks to its sources more closely.",
       "options": [
         "sonnet",
         "opus"
