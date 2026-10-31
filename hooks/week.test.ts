@@ -10,6 +10,8 @@ import {
   editionIds,
   feedbackForPrompt,
   isoWeek,
+  newsTitle,
+  withNewsTitles,
   pageText,
   parseEdition,
   parseWeekSources,
@@ -31,7 +33,7 @@ const story = (id: string, extra: Record<string, unknown> = {}) => ({ id, title:
 
 const ANSWER = JSON.stringify({
   edition_id: '2026-W42',
-  title: 'Claude Week 42',
+  title: 'News 42',
   date_from: '2026-10-10',
   date_to: '2026-10-17',
   intro: 'A quiet week.',
@@ -47,8 +49,18 @@ const ANSWER = JSON.stringify({
 })
 
 describe('the week', () => {
+  test('newsTitle renames "Claude Week NN" to "News NN" (v0.41.0) and leaves any other title; withNewsTitles says whether any changed', () => {
+    expect(newsTitle('Claude Week 42')).toBe('News 42')
+    expect(newsTitle('News 42')).toBe('News 42')
+    expect(newsTitle('Claude Week special')).toBe('Claude Week special')
+    const e = { title: 'Claude Week 41' } as Edition
+    const n = { title: 'News 42' } as Edition
+    expect(withNewsTitles({ '2026-W41': e, '2026-W42': n })).toEqual({ editions: { '2026-W41': { title: 'News 41' }, '2026-W42': n }, changed: true })
+    expect(withNewsTitles({ '2026-W42': n }).changed).toBe(false)
+  })
+
   test('isoWeek names the edition by ISO week, across a year boundary, covering the 7 days that end that day', () => {
-    expect(isoWeek(Date.parse('2026-10-17T09:00:00Z'))).toEqual({ id: '2026-W42', number: 42, title: 'Claude Week 42', from: '2026-10-10', to: '2026-10-17' })
+    expect(isoWeek(Date.parse('2026-10-17T09:00:00Z'))).toEqual({ id: '2026-W42', number: 42, title: 'News 42', from: '2026-10-10', to: '2026-10-17' })
     // Jan 1 2027 is a Friday: it belongs to 2026's week 53.
     expect(isoWeek(Date.parse('2027-01-01T12:00:00Z')).id).toBe('2026-W53')
     // Dec 31 2024 is a Tuesday: it belongs to 2025's week 1.
@@ -143,7 +155,7 @@ describe('feedback', () => {
       { tier: 2, label: 'Tracker', url: 'https://t.example/', error: 'HTTP 503' },
     ]
     const req = buildWeekRequest('name: Omar\n', [{ ...ref, verdict: 'down', why: 'too basic', take: null, updated_at: T }], isoWeek(Date.parse(T)), pages)
-    expect(req).toContain('Today is 2026-10-17. Write edition 2026-W42 ("Claude Week 42"), covering 2026-10-10 to 2026-10-17.')
+    expect(req).toContain('Today is 2026-10-17. Write edition 2026-W42 ("News 42"), covering 2026-10-10 to 2026-10-17.')
     expect(req).toContain('<reader_profile>\nname: Omar\n</reader_profile>')
     expect(req).toContain('"why":"too basic"')
     expect(req).toContain('<page tier="1" label="Newsroom" url="https://www.anthropic.com/news">\nOct 15 Haiku 5.5\n</page>')
@@ -178,7 +190,7 @@ describe('reading', () => {
 
   test('archiveRows lists editions newest first, with stories read and voted per edition', () => {
     const r = parseEdition(ANSWER, '2026-W42') as { edition: Edition }
-    const older = { ...(parseEdition(ANSWER.replaceAll('2026-W42', '2026-W41'), '2026-W41') as { edition: Edition }).edition, title: 'Claude Week 41' }
+    const older = { ...(parseEdition(ANSWER.replaceAll('2026-W42', '2026-W41'), '2026-W41') as { edition: Edition }).edition, title: 'News 41' }
     const feedback: FeedbackStore = {
       a: { story_id: 'a', edition_id: '2026-W41', section: 'code', title: 'A', verdict: 'down', why: null, take: null, updated_at: 'x' },
       b: { story_id: 'b', edition_id: '2026-W41', section: 'code', title: 'B', verdict: null, why: null, take: 'a take', updated_at: 'x' },
@@ -186,7 +198,7 @@ describe('reading', () => {
     const rows = archiveRows({ '2026-W41': older, '2026-W42': r.edition }, feedback, { '2026-W42-idle': true })
     expect(rows.map(x => [x.id, x.title, x.read, x.total, x.voted])).toEqual([
       ['2026-W42', r.edition.title, 1, 2, 0],
-      ['2026-W41', 'Claude Week 41', 0, 2, 1],
+      ['2026-W41', 'News 41', 0, 2, 1],
     ])
     expect(rows[0]!.range).toBe(dateRange(r.edition.date_from, r.edition.date_to))
     expect(archiveRows({}, {}, {})).toEqual([])
@@ -224,7 +236,7 @@ describe('source pages', () => {
 
   test('a tip keeps based_on only when it names another story of the edition, prefixed like story ids', () => {
     const json = JSON.stringify({
-      title: 'Claude Week 43', date_from: '2026-10-19', date_to: '2026-10-21', intro: 'i', feedback_note: null, top3: [], questions: [], sources: [],
+      title: 'News 43', date_from: '2026-10-19', date_to: '2026-10-21', intro: 'i', feedback_note: null, top3: [], questions: [], sources: [],
       sections: [
         { id: 'desktop', title: 'Claude Desktop', range: null, note: null, stories: [{ id: 'desk', title: 'Storage page', summary: 's', links: [{ label: 'Desktop notes', url: 'https://claude.com/docs/cowork/changelog' }] }] },
         { id: 'tips', title: 'Try this week', range: null, note: null, stories: [

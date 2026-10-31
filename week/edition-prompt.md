@@ -1,4 +1,4 @@
-You are writing this week's edition of Claude Week for the reader described in the reader profile. Claude Week is a personal weekly news digest about Claude, Claude Code, Claude Desktop, usage limits and Anthropic. Produce one edition in the format defined under "Edition format" below.
+You are writing this week's edition of News for the reader described in the reader profile. News is a personal weekly news digest about Claude, Claude Code, Claude Desktop, usage limits and Anthropic. Produce one edition in the format defined under "Edition format" below.
 
 ## Inputs
 
@@ -20,7 +20,7 @@ You have no tools: no browsing and no web search. The `<page>` blocks are everyt
 
 ## The week
 
-- Cover the 7 days that end today. Name the edition by ISO week number, for example "Claude Week 42", with the date range.
+- Cover the 7 days that end today. Name the edition by ISO week number, for example "News 42", with the date range.
 - An older item may appear only if it is still relevant this week. Give its real date and say plainly that it is older background.
 - If a section has nothing new this week, give it a one-line note saying so instead of padding it.
 
@@ -118,7 +118,7 @@ Return one edition as JSON in exactly this shape, and nothing else: no prose bef
 ```json
 {
   "edition_id": "2026-W42",
-  "title": "Claude Week 42",
+  "title": "News 42",
   "date_from": "2026-10-09",
   "date_to": "2026-10-16",
   "intro": "One short paragraph on the week.",

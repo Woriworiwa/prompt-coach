@@ -47,6 +47,7 @@ import {
   editionIds,
   feedbackForPrompt,
   isoWeek,
+  newsTitle,
   pageText,
   parseEdition,
   parseWeekSources,
@@ -56,6 +57,7 @@ import {
   setWhy,
   storyRef,
   vote,
+  withNewsTitles,
 } from './week.ts'
 
 // /improve <draft>: rewrites the draft for the model this session runs and
@@ -739,6 +741,12 @@ async function syncModel($: EngineInterface): Promise<boolean> {
 
 async function loadWeek($: EngineInterface): Promise<void> {
   editions = asRecord(await $.store.get(STORE.weekEditions)) as Editions
+  // Editions written before v0.41.0 are titled Claude Week NN; renamed once to News NN, the only change ever made to a stored edition.
+  const renamed = withNewsTitles(editions)
+  if (renamed.changed) {
+    editions = renamed.editions
+    await $.store.set(STORE.weekEditions, editions)
+  }
   feedback = asRecord(await $.store.get(STORE.weekFeedback)) as FeedbackStore
   readState = asRecord(await $.store.get(STORE.weekRead)) as ReadState
   try {
@@ -751,9 +759,12 @@ async function loadWeek($: EngineInterface): Promise<void> {
   weekTakes = Object.values(feedback).filter(f => f.take).map(f => f.story_id)
   // Only a failure is kept; one still running when the session ended never came back.
   const job = asRecord(await $.store.get(STORE.weekJob)) as Partial<StoredJob>
-  if (job.state === 'failed') weekJob = job as StoredJob
+  if (job.state === 'failed') {
+    const failed = job as Extract<StoredJob, { state: 'failed' }>
+    weekJob = { ...failed, title: newsTitle(failed.title) }
+  }
   else if (job.state === 'running') {
-    weekJob = { state: 'failed', title: job.title ?? 'Claude Week', editionId: job.editionId, reason: 'the session ended before the edition was ready.' }
+    weekJob = { state: 'failed', title: newsTitle(job.title ?? 'News'), editionId: job.editionId, reason: 'the session ended before the edition was ready.' }
     await $.store.set(STORE.weekJob, weekJob)
   } else weekJob = { state: 'idle' }
 }

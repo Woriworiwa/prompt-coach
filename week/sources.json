@@ -1,5 +1,5 @@
 {
-  "note": "The pages Claude Week reads, in tier order. The mod fetches each one, cuts it to its text (links kept as <url>), and hands them all to the Week model in one request. kind 'github-releases' is the GitHub API's JSON, reduced to the last 14 days of release notes; 'link' is the page stories should link to instead.",
+  "note": "The pages News reads, in tier order. The mod fetches each one, cuts it to its text (links kept as <url>), and hands them all to the Week model in one request. kind 'github-releases' is the GitHub API's JSON, reduced to the last 14 days of release notes; 'link' is the page stories should link to instead.",
   "pages": [
     { "tier": 1, "label": "claude.dev blog", "url": "https://claude.dev/blog/" },
     { "tier": 1, "label": "Anthropic newsroom", "url": "https://www.anthropic.com/news" },

@@ -164,9 +164,29 @@ export const FEEDBACK_EDITIONS = 4
 
 // ---- The week ----
 
+/**
+ * An edition's title as the News tab names it: "Claude Week 42" became
+ * "News 42" in v0.41.0 (Omar dropped the term Week); any other title stays.
+ */
+export function newsTitle(title: string): string {
+  return title.replace(/^Claude Week (\d+)$/, 'News $1')
+}
+
+/** The stored editions with their titles renamed by newsTitle, and whether any changed. */
+export function withNewsTitles(editions: Editions): { editions: Editions; changed: boolean } {
+  let changed = false
+  const out: Editions = {}
+  for (const [id, e] of Object.entries(editions)) {
+    const title = newsTitle(e.title)
+    if (title !== e.title) changed = true
+    out[id] = title === e.title ? e : { ...e, title }
+  }
+  return { editions: out, changed }
+}
+
 export type Week = { id: string; number: number; title: string; from: string; to: string }
 
-/** The ISO week of `ms`, named as an edition (`2026-W42`, "Claude Week 42"), covering the 7 days that end that day. */
+/** The ISO week of `ms`, named as an edition (`2026-W42`, "News 42"), covering the 7 days that end that day. */
 export function isoWeek(ms: number): Week {
   const day = new Date(ms)
   const d = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()))
@@ -177,7 +197,7 @@ export function isoWeek(ms: number): Week {
   const number = Math.ceil(((d.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7)
   const to = new Date(ms).toISOString().slice(0, 10)
   const from = new Date(ms - 7 * 86_400_000).toISOString().slice(0, 10)
-  return { id: `${year}-W${String(number).padStart(2, '0')}`, number, title: `Claude Week ${number}`, from, to }
+  return { id: `${year}-W${String(number).padStart(2, '0')}`, number, title: `News ${number}`, from, to }
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -268,7 +288,7 @@ export function parseEdition(text: string, editionId: string): { edition: Editio
   return {
     edition: {
       edition_id: editionId,
-      title: str(raw.title) ?? `Claude Week ${Number(editionId.slice(-2))}`,
+      title: newsTitle(str(raw.title) ?? `News ${Number(editionId.slice(-2))}`),
       date_from: str(raw.date_from) ?? '',
       date_to: str(raw.date_to) ?? '',
       intro: str(raw.intro) ?? '',
@@ -501,7 +521,7 @@ function cut(s: string, max: number): string {
 export function asideAboutStory(s: Story): string {
   return paragraphs([
     s.prompt ?? s.title,
-    `This is about the Claude Week story "${s.title}".`,
+    `This is about the News story "${s.title}".`,
     ...s.summary.split(/\n{2,}/),
     s.detail,
     s.links.length ? `Sources: ${s.links.map(l => l.url).join(', ')}` : '',

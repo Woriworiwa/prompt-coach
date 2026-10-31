@@ -1,7 +1,7 @@
 {
   "name": "prompt-coach",
-  "version": "0.40.4",
-  "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with the rules for each model; /improve rewrites a draft straight into the prompt box; a Week tab with Claude Week, a weekly digest you vote on.",
+  "version": "0.41.0",
+  "description": "/coach opens a pane that checks, rewrites and explains your draft prompt for the model your session runs, with the rules for each model; /improve rewrites a draft straight into the prompt box; a News tab with a weekly digest you vote on.",
   "author": {
     "name": "Omar"
   },

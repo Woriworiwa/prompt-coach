@@ -250,8 +250,8 @@ const FILES: Record<string, string> = {
   'rules/sonnet-5-5.md': '# Sonnet\n\nSource: x\nAs of: 2026-10\n\n- Ask for a real check.\n',
   [OWN_RULES]: '# Your own rules\n\n- End with a recap.\n',
   [PROFILE]: 'name: Omar\nuses_claude_code: daily, in the desktop app\n',
-  'week/profile.example.yaml': '# Claude Week reader profile.\nname:\n',
-  'week/edition-prompt.md': 'You are writing this week\'s edition of Claude Week.\n',
+  'week/profile.example.yaml': '# News reader profile.\nname:\n',
+  'week/edition-prompt.md': 'You are writing this week\'s edition of News.\n',
   'week/sources.json': JSON.stringify({
     pages: [
       { tier: 1, label: 'Newsroom', url: 'https://news.example/' },
@@ -338,7 +338,7 @@ function world(
       s.analysisModels.push(e.model)
       return { value: { isAnswered: true as const, text: opts.analysis ?? ANALYSIS, usage } }
     }
-    if (String(e.system).includes('Claude Week')) {
+    if (String(e.system).includes('edition of News')) {
       s.weekRequests.push({ prompt: String(e.prompt), system: String(e.system), model: e.model })
       return { value: { isAnswered: true as const, text: opts.weekAnswer ?? WEEK_ANSWER, usage } }
     }
@@ -1336,7 +1336,7 @@ test('/coach outside an interactive app points to /improve', async ($, on) => {
 
 const WEEK_ANSWER = JSON.stringify({
   edition_id: '2026-W42',
-  title: 'Claude Week 42',
+  title: 'News 42',
   date_from: '2026-10-10',
   date_to: '2026-10-17',
   intro: 'Idle compaction lands.',
@@ -1382,17 +1382,26 @@ function storedEdition() {
   return { weekEditions: { '2026-W42': r.edition } }
 }
 
+test('Week: editions stored as Claude Week NN are renamed News NN once, at session start, and nothing else in them changes (v0.41.0)', async ($, on) => {
+  const old = storedEdition().weekEditions['2026-W42']
+  const { saved, ui } = await weekPane($, on, { saved: { weekEditions: { '2026-W42': { ...old, title: 'Claude Week 42' } } } })
+  expect((saved.get('weekEditions') as Record<string, { title: string }>)['2026-W42']).toEqual({ ...old, title: 'News 42' })
+  expect(await ui.find({ text: /Claude Week/ })).toBeUndefined()
+  expect(await ui.find({ text: /News 42/ })).toBeDefined()
+  await ui.unmount()
+})
+
 test('Week: Write reads the source pages, asks the Week model once, and its answer becomes the edition', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on)
   expect(await ui.find({ text: /No edition yet/ })).toBeDefined()
-  expect(buttonProps(await ui.drawn(), 'week-write')?.label).toBe('Write Claude Week 42')
+  expect(buttonProps(await ui.drawn(), 'week-write')?.label).toBe('Write News 42')
   await ui.press({ key: 'week-write' })
 
   expect(s.fetched).toEqual(['https://news.example/', 'https://tracker.example/broken'])
   expect(s.weekRequests).toHaveLength(1)
   const req = s.weekRequests[0]!
   expect(req.model).toBe('opus')
-  expect(req.system).toContain("this week's edition of Claude Week")
+  expect(req.system).toContain("this week's edition of News")
   expect(req.prompt).toContain('Today is 2026-10-17. Write edition 2026-W42')
   expect(req.prompt).toContain('uses_claude_code: daily, in the desktop app')
   expect(req.prompt).toContain('<page tier="1" label="Newsroom" url="https://news.example/">\nPAGE https://news.example/\n</page>')
@@ -1400,9 +1409,9 @@ test('Week: Write reads the source pages, asks the Week model once, and its answ
 
   expect(Object.keys(saved.get('weekEditions') as object)).toEqual(['2026-W42'])
   expect(saved.has('weekJob')).toBe(false)
-  expect(s.toasts.at(-1)).toContain('Claude Week 42 is ready in the coach pane\'s News tab')
+  expect(s.toasts.at(-1)).toContain('News 42 is ready in the coach pane\'s News tab')
   // The header card's title, as the Stitch design draws it (v0.35.0).
-  expect(await ui.find({ text: '> Claude Week 42 · Oct 10 – Oct 17' })).toBeDefined()
+  expect(await ui.find({ text: '> News 42 · Oct 10 – Oct 17' })).toBeDefined()
   expect(await ui.find({ text: /From your feedback: Shortened release stories/ })).toBeDefined()
   const top1 = JSON.stringify(boxNode(await ui.drawn(), 'week-top3-0'))
   for (const part of ['1.', 'Idle compaction', '— Claude Code']) expect(top1).toContain(part)
@@ -1524,7 +1533,7 @@ test('Week: the Stitch look: SYS line, header card, Top 3 and reading cards, tag
 test('Week: Rewrite on an existing week runs at once, keeps everything and adds only the stories it lacks', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: updateAnswer() })
   expect(buttonProps(await ui.drawn(), 'week-write')).toBeUndefined()
-  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe(':rewrite Claude Week 42')
+  expect(buttonProps(await ui.drawn(), 'week-redo')?.label).toBe(':rewrite News 42')
 
   // One press runs it: no confirm (v0.33.1).
   await ui.press({ key: 'week-redo' })
@@ -1545,7 +1554,7 @@ test('Week: Rewrite on an existing week runs at once, keeps everything and adds 
   // Votes, reasons and read marks all stay.
   expect(Object.keys(saved.get('weekFeedback') as object).sort()).toEqual(['2026-W41-old', '2026-W42-idle'])
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
-  expect(s.toasts.at(-1)).toBe('Added 2 new stories to Claude Week 42.')
+  expect(s.toasts.at(-1)).toBe('Added 2 new stories to News 42.')
   await ui.unmount()
 })
 
@@ -1556,14 +1565,14 @@ test('Week: a Rewrite that finds nothing new leaves the week exactly as it was',
   expect(s.weekRequests).toHaveLength(1)
   expect(saved.has('weekEditions') ? JSON.stringify((saved.get('weekEditions') as Record<string, Edition>)['2026-W42']) : before).toBe(before)
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
-  expect(s.toasts.at(-1)).toBe("No new stories for Claude Week 42; it's unchanged.")
+  expect(s.toasts.at(-1)).toBe("No new stories for News 42; it's unchanged.")
   await ui.unmount()
 })
 
 test('Week: a rewrite that fails keeps this week\'s edition, votes and read marks, and offers to try again', async ($, on) => {
   const { saved, ui } = await weekPane($, on, { saved: { ...storedEdition(), weekFeedback: REDO_FEEDBACK, weekRead: { '2026-W42-idle': true } }, weekAnswer: 'I could not reach the sources.' })
   await ui.press({ key: 'week-redo' })
-  expect(await ui.find({ text: /Couldn't write Claude Week 42/ })).toBeDefined()
+  expect(await ui.find({ text: /Couldn't write News 42/ })).toBeDefined()
   expect(await ui.find({ text: 'Idle compaction lands.' })).toBeDefined()
   expect(Object.keys(saved.get('weekFeedback') as object).sort()).toEqual(['2026-W41-old', '2026-W42-idle'])
   expect(saved.get('weekRead')).toEqual({ '2026-W42-idle': true })
@@ -1572,7 +1581,7 @@ test('Week: a rewrite that fails keeps this week\'s edition, votes and read mark
 })
 
 test('Week: Rewrite shows only on this week\'s edition, not on an older one', async ($, on) => {
-  const w41 = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('Claude Week 42', 'Claude Week 41'), '2026-W41')
+  const w41 = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('News 42', 'News 41'), '2026-W41')
   if (!('edition' in w41)) throw new Error(w41.reason)
   const { ui } = await weekPane($, on, { saved: { weekEditions: { ...storedEdition().weekEditions, '2026-W41': w41.edition } } })
   expect(buttonProps(await ui.drawn(), 'week-redo')).toBeDefined()
@@ -1584,7 +1593,7 @@ test('Week: Rewrite shows only on this week\'s edition, not on an older one', as
 test('Week: an answer that is not an edition says why and offers Try again', async ($, on) => {
   const { s, saved, ui } = await weekPane($, on, { weekAnswer: 'I could not reach the sources.' })
   await ui.press({ key: 'week-write' })
-  expect(await ui.find({ text: /Couldn't write Claude Week 42: the answer couldn't be read as an edition/ })).toBeDefined()
+  expect(await ui.find({ text: /Couldn't write News 42: the answer couldn't be read as an edition/ })).toBeDefined()
   expect(saved.get('weekJob')).toMatchObject({ state: 'failed', raw: 'I could not reach the sources.' })
   expect(buttonProps(await ui.drawn(), 'week-write')?.label).toBe('Try again')
   await ui.press({ key: 'week-write' })
@@ -1601,7 +1610,7 @@ test('Week: when no source page can be read, nothing is asked of the model', asy
 })
 
 test('Week: an edition still being written when a session ended shows as failed at the next start', async ($, on) => {
-  const job = { state: 'running', title: 'Claude Week 42', startedAt: Date.parse('2026-10-17T08:59:00Z'), progress: 'Writing…', editionId: '2026-W42' }
+  const job = { state: 'running', title: 'News 42', startedAt: Date.parse('2026-10-17T08:59:00Z'), progress: 'Writing…', editionId: '2026-W42' }
   const { ui } = await weekPane($, on, { saved: { weekJob: job } })
   expect(await ui.find({ text: /the session ended before the edition was ready/ })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'week-write')?.label).toBe('Try again')
@@ -1661,18 +1670,18 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-idle')?.label).toBe('Ask in side chat')
   await ui.press({ key: 'aside-2026-W42-idle' })
   expect(s.box).toBe(
-    '/btw Explain idle compaction.\n\nThis is about the Claude Week story "Idle compaction".\n\nv2.1.299 (Oct 14) adds idle compaction.\n\nTerminal only.\n\nSources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299',
+    '/btw Explain idle compaction.\n\nThis is about the News story "Idle compaction".\n\nv2.1.299 (Oct 14) adds idle compaction.\n\nTerminal only.\n\nSources: https://github.com/anthropics/claude-code/releases/tag/v2.1.299',
   )
   // No toast telling Omar to press Enter (v0.33.4).
   expect(s.toasts.some(t => /Press Enter/.test(t))).toBe(false)
   await ui.press({ key: 'week-q-aside-2026-W42-0' })
   // Paragraphs are separated by a blank line (v0.31.2).
-  expect(s.box).toBe('/btw Audit my hooks.\n\nFrom the questions in Claude Week 42: "Which hooks enforce a rule?"')
+  expect(s.box).toBe('/btw Audit my hooks.\n\nFrom the questions in News 42: "Which hooks enforce a rule?"')
   expect(s.submitted).toEqual([])
   // A story with no prompt has the button too (v0.33.3), and its title is the question.
   expect(buttonProps(await ui.drawn(), 'aside-2026-W42-haiku')?.label).toBe('Ask in side chat')
   await ui.press({ key: 'aside-2026-W42-haiku' })
-  expect(s.box).toBe('/btw Haiku default\n\nThis is about the Claude Week story "Haiku default".\n\nOct 15: Haiku 5.5 is the default.')
+  expect(s.box).toBe('/btw Haiku default\n\nThis is about the News story "Haiku default".\n\nOct 15: Haiku 5.5 is the default.')
   expect(s.submitted).toEqual([])
 
   await ui.press({ key: 'read-2026-W42-idle' })
@@ -1691,14 +1700,14 @@ test('Week: Mark read folds a story and counts it; Reopen unfolds it; More detai
 })
 
 test('Week: Older and Newer step through the stored editions', async ($, on) => {
-  const older = parseEdition(WEEK_ANSWER.replace('Claude Week 42', 'Claude Week 41'), '2026-W41') as { edition: unknown }
+  const older = parseEdition(WEEK_ANSWER.replace('News 42', 'News 41'), '2026-W41') as { edition: unknown }
   const { ui } = await weekPane($, on, { saved: { weekEditions: { ...storedEdition().weekEditions, '2026-W41': older.edition } } })
   expect(buttonProps(await ui.drawn(), 'week-newer')).toBeUndefined()
   await ui.press({ key: 'week-older' })
-  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> News 41/ })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'week-older')).toBeUndefined()
   await ui.press({ key: 'week-newer' })
-  expect(await ui.find({ text: /^> Claude Week 42/ })).toBeDefined()
+  expect(await ui.find({ text: /^> News 42/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1741,7 +1750,7 @@ test('Week: an existing reader profile in the data folder is used and never writ
 test('Week: with no reader profile yet, a blank one is created from the template and Settings says so', async ($, on) => {
   const { s } = world(on, { noProfile: true })
   await $.session.start(START)
-  expect(s.written.get(PROFILE)).toBe('# Claude Week reader profile.\nname:\n')
+  expect(s.written.get(PROFILE)).toBe('# News reader profile.\nname:\n')
   await $.command.run(coach())
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'tab-settings' })
@@ -1751,7 +1760,7 @@ test('Week: with no reader profile yet, a blank one is created from the template
 })
 
 test('Week: Archive lists every edition with its counts, and Open shows an older one as it was, still editable', async ($, on) => {
-  const older = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('Claude Week 42', 'Claude Week 41'), '2026-W41') as { edition: unknown }
+  const older = parseEdition(WEEK_ANSWER.replaceAll('2026-W42', '2026-W41').replace('News 42', 'News 41'), '2026-W41') as { edition: unknown }
   const vote = { story_id: '2026-W41-idle', edition_id: '2026-W41', section: 'code', title: 'Idle compaction', verdict: 'up', why: null, take: 'worth trying', updated_at: 'x' }
   const { saved, ui } = await weekPane($, on, {
     saved: {
@@ -1763,14 +1772,14 @@ test('Week: Archive lists every edition with its counts, and Open shows an older
   // One edition alone has no archive; two do.
   await ui.press({ key: 'week-archive' })
   expect(await ui.find({ text: 'Archive' })).toBeDefined()
-  expect(await ui.find({ text: /^Claude Week 42 · .* \(showing\)$/ })).toBeDefined()
+  expect(await ui.find({ text: /^News 42 · .* \(showing\)$/ })).toBeDefined()
   expect(await ui.find({ text: '0 of 2 read · 0 voted' })).toBeDefined()
-  expect(await ui.find({ text: /^Claude Week 41 · / })).toBeDefined()
+  expect(await ui.find({ text: /^News 41 · / })).toBeDefined()
   expect(await ui.find({ text: '1 of 2 read · 1 voted' })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'up-2026-W42-idle')).toBeUndefined()
 
   await ui.press({ key: 'week-open-2026-W41' })
-  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> News 41/ })).toBeDefined()
   expect(buttonLook(await ui.drawn(), 'up-2026-W41-idle')?.variant).toBe('primary')
   expect(await ui.find({ type: 'Input', key: 'take-field-2026-W41-idle' })).toBeDefined()
   // Folded to a green check and the dim title (v0.35.0).
@@ -1782,7 +1791,7 @@ test('Week: Archive lists every edition with its counts, and Open shows an older
 
   await ui.press({ key: 'week-archive' })
   await ui.press({ key: 'week-archive-back' })
-  expect(await ui.find({ text: /^> Claude Week 41/ })).toBeDefined()
+  expect(await ui.find({ text: /^> News 41/ })).toBeDefined()
   expect(buttonProps(await ui.drawn(), 'week-archive-back')).toBeUndefined()
   await ui.unmount()
 })
@@ -1816,7 +1825,7 @@ test('Week: a redraw keeps the story buttons\' press handles', async ($, on) => 
 test('Week: when the prompt box can\'t take the side question, it goes on the clipboard and a toast says so', async ($, on) => {
   const { s, ui } = await weekPane($, on, { saved: storedEdition(), boxBlocked: true })
   await ui.press({ key: 'aside-2026-W42-idle' })
-  expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\.\n\nThis is about the Claude Week story/)
+  expect(s.copied[0]).toMatch(/^\/btw Explain idle compaction\.\n\nThis is about the News story/)
   expect(s.toasts.at(-1)).toContain("Couldn't put the side question in the prompt box, so it's on the clipboard")
   await ui.unmount()
 })
