@@ -5,7 +5,7 @@ import {
   LIVE_DEBOUNCE_MS,
   SYSTEM,
   answersFor,
-  buildAnalysisRequest,
+  analysisBlocks,
   buildRequest,
   NO_PICK,
   cleanRule,
@@ -98,6 +98,8 @@ const STORE = {
   weekJob: 'weekJob',
 } as const
 /** How long the draft preview waits after typing stops, outside live mode. */
+/** How hard the rewrite model thinks about a draft (v0.38.0): low, since a short draft needs little, and it answers sooner. */
+const ANALYSIS_EFFORT = 'low' as const
 const PREVIEW_DEBOUNCE_MS = 400
 /** How often an open pane checks whether the session's model changed. */
 const MODEL_POLL_MS = 5000
@@ -600,7 +602,9 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
     const reply = await $.model.complete({
       model: rewriteModel,
       system: analysisSystem(items),
-      prompt: buildAnalysisRequest(text, rules, modelLabel || 'Claude', previous.text),
+      prompt: analysisBlocks(text, rules, modelLabel || 'Claude', previous.text),
+      // Judging and rewriting a short draft needs little thinking; low effort answers sooner (v0.38.0).
+      effort: ANALYSIS_EFFORT,
       maxTokens: 3000,
       timeoutMs: 90_000,
     })

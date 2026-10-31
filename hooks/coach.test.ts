@@ -344,6 +344,7 @@ function world(
     analyses: [] as string[],
     analysisSystems: [] as string[],
     analysisModels: [] as string[],
+    analysisCalls: [] as { effort?: string; blocks?: readonly { text: string; cache?: true }[] }[],
     refreshes: [] as string[],
     refreshModels: [] as string[],
     fetched: [] as string[],
@@ -393,6 +394,7 @@ function world(
     if (String(e.system).startsWith(ANALYSIS_SYSTEM.slice(0, 60))) {
       s.analyses.push(String(e.prompt))
       s.analysisSystems.push(String(e.system))
+      s.analysisCalls.push({ effort: e.effort, blocks: e.promptBlocks })
       s.analysisModels.push(e.model)
       return { value: { isAnswered: true as const, text: opts.analysis ?? ANALYSIS, usage } }
     }
@@ -2235,6 +2237,27 @@ test('Rules on the Analytics tab: the mobile app picks the model with buttons; a
   await ui.press({ key: 'rules-pick-opus-5-5.md' })
   expect(await ui.find({ key: 'rules-pick-opus-5-5.md', text: '[Opus 5.5]' })).toBeDefined()
   expect(await ui.find({ key: 'rules-model-list', text: 'Name the finish line.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Rewrite asks for low effort and marks the rules and target for the prompt cache, the draft after them (v0.38.0)', async ($, on) => {
+  const { s } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  const call = s.analysisCalls[0]!
+  expect(call.effort).toBe('low')
+  expect(call.blocks).toHaveLength(2)
+  expect(call.blocks![0]!.cache).toBe(true)
+  expect(call.blocks![0]!.text).toContain('<prompting_rules>')
+  expect(call.blocks![0]!.text).toContain('The prompt will be sent to: Opus 5.5')
+  expect(call.blocks![0]!.text).not.toContain('fix the login thing')
+  expect(call.blocks![1]!.cache).toBeUndefined()
+  expect(call.blocks![1]!.text).toContain('<draft_prompt>\nfix the login thing\n</draft_prompt>')
+  // Joined, the blocks are the request as before.
+  expect(call.blocks!.map(b => b.text).join('')).toBe(s.analyses[0])
   await ui.unmount()
 })
 

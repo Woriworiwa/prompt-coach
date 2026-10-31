@@ -273,13 +273,22 @@ export const ANALYSIS_SYSTEM = analysisSystem(FALLBACK_CHECKLIST)
 
 /** The user message for the analysis call. `reply` is Claude's last reply, or '' at the start of a conversation. */
 export function buildAnalysisRequest(draft: string, rules: string, targetLabel: string, reply = ''): string {
-  return [
-    `<prompting_rules>\n${rules}\n</prompting_rules>`,
-    `The prompt will be sent to: ${targetLabel}, running in Claude Code.`,
-    ...replyBlock(reply),
-    `<draft_prompt>\n${draft}\n</draft_prompt>`,
-    'Check, rewrite and explain the draft prompt.',
-  ].join('\n\n')
+  return analysisBlocks(draft, rules, targetLabel, reply)
+    .map(b => b.text)
+    .join('')
+}
+
+/**
+ * The analysis request as two blocks (v0.38.0): the part that stays the same
+ * for a model (the rules and the target), marked for the prompt cache, then
+ * the draft and the reply it answers. A second Rewrite within five minutes
+ * reads the system prompt and the rules from the cache. Joined, they are
+ * buildAnalysisRequest's text.
+ */
+export function analysisBlocks(draft: string, rules: string, targetLabel: string, reply = ''): { text: string; cache?: true }[] {
+  const fixed = [`<prompting_rules>\n${rules}\n</prompting_rules>`, `The prompt will be sent to: ${targetLabel}, running in Claude Code.`].join('\n\n')
+  const rest = [...replyBlock(reply), `<draft_prompt>\n${draft}\n</draft_prompt>`, 'Check, rewrite and explain the draft prompt.'].join('\n\n')
+  return [{ text: `${fixed}\n\n`, cache: true }, { text: rest }]
 }
 
 function replyBlock(reply: string): string[] {
