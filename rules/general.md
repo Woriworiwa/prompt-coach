@@ -3,7 +3,7 @@
 Source: Anthropic, "Prompting best practices"
 https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
 Paraphrased. Recheck when Anthropic updates the guide.
-As of: 2026-10
+As of: 2026-10-21
 
 ## Clarity
 - Be explicit about what you want. Claude works like a capable new colleague with no context on your norms: anything you leave implicit, it has to guess.
@@ -28,6 +28,7 @@ As of: 2026-10
 
 ## Verification
 - For tasks where correctness matters, say how to check the result (the tests pass, the command runs, the numbers add up).
+- Exception: Claude Opus 5 checks its own work without being told, and leftover self-check instructions make it over-verify (more tokens, more latency). For that model, delete such instructions rather than rewording them.
 
 ## Quick instructions
 - Make the change: Make the change rather than suggesting one. Source: "Be clear and direct" (action verbs get edits; "can you suggest" gets suggestions)
@@ -40,4 +41,4 @@ As of: 2026-10
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: "Be clear and direct" (a brilliant new employee with no context on your norms) and "Add context to improve performance"
 - Constraints: limits, scope, or things to leave alone. Source: "Be clear and direct" (be specific about the desired output format and constraints)
 - Output: what form the answer or result should take. Source: "Be clear and direct" (same line) and "Control the format of responses"
-- Done means: how the result will be checked (tests pass, the numbers add up). Source: "Ask Claude to self-check" (verify the answer against test criteria before finishing)
+- Done means: how the result will be checked (tests pass, the numbers add up); not asked for on Claude Opus 5, which over-verifies when told to. Source: "Ask Claude to self-check" (verify the answer against test criteria before finishing; Claude Opus 5 is the exception)

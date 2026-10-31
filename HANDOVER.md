@@ -1,6 +1,6 @@
-# Handover: prompt-coach v0.39.0
+# Handover: prompt-coach v0.39.1
 
-prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/prompt-coach`, made for Omar. It's a private git repo on his personal GitHub: https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
+prompt-coach is a Claude Code mod (a plugin with a TypeScript hooks module) in `~/projects/prompt-coach`, made for Omar. It's a public git repo on his personal GitHub (made public by Omar on 2026-10-31): https://github.com/Woriworiwa/prompt-coach, branch `main`. The repo's own git config sets his personal identity (Omar Dalgamuni, omar@dalgamuni.me) and a credential helper that takes the `Woriworiwa` token from `gh`. Pushes must never use his work account (`omar-smartarena`, the global git identity and gh's active account), and the repo stays separate from his work repositories. `.claude-plugin/types/` is ignored because the installed Claude Code writes it.
 
 This file is the only brief and describes the current state. `.claude/CLAUDE.md` imports it into every session and says to keep it current as you go. Version history lives in `TASKS.md` (one line per version) and in the commits. `README.md` describes the mod for Omar.
 
@@ -144,6 +144,6 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 - The Coach and Settings layout changes of v0.18.0–v0.29.0 (14 items, each in TASKS.md): check them together, in one pass over the Coach and Settings tabs.
 - Week tab: Archive lists W42, W41 and W40 with their counts, Open shows each one, and Back returns. Write shows its progress and an edition arrives with links that open. Votes, reasons and takes survive closing and reopening the pane. Mark read updates the counts. Ask in side chat puts `/btw …` in the prompt box and Enter opens the side chat. Also how good the stories are from index pages alone.
 - Coach: Send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
-- A real `/coach refresh` after a source page changes. So far only the baseline run has happened.
+- A real `/coach refresh` after a source page changes. The 2026-10-21 proposal was checked against the pages on 2026-10-31 and applied by hand in v0.39.1 (it predated v0.37.0, so Accept would have dropped every Quick instructions section; the Haiku chatbot, today's-date and JSON-tool-first lines were left out as API-only). Omar presses Reject on it in Settings → Rules to clear it.
 
 **Ideas, only if Omar asks:** publish to GitHub and the mods gallery, an opener button in the band above the prompt, a `/handover` skill (not needed now that this file is kept current as you go).

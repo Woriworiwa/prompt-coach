@@ -2,14 +2,15 @@
 
 Source, paraphrased:
 - Anthropic, "Prompting Claude Fable 5.1": https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1
-As of: 2026-10
+- Anthropic, "Prompting best practices" (the general prompting guide): https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
+As of: 2026-10-21
 
 ## Scope
 - Make the scope explicit: the request (or an approved plan) is the scope, and other issues it notices should be reported as follow-ups, not fixed.
 - When describing a problem or asking a question, say whether you want an assessment only or a fix. Without that, an assessment is the deliverable and no fix should be applied.
 - For implementation, say not to fix nearby bugs or extend behavior unless required, and to note them in the summary.
 - For small file changes, ask for targeted edits, not whole-file rewrites.
-- Limit tests to what the task needs, roughly one focused test per stated behavior.
+- Keep committed tests to what the task asks for or what the repo already keeps for this kind of change, roughly one focused test per stated behavior. Scratch checks don't need to be kept.
 
 ## Working style
 - If it should work without checking in, say so: proceed on reversible steps, stop only for destructive actions or real scope changes, and finish the work rather than describe the next step.
@@ -36,7 +37,7 @@ As of: 2026-10
 ## Checklist
 - Goal: what outcome they want, said explicitly. Source: general guide, "Be clear and direct"
 - Context: the files, errors, background and reasons the assistant can't see on its own. Source: general guide, "Be clear and direct" and "Add context to improve performance"
-- Constraints: keep changes to what the task asks; anything else it notices is a follow-up to report, not a change to make. Source: "Keep changes and tests to what the task asks for"
+- Constraints: keep changes to what the task asks; anything else it notices is a follow-up to report, not a change to make. Source: general guide, "Be clear and direct"; "Keep changes and tests to what the task asks for"
 - Output: what form the answer or result should take. Source: general guide, "Be clear and direct" and "Control the format of responses"
 - Done means: how the result will be checked (tests pass, the numbers add up). Source: general guide, "Ask Claude to self-check"
-- Stop rule: carry on with reversible steps the request covers; stop only for destructive actions or scope changes you must decide. Source: "Finish the whole task"
+- Stop rule: carry on with reversible steps the request covers; stop only for destructive actions or scope changes you must decide, or, for a question, once the assessment is given. Source: "Finish the whole task"
