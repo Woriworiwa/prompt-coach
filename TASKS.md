@@ -145,3 +145,4 @@ Notes from the build:
 - v0.45.0: Omar picked A: one Quick instructions box, closed with its buttons in a row, Show puts each sentence beside its button; the A/B split is gone. 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.46.0: the Quick instructions box's Show/Hide moved to its bottom right, beside the hint (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.47.0: the draft and Rewrite share their own bordered box (with the status line), under the Quick instructions box (Omar: apart they read as unrelated). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
+- v0.48.0: the draft-and-Rewrite box comes first, the Quick instructions box under it (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.

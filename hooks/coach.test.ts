@@ -2034,7 +2034,7 @@ describe('quick instructions', () => {
   })
 })
 
-test('Quick instructions: the session model\'s buttons sit above Rewrite; a press adds the line to the prompt box, another takes it out, with no analysis', async ($, on) => {
+test('Quick instructions: the session model\'s buttons sit under the draft and Rewrite; a press adds the line to the prompt box, another takes it out, with no analysis', async ($, on) => {
   const { s } = world(on, { files: { 'rules/general.md': QUICK_GENERAL, 'rules/opus-5-5.md': QUICK_OPUS } })
   s.box = 'why does the login fail?'
   await $.session.start(START)
@@ -2042,14 +2042,15 @@ test('Quick instructions: the session model\'s buttons sit above Rewrite; a pres
   const ui = await $.ui.mount(pane('desktop'))
   const text = JSON.stringify(await ui.drawn())
   expect(text.indexOf('quick-0-Answer directly')).toBeGreaterThan(-1)
-  expect(text.indexOf('quick-0-Answer directly')).toBeLessThan(text.indexOf('"analyze"'))
+  // The draft box (with Rewrite) comes first, the quick instructions under it (v0.48.0).
+  expect(text.indexOf('quick-0-Answer directly')).toBeGreaterThan(text.indexOf('"analyze"'))
   expect(await ui.find({ key: 'quick-2-Check it' })).toBeUndefined()
   // One box, closed at first (v0.45.0): the buttons in a row, no sentences.
   expect(await ui.find({ text: 'A press adds the line to your prompt; Show lists what each adds.' })).toBeDefined()
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
-  // The draft and Rewrite share their own box, under the quick instructions (v0.47.0).
+  // The draft and Rewrite share their own box (v0.47.0).
   const draftBox = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
   expect(draftBox).toContain('why does the login fail?')
   expect(draftBox).toContain('"analyze"')
