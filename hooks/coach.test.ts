@@ -444,17 +444,19 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   expect(rewriteAt).toBeGreaterThan(draftAt)
   expect(order.findIndex(t => t === 'Rewrite')).toBeGreaterThan(draftAt)
   expect(rewriteAt).toBeGreaterThan(order.findIndex(t => t === 'Rewrite'))
-  // No heading above the rewrite box since v0.25.0: the only "Rewrite" before it is the button.
-  expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(1)
+  // A dim "Rewrite" label right above the rewrite (v0.54.0), after the button of the same name.
+  expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(2)
+  expect(order[rewriteAt - 1]).toBe('Rewrite')
   expect((await ui.find({ key: 'analyze' }))?.text).toBe('Rewrite')
   // Send last in the draft's box, after the rewrite, its gap questions and suggestions (v0.49.0), with no Copy to prompt
-  // beside it (v0.29.0), and no "Your draft" label above the draft.
+  // beside it (v0.29.0), and a dim "Your draft" label right above the draft (v0.54.0).
   const box = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
   expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('which file?'))
   expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('"suggestions"'))
   expect(order.indexOf('Send')).toBeGreaterThan(rewriteAt)
   expect(order).not.toContain('Copy to prompt')
-  expect(textLook(await ui.drawn(), 'Your draft')).toEqual({ found: false })
+  expect(order[draftAt - 1]).toBe('Your draft')
+  expect(box).toContain('"Your draft"')
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
   // The analysis asks for no tips.
   expect(s.analysisSystems[0]).not.toContain('<tips>')

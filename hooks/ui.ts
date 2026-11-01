@@ -288,9 +288,13 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   // (v0.25.3). Quick instructions (v0.37.0): the model's own short lines, appended to the prompt box (or, with a rewrite
   // on screen, to the rewrite) with one press and taken out with another, no analysis needed. Copy to prompt went in
   // v0.29.0.
+  // Dim labels over the draft and the rewrite (v0.54.0, Omar), so the two read as a before and after; the draft had no
+  // label from v0.26.0.
   const sections: RenderElement[][] = [
     [
-      v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }),
+      ...(v.draft.trim()
+        ? [text(E, 'Your draft', { dimColor: true }), code(E, v.draft)]
+        : [text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true })]),
       row(E, [
         E.Button({
           key: 'analyze',
@@ -307,6 +311,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     ...(v.analysis
       ? [
           [
+            text(E, 'Rewrite', { dimColor: true }),
             F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite),
             // The gap questions and the suggestions to add (v0.26.0), which change the rewrite before Send.
             ...(v.analysis.placeholders.length ? gaps(E, v, a, v.analysis.placeholders, F) : []),
