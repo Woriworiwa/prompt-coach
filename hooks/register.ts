@@ -32,7 +32,7 @@ import {
   withoutChecklist,
   rulesFor,
 } from './lib.ts'
-import { type ElementCache, type Form, type Mode, type ModelSetting, type QuickBox, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
+import { type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
   type Editions,
   type FeedbackStore,
@@ -152,8 +152,8 @@ let ruleTexts: Record<string, string> = {}
 let rulesPick = ''
 /** The rules list's groups that are open; all start closed. */
 let rulesOpen: RuleGroup[] = []
-/** The quick instruction boxes Omar opened; closing the pane closes them. */
-let quickOpen: QuickBox[] = []
+/** Whether Omar opened the quick instruction box; closing the pane closes it. */
+let quickOpen = false
 
 // Claude Week. Editions, feedback and read state come back from $.store.
 /** How long one source page may take before it counts as unreadable. */
@@ -395,8 +395,8 @@ export const register: Register = (on, options) => {
       analyze: () => analyzeNow($),
       apply: () => (analysis ? applyRewrite($, filled()) : undefined),
       toggleQuick: index => toggleQuick($, index),
-      toggleQuickBox: box => {
-        quickOpen = quickOpen.includes(box) ? quickOpen.filter(b => b !== box) : [...quickOpen, box]
+      toggleQuickBox: () => {
+        quickOpen = !quickOpen
         $.ui.invalidate('ui.render')
       },
       toggleAddition: index => {
@@ -488,7 +488,7 @@ async function openPane($: EngineInterface): Promise<void> {
 
 function closed(): void {
   isPaneOpen = false
-  quickOpen = []
+  quickOpen = false
   buttons.clear()
   pauseTimer?.cancel()
   modelPoll?.cancel()
