@@ -281,9 +281,9 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Its rules come once its guide is added to sources.json and the weekly refresh runs.`, { color: 'warning' }))
   }
 
-  // One box (v0.49.0, Omar; two boxes in v0.47.0–v0.48.0): the draft (no label since v0.26.0) and Rewrite; then, once
-  // there is one, the rewrite with its gap questions and suggestions; then the quick instructions and Send last (the
-  // quick instructions at the bottom since v0.50.0, Omar). Rewrite (the analyze button) is always active and always the
+  // One box (v0.49.0, Omar; two boxes in v0.47.0–v0.48.0): the draft and Rewrite; then, once there is one, the rewrite
+  // with its gap questions and suggestions; then Send last. The quick instructions sit in their own box below it since
+  // v0.55.0 (Omar). Rewrite (the analyze button) is always active and always the
   // primary style: it used to drop to the plain style once a rewrite existed, which read as grayed out in Desktop
   // (v0.25.3). Quick instructions (v0.37.0): the model's own short lines, appended to the prompt box (or, with a rewrite
   // on screen, to the rewrite) with one press and taken out with another, no analysis needed. Copy to prompt went in
@@ -321,11 +321,8 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
           ],
         ]
       : []),
-    [
-      ...(v.quick.length ? [quickRow(E, v, a)] : []),
-      // Send fills the prompt box and sends; the box's last control.
-      ...(v.analysis ? [row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })])] : []),
-    ],
+    // Send fills the prompt box and sends; the box's last control.
+    ...(v.analysis ? [[row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })])]] : []),
   ].filter(s => s.length)
   out.push(
     E.Box({
@@ -338,6 +335,8 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       children: sections.flatMap((s, i) => (i ? [...hairline(E, v, `draft-${i}`), ...s] : s)),
     }),
   )
+  // The quick instructions in their own box under it (v0.55.0, Omar; inside the draft's box v0.49.0–v0.54.0).
+  if (v.quick.length) out.push(quickRow(E, v, a))
   if (v.analysis) {
     const an = v.analysis
     if (v.isStale) out.push(text(E, 'Your draft changed since this rewrite. Press Rewrite to update it.', { dimColor: true }))
@@ -393,7 +392,7 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
         E.Box({ key: 'quick-buttons', flexDirection: 'row', flexWrap: 'wrap', gap: 'sm', children: v.quick.map(button) }),
         foot(`A press adds the line to ${where}; Show lists what each adds.`),
       ]
-  return E.Box({ key: 'quick', flexDirection: 'column', gap: 1, children: [head, ...body] })
+  return E.Box({ key: 'quick', flexDirection: 'column', borderStyle: 'round', borderColor: 'subtle', paddingX: 1, gap: 1, children: [head, ...body] })
 }
 
 /**

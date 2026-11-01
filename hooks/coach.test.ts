@@ -2097,12 +2097,14 @@ test('Quick instructions: the session model\'s buttons sit under the draft and R
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
-  // The draft, Rewrite and the quick instructions share one box (v0.49.0), titled Append quick instructions (v0.50.0).
+  // The quick instructions, titled Append quick instructions (v0.50.0), sit in their own box under the draft's (v0.55.0).
   expect(await ui.find({ text: 'Append quick instructions' })).toBeDefined()
   const draftBox = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
   expect(draftBox).toContain('why does the login fail?')
   expect(draftBox).toContain('"analyze"')
-  expect(draftBox).toContain('quick-0-Answer directly')
+  expect(draftBox).not.toContain('quick-0-Answer directly')
+  expect(boxNode(await ui.drawn(), 'quick')?.props).toMatchObject({ borderStyle: 'round', borderColor: 'subtle' })
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'quick'))).toContain('quick-0-Answer directly')
   // Show or Hide sits at the bottom of the box, after the buttons (v0.46.0).
   const quickText = JSON.stringify(boxNode(await ui.drawn(), 'quick'))
   expect(quickText.indexOf('"quick-toggle"')).toBeGreaterThan(quickText.indexOf('quick-1-Short why'))
@@ -2136,10 +2138,13 @@ test('Quick instructions: with a rewrite on screen a press adds the line to the 
   await ui.press({ key: 'analyze' })
   const rewrite = parseAnalysis(ANALYSIS)!.rewrite
   expect(await ui.find({ text: 'A press adds the line to the rewrite; Show lists what each adds.' })).toBeDefined()
-  // In the same box: the rewrite, then the quick instructions, then Send last (v0.50.0).
+  // The draft's box ends with Send after the rewrite; the quick instructions' own box follows it (v0.55.0).
   const box = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
-  expect(box.indexOf('quick-toggle')).toBeGreaterThan(box.indexOf(JSON.stringify(rewrite).slice(1, -1)))
-  expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('quick-toggle'))
+  expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf(JSON.stringify(rewrite).slice(1, -1)))
+  expect(box).not.toContain('quick-toggle')
+  const whole = JSON.stringify(await ui.drawn())
+  expect(whole.indexOf('quick-toggle')).toBeGreaterThan(whole.indexOf('"apply"'))
+  expect(whole.indexOf('quick-toggle')).toBeLessThan(whole.indexOf('group-checklist'))
   await ui.press({ key: 'quick-1-Short why' })
   // The box is untouched; the rewrite carries the line.
   expect(s.box).toBe('fix the login thing')
