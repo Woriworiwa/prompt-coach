@@ -2049,6 +2049,10 @@ test('Quick instructions: the session model\'s buttons sit above Rewrite; a pres
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
+  // Show or Hide sits at the bottom of the box, after the buttons (v0.46.0).
+  const quickText = JSON.stringify(boxNode(await ui.drawn(), 'quick'))
+  expect(quickText.indexOf('"quick-toggle"')).toBeGreaterThan(quickText.indexOf('quick-1-Short why'))
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'quick-foot'))).toContain('"quick-toggle"')
   // Show draws each button on its own row, the sentence it adds beside it; Hide goes back.
   await ui.press({ key: 'quick-toggle' })
   const row = boxNode(await ui.drawn(), 'quick-1-row')

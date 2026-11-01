@@ -326,23 +326,26 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
  * lines of v0.43.0 sat too far from their buttons). Closed, as it starts, the
  * buttons wrap in a row (Omar picked this over a box with only its title,
  * v0.45.0). Shown, each button sits on its own row with the sentence it adds
- * beside it, a hairline between rows.
+ * beside it, a hairline between rows. Show or Hide sits at the bottom right,
+ * beside the hint (v0.46.0, Omar).
  */
 function quickRow(E: UI, v: View, a: Actions): RenderElement {
   const where = v.analysis ? 'the rewrite' : 'your prompt'
   const button = (q: QuickInstruction, i: number) => E.Button({ key: `quick-${i}-${q.label}`, label: `+ ${q.label}`, onPress: () => void a.toggleQuick(i) })
-  const head = E.Box({
-    key: 'quick-head',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    columnGap: 2,
-    flexWrap: 'wrap',
-    children: [
-      text(E, 'Quick instructions', { weight: 'semibold' }),
-      E.Button({ key: 'quick-toggle', label: v.quickOpen ? 'Hide' : 'Show', onPress: () => a.toggleQuickBox() }),
-    ],
-  })
+  const head = text(E, 'Quick instructions', { weight: 'semibold' })
+  const foot = (hint: string) =>
+    E.Box({
+      key: 'quick-foot',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      columnGap: 2,
+      flexWrap: 'wrap',
+      children: [
+        E.Box({ flexShrink: 1, children: [text(E, hint, { dimColor: true, wrap: 'wrap' })] }),
+        E.Button({ key: 'quick-toggle', label: v.quickOpen ? 'Hide' : 'Show', onPress: () => a.toggleQuickBox() }),
+      ],
+    })
   const body = v.quickOpen
     ? [
         ...v.quick.flatMap((q, i) => [
@@ -356,11 +359,11 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
             children: [button(q, i), E.Box({ flexShrink: 1, children: [text(E, `\u201c${q.text}\u201d`, { dimColor: true, wrap: 'wrap' })] })],
           }),
         ]),
-        text(E, `A press adds the line to ${where}; press again to take it out.`, { dimColor: true, wrap: 'wrap' }),
+        foot(`A press adds the line to ${where}; press again to take it out.`),
       ]
     : [
         E.Box({ key: 'quick-buttons', flexDirection: 'row', flexWrap: 'wrap', gap: 'sm', children: v.quick.map(button) }),
-        text(E, `A press adds the line to ${where}; Show lists what each adds.`, { dimColor: true, wrap: 'wrap' }),
+        foot(`A press adds the line to ${where}; Show lists what each adds.`),
       ]
   return E.Box({
     key: 'quick',
