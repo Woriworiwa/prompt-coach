@@ -2044,7 +2044,11 @@ test('Quick instructions: the session model\'s buttons sit above Rewrite; a pres
   expect(text.indexOf('quick-0-Answer directly')).toBeGreaterThan(-1)
   expect(text.indexOf('quick-0-Answer directly')).toBeLessThan(text.indexOf('"analyze"'))
   expect(await ui.find({ key: 'quick-2-Check it' })).toBeUndefined()
-  expect(await ui.find({ text: 'Adds the line to your prompt; press again to take it out.' })).toBeDefined()
+  expect(await ui.find({ text: 'Each button adds its line to your prompt; press it again to take the line out.' })).toBeDefined()
+  // Each button is led by "+" and has a dim line with the exact sentence it adds (v0.43.0).
+  expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
+  expect(await ui.find({ text: '+ Answer directly: \u201cAnswer directly.\u201d' })).toBeDefined()
+  expect(await ui.find({ text: '+ Short why: \u201cExplain why you chose this in three sentences.\u201d' })).toBeDefined()
 
   await ui.press({ key: 'quick-0-Answer directly' })
   expect(s.box).toBe('why does the login fail? Answer directly.')
@@ -2063,7 +2067,7 @@ test('Quick instructions: with a rewrite on screen a press adds the line to the 
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
   const rewrite = parseAnalysis(ANALYSIS)!.rewrite
-  expect(await ui.find({ text: 'Adds the line to the rewrite; press again to take it out.' })).toBeDefined()
+  expect(await ui.find({ text: 'Each button adds its line to the rewrite; press it again to take the line out.' })).toBeDefined()
   await ui.press({ key: 'quick-1-Short why' })
   // The box is untouched; the rewrite carries the line.
   expect(s.box).toBe('fix the login thing')

@@ -318,7 +318,12 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
   return out
 }
 
-/** The quick instruction buttons, wrapping when narrow, with a dim line saying where a press puts the sentence. */
+/**
+ * The quick instruction buttons, wrapping when narrow, each label led by "+",
+ * then a dim line saying where a press puts the sentence and one dim line per
+ * button with the exact sentence it adds (v0.43.0, Omar: buttons have no
+ * tooltips, so the row said nothing about what a press adds).
+ */
 function quickRow(E: UI, v: View, a: Actions): RenderElement {
   const where = v.analysis ? 'the rewrite' : 'your prompt'
   return E.Box({
@@ -331,9 +336,10 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 'sm',
-        children: v.quick.map((q, i) => E.Button({ key: `quick-${i}-${q.label}`, label: q.label, onPress: () => void a.toggleQuick(i) })),
+        children: v.quick.map((q, i) => E.Button({ key: `quick-${i}-${q.label}`, label: `+ ${q.label}`, onPress: () => void a.toggleQuick(i) })),
       }),
-      text(E, `Adds the line to ${where}; press again to take it out.`, { dimColor: true, wrap: 'wrap' }),
+      text(E, `Each button adds its line to ${where}; press it again to take the line out.`, { dimColor: true, wrap: 'wrap' }),
+      ...v.quick.map(q => text(E, `+ ${q.label}: \u201c${q.text}\u201d`, { dimColor: true, wrap: 'wrap' })),
     ],
   })
 }
