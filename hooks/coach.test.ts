@@ -446,8 +446,12 @@ test('/coach opens the pane; Analyze shows the checklist and rewrite; Apply fill
   // No heading above the rewrite box since v0.25.0: the only "Rewrite" before it is the button.
   expect(order.slice(0, rewriteAt).filter(t => t === 'Rewrite')).toHaveLength(1)
   expect((await ui.find({ key: 'analyze' }))?.text).toBe('Rewrite')
-  // Send right under the rewrite box, with no Copy to prompt beside it (v0.29.0), and no "Your draft" label above the draft.
-  expect(order[rewriteAt + 1]).toBe('Send')
+  // Send last in the draft's box, after the rewrite, its gap questions and suggestions (v0.49.0), with no Copy to prompt
+  // beside it (v0.29.0), and no "Your draft" label above the draft.
+  const box = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
+  expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('which file?'))
+  expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('"suggestions"'))
+  expect(order.indexOf('Send')).toBeGreaterThan(rewriteAt)
   expect(order).not.toContain('Copy to prompt')
   expect(textLook(await ui.drawn(), 'Your draft')).toEqual({ found: false })
   expect(rewriteAt).toBeLessThan(order.findIndex(t => t === 'Checklist'))
@@ -2050,11 +2054,11 @@ test('Quick instructions: the session model\'s buttons sit under the draft and R
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
-  // The draft and Rewrite share their own box (v0.47.0).
+  // The draft, Rewrite and the quick instructions share one box (v0.49.0).
   const draftBox = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
   expect(draftBox).toContain('why does the login fail?')
   expect(draftBox).toContain('"analyze"')
-  expect(JSON.stringify(boxNode(await ui.drawn(), 'quick'))).not.toContain('"analyze"')
+  expect(draftBox).toContain('quick-0-Answer directly')
   // Show or Hide sits at the bottom of the box, after the buttons (v0.46.0).
   const quickText = JSON.stringify(boxNode(await ui.drawn(), 'quick'))
   expect(quickText.indexOf('"quick-toggle"')).toBeGreaterThan(quickText.indexOf('quick-1-Short why'))
@@ -2088,6 +2092,9 @@ test('Quick instructions: with a rewrite on screen a press adds the line to the 
   await ui.press({ key: 'analyze' })
   const rewrite = parseAnalysis(ANALYSIS)!.rewrite
   expect(await ui.find({ text: 'A press adds the line to the rewrite; Show lists what each adds.' })).toBeDefined()
+  // The rewrite and Send sit at the bottom of the same box, after the quick instructions (v0.49.0).
+  const box = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
+  expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('quick-toggle'))
   await ui.press({ key: 'quick-1-Short why' })
   // The box is untouched; the rewrite carries the line.
   expect(s.box).toBe('fix the login thing')

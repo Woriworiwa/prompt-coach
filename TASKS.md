@@ -146,3 +146,4 @@ Notes from the build:
 - v0.46.0: the Quick instructions box's Show/Hide moved to its bottom right, beside the hint (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.47.0: the draft and Rewrite share their own bordered box (with the status line), under the Quick instructions box (Omar: apart they read as unrelated). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.48.0: the draft-and-Rewrite box comes first, the Quick instructions box under it (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
+- v0.49.0: one box on the Coach tab: the draft and Rewrite, then Quick instructions, then the rewrite, its gap questions and suggestions, with Send last (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.

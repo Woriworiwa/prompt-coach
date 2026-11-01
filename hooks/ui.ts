@@ -279,10 +279,43 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Its rules come once its guide is added to sources.json and the weekly refresh runs.`, { color: 'warning' }))
   }
 
-  // The draft and Rewrite share a box of their own, styled like the quick instructions' (v0.47.0, Omar: they read as
-  // unrelated apart), above the quick instructions since v0.48.0 (Omar). The draft has no label since v0.26.0. Rewrite
-  // (the analyze button) is always active and always the primary style: it used to drop to the plain style once a
-  // rewrite existed, which read as grayed out in Desktop (v0.25.3).
+  // One box (v0.49.0, Omar; two boxes in v0.47.0–v0.48.0): the draft (no label since v0.26.0) and Rewrite, then the
+  // quick instructions, then, once there is one, the rewrite and Send at the bottom. Rewrite (the analyze button) is
+  // always active and always the primary style: it used to drop to the plain style once a rewrite existed, which read
+  // as grayed out in Desktop (v0.25.3). Quick instructions (v0.37.0): the model's own short lines, added to the prompt
+  // box (or, with a rewrite on screen, to the rewrite) with one press and taken out with another, no analysis needed.
+  // The rewrite, its gap questions and suggestions sit just above Send, so Send stays with what it sends and comes last
+  // (Copy to prompt went in v0.29.0).
+  const sections: RenderElement[][] = [
+    [
+      v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }),
+      row(E, [
+        E.Button({
+          key: 'analyze',
+          label: v.isRunning ? 'Rewriting…' : 'Rewrite',
+          hotkey: 'a',
+          variant: 'primary',
+          onPress: a.analyze,
+        }),
+      ]),
+      ...(v.status ? [text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' })] : []),
+    ],
+    ...(v.quick.length ? [[quickRow(E, v, a)]] : []),
+    ...(v.analysis
+      ? [
+          [
+            F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite),
+            // The gap questions and the suggestions to add (v0.26.0), which change the rewrite before Send.
+            ...(v.analysis.placeholders.length ? gaps(E, v, a, v.analysis.placeholders, F) : []),
+            ...(v.analysis.additions.length
+              ? [E.Box({ key: 'suggestions', flexDirection: 'column', gap: 1, children: v.analysis.additions.map((s, i) => suggestion(E, v, a, s, i)) })]
+              : []),
+            // Send fills the prompt box and sends; the box's last control.
+            row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })]),
+          ],
+        ]
+      : []),
+  ]
   out.push(
     E.Box({
       key: 'draft',
@@ -291,36 +324,9 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       borderColor: 'subtle',
       paddingX: 1,
       gap: 1,
-      children: [
-        v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }),
-        row(E, [
-          E.Button({
-            key: 'analyze',
-            label: v.isRunning ? 'Rewriting…' : 'Rewrite',
-            hotkey: 'a',
-            variant: 'primary',
-            onPress: a.analyze,
-          }),
-        ]),
-        ...(v.status ? [text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' })] : []),
-      ],
+      children: sections.flatMap((s, i) => (i ? [...hairline(E, v, `draft-${i}`), ...s] : s)),
     }),
   )
-  // Quick instructions (v0.37.0): the model's own short lines, added to the prompt box (or, with a rewrite on screen, to the
-  // rewrite) with one press and taken out with another, no analysis needed. Plain buttons whose look never changes.
-  if (v.quick.length) out.push(quickRow(E, v, a))
-  // The rewrite sits right under the draft, so the two read side by side; Send right under it (Copy to prompt went in v0.29.0)
-  // (v0.26.0), then the gap questions, then the suggestions to add.
-  if (v.analysis) {
-    out.push(F && REWRITE_EDITABLE ? rewriteField(E, F, v, a) : code(E, v.filledRewrite))
-    // Send fills the prompt box and sends.
-    out.push(row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })]))
-    if (v.analysis.placeholders.length) out.push(...gaps(E, v, a, v.analysis.placeholders, F))
-    if (v.analysis.additions.length) {
-      out.push(E.Box({ key: 'suggestions', flexDirection: 'column', gap: 1, children: v.analysis.additions.map((s, i) => suggestion(E, v, a, s, i)) }))
-    }
-  }
-
   if (v.analysis) {
     const an = v.analysis
     if (v.isStale) out.push(text(E, 'Your draft changed since this rewrite. Press Rewrite to update it.', { dimColor: true }))
@@ -333,7 +339,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 }
 
 /**
- * The quick instructions in a box with Show or Hide (v0.44.0, Omar: the dim
+ * The quick instructions, a section of the draft's box since v0.49.0, with Show or Hide (v0.44.0, Omar: the dim
  * lines of v0.43.0 sat too far from their buttons). Closed, as it starts, the
  * buttons wrap in a row (Omar picked this over a box with only its title,
  * v0.45.0). Shown, each button sits on its own row with the sentence it adds
@@ -376,15 +382,7 @@ function quickRow(E: UI, v: View, a: Actions): RenderElement {
         E.Box({ key: 'quick-buttons', flexDirection: 'row', flexWrap: 'wrap', gap: 'sm', children: v.quick.map(button) }),
         foot(`A press adds the line to ${where}; Show lists what each adds.`),
       ]
-  return E.Box({
-    key: 'quick',
-    flexDirection: 'column',
-    borderStyle: 'round',
-    borderColor: 'subtle',
-    paddingX: 1,
-    gap: 1,
-    children: [head, ...body],
-  })
+  return E.Box({ key: 'quick', flexDirection: 'column', gap: 1, children: [head, ...body] })
 }
 
 /**
