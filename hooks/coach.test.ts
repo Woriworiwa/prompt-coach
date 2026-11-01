@@ -2044,11 +2044,23 @@ test('Quick instructions: the session model\'s buttons sit above Rewrite; a pres
   expect(text.indexOf('quick-0-Answer directly')).toBeGreaterThan(-1)
   expect(text.indexOf('quick-0-Answer directly')).toBeLessThan(text.indexOf('"analyze"'))
   expect(await ui.find({ key: 'quick-2-Check it' })).toBeUndefined()
-  expect(await ui.find({ text: 'Each button adds its line to your prompt; press it again to take the line out.' })).toBeDefined()
-  // Each button is led by "+" and has a dim line with the exact sentence it adds (v0.43.0).
+  // Two trial boxes, both closed (v0.44.0): A (the first half) keeps its buttons, B (the rest) shows only its title.
+  expect(await ui.find({ text: 'A press adds the line to your prompt; Show lists what each adds.' })).toBeDefined()
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
-  expect(await ui.find({ text: '+ Answer directly: \u201cAnswer directly.\u201d' })).toBeDefined()
-  expect(await ui.find({ text: '+ Short why: \u201cExplain why you chose this in three sentences.\u201d' })).toBeDefined()
+  expect(await ui.find({ key: 'quick-1-Short why' })).toBeUndefined()
+  expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
+  // Show draws each button on its own row, the sentence it adds beside it; Hide goes back.
+  await ui.press({ key: 'quick-toggle-b' })
+  const row = boxNode(await ui.drawn(), 'quick-1-row')
+  expect(JSON.stringify(row)).toContain('quick-1-Short why')
+  expect(JSON.stringify(row)).toContain('\u201cExplain why you chose this in three sentences.\u201d')
+  await ui.press({ key: 'quick-toggle-a' })
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'quick-0-row'))).toContain('\u201cAnswer directly.\u201d')
+  expect(await ui.find({ text: 'A press adds the line to your prompt; press again to take it out.' })).toBeDefined()
+  await ui.press({ key: 'quick-toggle-a' })
+  await ui.press({ key: 'quick-toggle-b' })
+  expect(boxNode(await ui.drawn(), 'quick-0-row')).toBeUndefined()
+  expect(await ui.find({ key: 'quick-1-Short why' })).toBeUndefined()
 
   await ui.press({ key: 'quick-0-Answer directly' })
   expect(s.box).toBe('why does the login fail? Answer directly.')
@@ -2067,7 +2079,8 @@ test('Quick instructions: with a rewrite on screen a press adds the line to the 
   const ui = await $.ui.mount(pane('desktop'))
   await ui.press({ key: 'analyze' })
   const rewrite = parseAnalysis(ANALYSIS)!.rewrite
-  expect(await ui.find({ text: 'Each button adds its line to the rewrite; press it again to take the line out.' })).toBeDefined()
+  expect(await ui.find({ text: 'A press adds the line to the rewrite; Show lists what each adds.' })).toBeDefined()
+  await ui.press({ key: 'quick-toggle-b' })
   await ui.press({ key: 'quick-1-Short why' })
   // The box is untouched; the rewrite carries the line.
   expect(s.box).toBe('fix the login thing')

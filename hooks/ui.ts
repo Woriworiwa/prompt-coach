@@ -31,6 +31,8 @@ export type View = {
   filledRewrite: string
   /** The session model's quick instructions, as buttons under the draft. */
   quick: QuickInstruction[]
+  /** The quick instruction boxes shown open (Show pressed); both closed when the pane opens. */
+  quickOpen: QuickBox[]
   /** The surface's width in cells, when it has said; sizes the rewrite field. */
   columns?: number
   /** The rewrite field's key; it changes whenever the field's text changed since it was drawn. */
@@ -126,6 +128,9 @@ export type Settings = {
   note: string
 }
 
+/** The two trial layouts of the quick instruction box (v0.44.0); see `quickRow`. */
+export type QuickBox = 'a' | 'b'
+
 export type ModelSetting = 'rewriteModel' | 'rewriteEffort' | 'weekModel'
 
 /** What the pane's controls do. Each may return the work it started, so a press can wait for it. */
@@ -138,6 +143,7 @@ export type Actions = {
   apply: () => Promise<void> | undefined
   toggleAddition: (index: number) => void
   toggleQuick: (index: number) => Promise<void>
+  toggleQuickBox: (box: QuickBox) => void
   editRewrite: (value: string) => void
   submitRewrite: (value: string) => void
   pick: (token: string, value: string) => void
@@ -319,28 +325,84 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 }
 
 /**
- * The quick instruction buttons, wrapping when narrow, each label led by "+",
- * then a dim line saying where a press puts the sentence and one dim line per
- * button with the exact sentence it adds (v0.43.0, Omar: buttons have no
- * tooltips, so the row said nothing about what a press adds).
+ * The quick instructions in a box with Show or Hide (v0.44.0, Omar: the dim
+ * lines of v0.43.0 sat too far from their buttons). Shown, each button sits on
+ * its own row with the sentence it adds beside it, a hairline between rows.
+ * Closed, which layout reads better is still open, so for now the list is
+ * split to compare both (Omar: "make half of them one way, the other half the
+ * other way"): box A, the first half, keeps its buttons in a wrapping row when
+ * closed; box B, the rest, shows only its title. Both start closed.
  */
 function quickRow(E: UI, v: View, a: Actions): RenderElement {
   const where = v.analysis ? 'the rewrite' : 'your prompt'
+  const half = Math.ceil(v.quick.length / 2)
+  const items = v.quick.map((q, i) => ({ q, i }))
+  const boxes: [QuickBox, typeof items][] = [
+    ['a', items.slice(0, half)],
+    ['b', items.slice(half)],
+  ]
   return E.Box({
     key: 'quick',
     flexDirection: 'column',
-    gap: 'xs',
+    gap: 'sm',
+    children: boxes.filter(([, list]) => list.length).map(([box, list]) => quickBox(E, v, a, box, list, where)),
+  })
+}
+
+/** One quick instruction box: its title and Show or Hide, then the buttons as `quickRow` says. */
+function quickBox(E: UI, v: View, a: Actions, box: QuickBox, list: { q: QuickInstruction; i: number }[], where: string): RenderElement {
+  const isOpen = v.quickOpen.includes(box)
+  const button = ({ q, i }: { q: QuickInstruction; i: number }) =>
+    E.Button({ key: `quick-${i}-${q.label}`, label: `+ ${q.label}`, onPress: () => void a.toggleQuick(i) })
+  const head = E.Box({
+    key: `quick-${box}-head`,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    columnGap: 2,
+    flexWrap: 'wrap',
     children: [
       E.Box({
-        key: 'quick-buttons',
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 'sm',
-        children: v.quick.map((q, i) => E.Button({ key: `quick-${i}-${q.label}`, label: `+ ${q.label}`, onPress: () => void a.toggleQuick(i) })),
+        columnGap: 1,
+        alignItems: 'center',
+        children: [
+          text(E, 'Quick instructions', { weight: 'semibold' }),
+          text(E, box === 'a' ? 'A: buttons stay when closed' : 'B: title only when closed', { dimColor: true }),
+        ],
       }),
-      text(E, `Each button adds its line to ${where}; press it again to take the line out.`, { dimColor: true, wrap: 'wrap' }),
-      ...v.quick.map(q => text(E, `+ ${q.label}: \u201c${q.text}\u201d`, { dimColor: true, wrap: 'wrap' })),
+      E.Button({ key: `quick-toggle-${box}`, label: isOpen ? 'Hide' : 'Show', onPress: () => a.toggleQuickBox(box) }),
     ],
+  })
+  const body = isOpen
+    ? [
+        ...list.flatMap((item, n) => [
+          ...(n ? hairline(E, v, `quick-${box}-${n}`) : []),
+          E.Box({
+            key: `quick-${item.i}-row`,
+            flexDirection: 'row',
+            alignItems: 'center',
+            columnGap: 2,
+            flexWrap: 'wrap',
+            children: [button(item), E.Box({ flexShrink: 1, children: [text(E, `\u201c${item.q.text}\u201d`, { dimColor: true, wrap: 'wrap' })] })],
+          }),
+        ]),
+        text(E, `A press adds the line to ${where}; press again to take it out.`, { dimColor: true, wrap: 'wrap' }),
+      ]
+    : box === 'a'
+      ? [
+          E.Box({ key: `quick-${box}-buttons`, flexDirection: 'row', flexWrap: 'wrap', gap: 'sm', children: list.map(button) }),
+          text(E, `A press adds the line to ${where}; Show lists what each adds.`, { dimColor: true, wrap: 'wrap' }),
+        ]
+      : []
+  return E.Box({
+    key: `quick-${box}`,
+    flexDirection: 'column',
+    borderStyle: 'round',
+    borderColor: 'subtle',
+    paddingX: 1,
+    gap: 1,
+    children: [head, ...body],
   })
 }
 
