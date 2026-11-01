@@ -148,3 +148,4 @@ Notes from the build:
 - v0.48.0: the draft-and-Rewrite box comes first, the Quick instructions box under it (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.49.0: one box on the Coach tab: the draft and Rewrite, then Quick instructions, then the rewrite, its gap questions and suggestions, with Send last (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
 - v0.50.0: the quick instructions moved to the bottom of the Coach box, just above Send, and are titled Append quick instructions (Omar). 139 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.
+- v0.51.0: a sent prompt (Send or Enter) resets the Coach tab: draft, rewrite, Checklist, gap answers, added suggestions and quick lines; a refused send keeps them, a slash command clears only the draft (Omar). 141 tests pass on 2.1.312, 2.1.308 and 2.1.309. Not yet checked in Desktop.

@@ -110,6 +110,8 @@ let mode: Mode = 'manual'
 let draft = ''
 let analysis: Analysis | undefined
 let analyzedText = ''
+/** The prompt last sent; an echo of it in the box (the fill before a send) isn't a new draft. */
+let lastSent = ''
 // Answers to the rewrite's placeholders, by token; a new analysis starts them afresh.
 let typed: Record<string, string> = {}
 let picked: Record<string, string> = {}
@@ -314,12 +316,16 @@ export const register: Register = (on, options) => {
 
   // Sending clears the box. (Not `prompt.change`: the Desktop app's bundled
   // Claude Code 2.1.299 doesn't have that event and refuses the whole module.)
+  // A prompt sent (Enter or Send) resets the Coach tab once it has entered (v0.51.0, Omar); a dropped one keeps it all.
+  // A slash command only clears the draft, as before.
   on('prompt.submit', async ($, e, next) => {
-    if (isPaneOpen) {
-      draft = ''
+    const result = await next(e)
+    if (isPaneOpen && result.drop === undefined) {
+      if (e.command) draft = ''
+      else resetCoach(e.text)
       $.ui.invalidate('ui.render')
     }
-    return next(e)
+    return result
   })
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
@@ -506,6 +512,7 @@ function closed(): void {
 function noteDraft(text: string): boolean {
   if (!text.trim() && analysis && draft.trim()) return false
   if (text === draft) return false
+  if (!analysis && text.trim() && text === lastSent) return false
   draft = text
   return true
 }
@@ -693,12 +700,28 @@ async function applyRewrite($: EngineInterface, rewrite: string): Promise<void> 
   if (sent.drop !== undefined) {
     status = `Not sent: ${sent.drop}. The rewrite is in the prompt box.`
   } else {
-    // Sent: empty the box, as Enter does, so the rewrite isn't sent twice.
+    // Sent: empty the box, as Enter does, so the rewrite isn't sent twice, and start the Coach tab afresh (v0.51.0).
     await $.prompt.fill({ text: '', mode: 'replace' })
-    draft = ''
-    status = ''
+    resetCoach(rewrite)
   }
   $.ui.invalidate('ui.render')
+}
+
+/** The Coach tab back to its start once a prompt is sent: no draft, rewrite, answers, added suggestions or quick lines. */
+function resetCoach(sent: string): void {
+  draft = ''
+  analysis = undefined
+  // Live mode then skips the sent text as already analyzed.
+  analyzedText = sent
+  lastSent = sent
+  typed = {}
+  picked = {}
+  added = []
+  removed = []
+  edited = undefined
+  quickOn = []
+  formGen += 1
+  status = ''
 }
 
 async function setMode($: EngineInterface, next: Mode): Promise<void> {

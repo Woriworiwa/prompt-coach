@@ -1299,6 +1299,46 @@ test('when the engine refuses the prompt, Apply leaves the rewrite in the box an
   expect(s.submitted).toEqual([])
   expect(s.box).toBe('Fix the login bug in [which file?]. Done means the login test passes.')
   expect(await ui.find({ text: /Not sent: a Stop hook stands/ })).toBeDefined()
+  // A refused send keeps the rewrite and the Checklist (v0.51.0).
+  expect(await ui.find({ key: 'apply' })).toBeDefined()
+  expect(await ui.find({ text: 'Checklist' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Send resets the Coach tab: no rewrite, Checklist, answers or quick lines left; the sent text coming back is no new draft', async ($, on) => {
+  const { s, clock } = world(on, { files: { 'rules/general.md': QUICK_GENERAL, 'rules/opus-5-5.md': QUICK_OPUS } })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  await ui.press({ key: 'quick-1-Short why' })
+  await ui.press({ key: 'apply' })
+  expect(s.submitted).toHaveLength(1)
+  expect(await ui.find({ key: 'apply' })).toBeUndefined()
+  expect(await ui.find({ text: 'Checklist' })).toBeUndefined()
+  expect(await ui.find({ text: 'Type in the prompt box. The coach reads it before you send.' })).toBeDefined()
+  // The quick lines start afresh: a press now goes to the prompt box, not into an old rewrite.
+  expect(await ui.find({ text: 'A press adds the line to your prompt; Show lists what each adds.' })).toBeDefined()
+  // An echo of what was sent doesn't come back as the draft.
+  await type($, s, s.submitted[0]!.text)
+  await clock.advance(1500)
+  expect(await ui.find({ text: 'Type in the prompt box. The coach reads it before you send.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Enter resets the Coach tab like Send', async ($, on) => {
+  const { s } = world(on)
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  await ui.press({ key: 'analyze' })
+  expect(await ui.find({ text: 'Checklist' })).toBeDefined()
+  await $.prompt.submit({ text: s.box, wait: false, origin: { kind: 'composer' } })
+  s.box = ''
+  expect(await ui.find({ key: 'apply' })).toBeUndefined()
+  expect(await ui.find({ text: 'Checklist' })).toBeUndefined()
   await ui.unmount()
 })
 
