@@ -31,6 +31,7 @@ import {
   parseRuleFile,
   withoutChecklist,
   rulesFor,
+  rewriteTiming,
 } from './lib.ts'
 import { type ElementCache, type Form, type Mode, type ModelSetting, type RuleGroup, type Tab, type View, type WeekJob, coachPane, withStableButtons, withStableForm } from './ui.ts'
 import {
@@ -130,6 +131,8 @@ let rewriteGen = 0
 /** Claude's last reply as the last analysis read it: its length, and whether it was cut. Undefined at the start of a conversation. */
 let isRunning = false
 let status = ''
+/** How long the last Rewrite took and whether it hit the prompt cache (v0.52.0); empty until one finishes. */
+let timing = ''
 let liveCalls = 0
 let pauseTimer: Timer | undefined
 /** The pane's Buttons per surface, reused between redraws so a press never names a dropped handle. */
@@ -349,6 +352,7 @@ export const register: Register = (on, options) => {
       hasModelRules,
       draft,
       status,
+      timing,
       isRunning,
       analysis,
       filledRewrite: filled(),
@@ -562,7 +566,9 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
   isRunning = true
   await syncModel($)
   status = modelLabel ? `Rewriting for ${modelLabel}…` : 'Rewriting…'
+  timing = ''
   $.ui.invalidate('ui.render')
+  const started = await $.clock.now()
   try {
     const file = rulesFor(model)?.file
     const rules = await loadRules($, file)
@@ -580,6 +586,7 @@ async function analyze($: EngineInterface, text: string): Promise<void> {
       maxTokens: 3000,
       timeoutMs: 90_000,
     })
+    if (reply.isAnswered) timing = rewriteTiming((await $.clock.now()) - started, reply.usage)
     if (!reply.isAnswered) {
       status = `Analysis failed: ${reply.reason}. Try again.`
       return
@@ -722,6 +729,7 @@ function resetCoach(sent: string): void {
   quickOn = []
   formGen += 1
   status = ''
+  timing = ''
 }
 
 async function setMode($: EngineInterface, next: Mode): Promise<void> {

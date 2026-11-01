@@ -279,6 +279,20 @@ export function buildAnalysisRequest(draft: string, rules: string, targetLabel: 
 }
 
 /**
+ * The line under Rewrite after each one (v0.52.0, Omar: to see whether
+ * v0.38.0's low effort and cached prefix help): how long the call took and
+ * what the prompt cache did, from the call's usage.
+ */
+export function rewriteTiming(ms: number, usage?: { cache_read_input_tokens: number; cache_creation_input_tokens: number }): string {
+  const took = `Rewritten in ${(Math.max(0, ms) / 1000).toFixed(1)} s`
+  if (!usage) return took
+  const n = (k: number) => k.toLocaleString('en-US')
+  if (usage.cache_read_input_tokens > 0) return `${took} · cache hit, ${n(usage.cache_read_input_tokens)} tokens read from it`
+  if (usage.cache_creation_input_tokens > 0) return `${took} · no cache hit; ${n(usage.cache_creation_input_tokens)} tokens cached for a Rewrite in the next 5 minutes`
+  return `${took} · no cache hit; nothing cached (the rules are under the model's minimum)`
+}
+
+/**
  * The analysis request as two blocks (v0.38.0): the part that stays the same
  * for a model (the rules and the target), marked for the prompt cache, then
  * the draft and the reply it answers. A second Rewrite within five minutes

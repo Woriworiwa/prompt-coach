@@ -29,6 +29,7 @@ import {
   parseQuick,
   quickFor,
   withSentence,
+  rewriteTiming,
 } from './lib.ts'
 import { REWRITE_EDITABLE, rowsFor } from './ui.ts'
 import { type Edition, parseEdition } from './week.ts'
@@ -269,7 +270,7 @@ const FILES: Record<string, string> = {
 
 function world(
   on: On,
-  opts: { mode?: string; model?: string; surfaces?: string[]; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string>; engine?: string; desktopEnv?: string } = {},
+  opts: { mode?: string; model?: string; surfaces?: string[]; analysis?: string; saved?: Record<string, unknown>; weekAnswer?: string; pagesDown?: boolean; boxBlocked?: boolean; noProfile?: boolean; noOwnRules?: boolean; files?: Record<string, string>; engine?: string; desktopEnv?: string; cacheRead?: number } = {},
 ) {
   const clock = mock.clock(on, { now: Date.parse('2026-10-17T09:00:00Z') })
   const saved = new Map<string, unknown>([
@@ -330,7 +331,7 @@ function world(
     return { value: { status: ok ? 200 : 404, ok, headers: {}, text: `PAGE ${e.url}` } }
   })
   on('model.complete', async ($, e) => {
-    const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+    const usage = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: opts.cacheRead ?? 0, cache_creation_input_tokens: 0 }
     if (String(e.system).startsWith(ANALYSIS_SYSTEM.slice(0, 60))) {
       s.analyses.push(String(e.prompt))
       s.analysisSystems.push(String(e.system))
@@ -2208,5 +2209,31 @@ test('A newer model borrows the newest older file of its family, and the pane sa
   await ui.press({ key: 'tab-settings' })
   expect(await ui.find({ text: "No rules file for Opus 6 yet; it uses Opus 5.5's." })).toBeDefined()
   expect((await ui.find({ type: 'Select', key: 'rules-model-opus-5-5.md' }))?.props?.value).toBe('opus-5-5.md')
+  await ui.unmount()
+})
+
+describe('rewrite timing', () => {
+  test('rewriteTiming says how long a Rewrite took and what the prompt cache did', () => {
+    const none = { cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+    expect(rewriteTiming(4230, { ...none, cache_read_input_tokens: 12345 })).toBe('Rewritten in 4.2 s · cache hit, 12,345 tokens read from it')
+    expect(rewriteTiming(6000, { ...none, cache_creation_input_tokens: 2100 })).toBe('Rewritten in 6.0 s · no cache hit; 2,100 tokens cached for a Rewrite in the next 5 minutes')
+    expect(rewriteTiming(900, none)).toBe("Rewritten in 0.9 s · no cache hit; nothing cached (the rules are under the model's minimum)")
+    expect(rewriteTiming(-5)).toBe('Rewritten in 0.0 s')
+  })
+})
+
+test('after each Rewrite the pane shows how long it took and whether the cache was hit; a send clears it (v0.52.0)', async ($, on) => {
+  const { s } = world(on, { cacheRead: 1200 })
+  s.box = 'fix the login thing'
+  await $.session.start(START)
+  await $.command.run(coach())
+  const ui = await $.ui.mount(pane('desktop'))
+  expect(await ui.find({ text: /^Rewritten in/ })).toBeUndefined()
+  await ui.press({ key: 'analyze' })
+  const line = await ui.find({ text: /^Rewritten in \d+\.\d s · cache hit, 1,200 tokens read from it$/ })
+  expect(line).toBeDefined()
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'draft'))).toContain('Rewritten in')
+  await ui.press({ key: 'apply' })
+  expect(await ui.find({ text: /^Rewritten in/ })).toBeUndefined()
   await ui.unmount()
 })

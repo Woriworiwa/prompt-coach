@@ -25,6 +25,8 @@ export type View = {
   hasModelRules: boolean
   draft: string
   status: string
+  /** How long the last Rewrite took and whether it hit the prompt cache; empty until one finishes. */
+  timing: string
   isRunning: boolean
   analysis?: Analysis
   /** The rewrite with the answers filled in so far. */
@@ -299,6 +301,8 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
         }),
       ]),
       ...(v.status ? [text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' })] : []),
+      // How long the last Rewrite took and what the prompt cache did (v0.52.0).
+      ...(v.timing ? [text(E, v.timing, { dimColor: true, wrap: 'wrap' })] : []),
     ],
     ...(v.analysis
       ? [
