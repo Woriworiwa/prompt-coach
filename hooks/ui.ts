@@ -279,25 +279,36 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Its rules come once its guide is added to sources.json and the weekly refresh runs.`, { color: 'warning' }))
   }
 
-  // The draft box has no label since v0.26.0.
-  out.push(v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }))
   // Quick instructions (v0.37.0): the model's own short lines, added to the prompt box (or, with a rewrite on screen, to the
   // rewrite) with one press and taken out with another, no analysis needed. Plain buttons whose look never changes.
   if (v.quick.length) out.push(quickRow(E, v, a))
-  // Rewrite (the analyze button) sits under the draft it reads, always active and always the primary style: it used to
-  // drop to the plain style once a rewrite existed, which read as grayed out in Desktop (v0.25.3).
+  // The draft and Rewrite share a box of their own, under the quick instructions and styled like them (v0.47.0, Omar:
+  // they read as unrelated apart). The draft has no label since v0.26.0. Rewrite (the analyze button) is always active
+  // and always the primary style: it used to drop to the plain style once a rewrite existed, which read as grayed out in
+  // Desktop (v0.25.3).
   out.push(
-    row(E, [
-      E.Button({
-        key: 'analyze',
-        label: v.isRunning ? 'Rewriting…' : 'Rewrite',
-        hotkey: 'a',
-        variant: 'primary',
-        onPress: a.analyze,
-      }),
-    ]),
+    E.Box({
+      key: 'draft',
+      flexDirection: 'column',
+      borderStyle: 'round',
+      borderColor: 'subtle',
+      paddingX: 1,
+      gap: 1,
+      children: [
+        v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }),
+        row(E, [
+          E.Button({
+            key: 'analyze',
+            label: v.isRunning ? 'Rewriting…' : 'Rewrite',
+            hotkey: 'a',
+            variant: 'primary',
+            onPress: a.analyze,
+          }),
+        ]),
+        ...(v.status ? [text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' })] : []),
+      ],
+    }),
   )
-  if (v.status) out.push(text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' }))
   // The rewrite sits right under the draft, so the two read side by side; Send right under it (Copy to prompt went in v0.29.0)
   // (v0.26.0), then the gap questions, then the suggestions to add.
   if (v.analysis) {

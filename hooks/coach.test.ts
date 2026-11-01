@@ -2049,6 +2049,11 @@ test('Quick instructions: the session model\'s buttons sit above Rewrite; a pres
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
+  // The draft and Rewrite share their own box, under the quick instructions (v0.47.0).
+  const draftBox = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
+  expect(draftBox).toContain('why does the login fail?')
+  expect(draftBox).toContain('"analyze"')
+  expect(JSON.stringify(boxNode(await ui.drawn(), 'quick'))).not.toContain('"analyze"')
   // Show or Hide sits at the bottom of the box, after the buttons (v0.46.0).
   const quickText = JSON.stringify(boxNode(await ui.drawn(), 'quick'))
   expect(quickText.indexOf('"quick-toggle"')).toBeGreaterThan(quickText.indexOf('quick-1-Short why'))
