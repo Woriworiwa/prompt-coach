@@ -2054,7 +2054,8 @@ test('Quick instructions: the session model\'s buttons sit under the draft and R
   expect(await ui.find({ text: '+ Answer directly' })).toBeDefined()
   expect(await ui.find({ text: '+ Short why' })).toBeDefined()
   expect(await ui.find({ text: '\u201cAnswer directly.\u201d' })).toBeUndefined()
-  // The draft, Rewrite and the quick instructions share one box (v0.49.0).
+  // The draft, Rewrite and the quick instructions share one box (v0.49.0), titled Append quick instructions (v0.50.0).
+  expect(await ui.find({ text: 'Append quick instructions' })).toBeDefined()
   const draftBox = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
   expect(draftBox).toContain('why does the login fail?')
   expect(draftBox).toContain('"analyze"')
@@ -2092,8 +2093,9 @@ test('Quick instructions: with a rewrite on screen a press adds the line to the 
   await ui.press({ key: 'analyze' })
   const rewrite = parseAnalysis(ANALYSIS)!.rewrite
   expect(await ui.find({ text: 'A press adds the line to the rewrite; Show lists what each adds.' })).toBeDefined()
-  // The rewrite and Send sit at the bottom of the same box, after the quick instructions (v0.49.0).
+  // In the same box: the rewrite, then the quick instructions, then Send last (v0.50.0).
   const box = JSON.stringify(boxNode(await ui.drawn(), 'draft'))
+  expect(box.indexOf('quick-toggle')).toBeGreaterThan(box.indexOf(JSON.stringify(rewrite).slice(1, -1)))
   expect(box.indexOf('"apply"')).toBeGreaterThan(box.indexOf('quick-toggle'))
   await ui.press({ key: 'quick-1-Short why' })
   // The box is untouched; the rewrite carries the line.

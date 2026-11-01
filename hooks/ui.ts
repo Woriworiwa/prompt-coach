@@ -279,13 +279,13 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
     out.push(text(E, `No rules for ${v.modelLabel} yet, so only the general rules apply. Its rules come once its guide is added to sources.json and the weekly refresh runs.`, { color: 'warning' }))
   }
 
-  // One box (v0.49.0, Omar; two boxes in v0.47.0–v0.48.0): the draft (no label since v0.26.0) and Rewrite, then the
-  // quick instructions, then, once there is one, the rewrite and Send at the bottom. Rewrite (the analyze button) is
-  // always active and always the primary style: it used to drop to the plain style once a rewrite existed, which read
-  // as grayed out in Desktop (v0.25.3). Quick instructions (v0.37.0): the model's own short lines, added to the prompt
-  // box (or, with a rewrite on screen, to the rewrite) with one press and taken out with another, no analysis needed.
-  // The rewrite, its gap questions and suggestions sit just above Send, so Send stays with what it sends and comes last
-  // (Copy to prompt went in v0.29.0).
+  // One box (v0.49.0, Omar; two boxes in v0.47.0–v0.48.0): the draft (no label since v0.26.0) and Rewrite; then, once
+  // there is one, the rewrite with its gap questions and suggestions; then the quick instructions and Send last (the
+  // quick instructions at the bottom since v0.50.0, Omar). Rewrite (the analyze button) is always active and always the
+  // primary style: it used to drop to the plain style once a rewrite existed, which read as grayed out in Desktop
+  // (v0.25.3). Quick instructions (v0.37.0): the model's own short lines, appended to the prompt box (or, with a rewrite
+  // on screen, to the rewrite) with one press and taken out with another, no analysis needed. Copy to prompt went in
+  // v0.29.0.
   const sections: RenderElement[][] = [
     [
       v.draft.trim() ? code(E, v.draft) : text(E, 'Type in the prompt box. The coach reads it before you send.', { dimColor: true }),
@@ -300,7 +300,6 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
       ]),
       ...(v.status ? [text(E, v.status, { color: v.status.startsWith('Rewriting') ? 'suggestion' : 'warning' })] : []),
     ],
-    ...(v.quick.length ? [[quickRow(E, v, a)]] : []),
     ...(v.analysis
       ? [
           [
@@ -310,12 +309,15 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
             ...(v.analysis.additions.length
               ? [E.Box({ key: 'suggestions', flexDirection: 'column', gap: 1, children: v.analysis.additions.map((s, i) => suggestion(E, v, a, s, i)) })]
               : []),
-            // Send fills the prompt box and sends; the box's last control.
-            row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })]),
           ],
         ]
       : []),
-  ]
+    [
+      ...(v.quick.length ? [quickRow(E, v, a)] : []),
+      // Send fills the prompt box and sends; the box's last control.
+      ...(v.analysis ? [row(E, [E.Button({ key: 'apply', label: 'Send', hotkey: 'p', variant: 'primary', onPress: a.apply })])] : []),
+    ],
+  ].filter(s => s.length)
   out.push(
     E.Box({
       key: 'draft',
@@ -339,7 +341,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 }
 
 /**
- * The quick instructions, a section of the draft's box since v0.49.0, with Show or Hide (v0.44.0, Omar: the dim
+ * The quick instructions ("Append quick instructions" since v0.50.0), a section of the draft's box since v0.49.0, with Show or Hide (v0.44.0, Omar: the dim
  * lines of v0.43.0 sat too far from their buttons). Closed, as it starts, the
  * buttons wrap in a row (Omar picked this over a box with only its title,
  * v0.45.0). Shown, each button sits on its own row with the sentence it adds
@@ -349,7 +351,7 @@ function coachTab(E: UI, v: View, a: Actions, F?: Form): RenderElement[] {
 function quickRow(E: UI, v: View, a: Actions): RenderElement {
   const where = v.analysis ? 'the rewrite' : 'your prompt'
   const button = (q: QuickInstruction, i: number) => E.Button({ key: `quick-${i}-${q.label}`, label: `+ ${q.label}`, onPress: () => void a.toggleQuick(i) })
-  const head = text(E, 'Quick instructions', { weight: 'semibold' })
+  const head = text(E, 'Append quick instructions', { weight: 'semibold' })
   const foot = (hint: string) =>
     E.Box({
       key: 'quick-foot',
