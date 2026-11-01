@@ -2214,15 +2214,18 @@ test('A newer model borrows the newest older file of its family, and the pane sa
 
 describe('rewrite timing', () => {
   test('rewriteTiming says how long a Rewrite took and what the prompt cache did', () => {
-    const none = { cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
-    expect(rewriteTiming(4230, { ...none, cache_read_input_tokens: 12345 })).toBe('Rewritten in 4.2 s · cache hit, 12,345 tokens read from it')
-    expect(rewriteTiming(6000, { ...none, cache_creation_input_tokens: 2100 })).toBe('Rewritten in 6.0 s · no cache hit; 2,100 tokens cached for a Rewrite in the next 5 minutes')
-    expect(rewriteTiming(900, none)).toBe("Rewritten in 0.9 s · no cache hit; nothing cached (the rules are under the model's minimum)")
+    // Tokens in count every input token, cached or not (v0.53.0).
+    const none = { input_tokens: 655, output_tokens: 640, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+    expect(rewriteTiming(4230, { ...none, cache_read_input_tokens: 12345 })).toBe('Rewritten in 4.2 s · cache hit, 12,345 tokens read from it · 13,000 tokens in, 640 out')
+    expect(rewriteTiming(6000, { ...none, cache_creation_input_tokens: 2100 })).toBe(
+      'Rewritten in 6.0 s · no cache hit; 2,100 tokens cached for a Rewrite in the next 5 minutes · 2,755 tokens in, 640 out',
+    )
+    expect(rewriteTiming(900, none)).toBe("Rewritten in 0.9 s · no cache hit; nothing cached (the rules are under the model's minimum) · 655 tokens in, 640 out")
     expect(rewriteTiming(-5)).toBe('Rewritten in 0.0 s')
   })
 })
 
-test('after each Rewrite the pane shows how long it took and whether the cache was hit; a send clears it (v0.52.0)', async ($, on) => {
+test('after each Rewrite the pane shows how long it took, whether the cache was hit and the tokens used; a send clears it (v0.52.0)', async ($, on) => {
   const { s } = world(on, { cacheRead: 1200 })
   s.box = 'fix the login thing'
   await $.session.start(START)
@@ -2230,7 +2233,7 @@ test('after each Rewrite the pane shows how long it took and whether the cache w
   const ui = await $.ui.mount(pane('desktop'))
   expect(await ui.find({ text: /^Rewritten in/ })).toBeUndefined()
   await ui.press({ key: 'analyze' })
-  const line = await ui.find({ text: /^Rewritten in \d+\.\d s · cache hit, 1,200 tokens read from it$/ })
+  const line = await ui.find({ text: /^Rewritten in \d+\.\d s · cache hit, 1,200 tokens read from it · 1,201 tokens in, 1 out$/ })
   expect(line).toBeDefined()
   expect(JSON.stringify(boxNode(await ui.drawn(), 'draft'))).toContain('Rewritten in')
   await ui.press({ key: 'apply' })
