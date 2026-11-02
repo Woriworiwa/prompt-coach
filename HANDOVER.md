@@ -155,4 +155,8 @@ Run the second line again with Desktop's bundled binaries, `~/Library/Applicatio
 - Coach: Send submits; changing a model under Settings saves it (the reload after it may reset an open analysis); the gap dropdowns and fields work, including Enter in an empty field; the ⓘ hover reveal (Omar said he'd test this himself); an Analyze on a reply such as "go with option 2" uses Claude's last reply; the colors look right overall.
 - The weekly refresh task (`prompt-coach-rules-refresh`, created 2026-10-31, saved in Auto mode): its first run, Monday 2026-11-02 10:05, should end in "No source page changed" with no commit; later, read its first PR against the pages before merging. If Auto mode's classifier stops its push or `gh pr create`, the run report says so.
 
+**Planned, not started** (Omar's ideas, 2026-11-02; not to be worked on until he says):
+1. Research prompt styles: how other people write prompts, for example conversational versus structured.
+2. A script or instructions that scan Omar's session files (the transcripts) and work out his prompt style; then adapt the Coach tab's layout to that style. Builds on 1.
+
 **Ideas, only if Omar asks:** publish to GitHub and the mods gallery, an opener button in the band above the prompt, a `/handover` skill (not needed now that this file is kept current as you go).
