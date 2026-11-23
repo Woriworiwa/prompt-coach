@@ -2,7 +2,7 @@
 
 Source, paraphrased:
 - Anthropic, "Prompting Claude Haiku 5.5": https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5
-As of: 2026-10-21
+As of: 2026-11-23
 
 ## Scope
 - For a longer task, say to keep working until everything requested is done, and to stop only to ask when blocked or before a risky step.
@@ -19,6 +19,7 @@ As of: 2026-10-21
 ## Remove
 - Remove "answer directly" if it is meant to stop thinking; it does not.
 - Remove blanket orders to search on every present-day question regardless of confidence; they add needless searches without better answers.
+- Remove requests to write out its thinking or reasoning in the reply; Haiku 5.5 may decline the whole request for them, and sending it again usually gets the same refusal, so change the prompt instead.
 
 ## Quick instructions
 - Run to completion: Keep working until everything is done; stop only when blocked or before a risky step. Source: "Prevent early stopping in long agent prompts"
